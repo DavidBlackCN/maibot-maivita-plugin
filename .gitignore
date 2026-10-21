@@ -1,0 +1,42 @@
+# Local environments and editor settings
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+.agents/
+.codex/
+.aws/
+
+# Private configuration and runtime data
+config.toml
+model_config.toml
+.env*
+*.db*
+*.sqlite*
+*.lock
+*.log
+*.pem
+*.key
+data/
+llm_logs/
+images/
+
+# Local archives and validation assets
+/docs/development/
+/development/
+/.integration/
+/evidence/
+/dist/
+/tests/
+/integration_tests/
+/requirements-dev.txt
+/requirements-i0.txt
+/tools/*
+!/tools/convert_config.py
+!/tools/r0_migrate.py
+!/tools/requirements.txt
