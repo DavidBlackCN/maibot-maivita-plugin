@@ -1,0 +1,69 @@
+{
+  "schema_version": 2,
+  "required_capabilities": [
+    "declarative_basic"
+  ],
+  "pages": [
+    {
+      "id": "status",
+      "title": "MaiVita integration status",
+      "mode": "declarative",
+      "description": "Public state only. Privileged writes and Owner Auth are unavailable.",
+      "queries": {
+        "state": {
+          "api": "get_life_state"
+        },
+        "plan": {
+          "api": "get_plan"
+        },
+        "availability": {
+          "api": "get_availability"
+        },
+        "diagnostics": {
+          "api": "get_diagnostics"
+        },
+        "legacy": {
+          "api": "get_current_activity"
+        },
+        "engine": {
+          "api": "get_engine_status"
+        },
+        "contracts": {
+          "api": "get_integration_contract"
+        }
+      },
+      "actions": {
+        "denied_replan": {
+          "api": "request_replan"
+        },
+        "denied_wake": {
+          "api": "request_wakeup"
+        }
+      },
+      "content": [
+        {
+          "type": "text",
+          "value": "Isolated integration candidate; privileged writes remain disabled."
+        },
+        {
+          "type": "text",
+          "label": "Sleep phase",
+          "value": {
+            "scope": "query",
+            "source": "state",
+            "field": "data.sleep_phase"
+          }
+        },
+        {
+          "type": "text",
+          "label": "State version",
+          "value": {
+            "scope": "query",
+            "source": "state",
+            "field": "state_version"
+          }
+        }
+      ]
+    }
+  ]
+}

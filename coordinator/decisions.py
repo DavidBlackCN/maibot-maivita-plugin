@@ -1,5 +1,6 @@
 """One in-flight model call per character; persisted basis and budget audit."""
 import asyncio
+import json
 from datetime import timedelta
 from uuid import uuid4
 
@@ -24,6 +25,14 @@ class DecisionCoordinator:
         # outcomes count toward budget and are never retried automatically.
         with self.engine.database.unit_of_work() as u:
             u.connection.execute("UPDATE decision_runs SET status='abandoned',diagnostic='process_restart_unknown_outcome' WHERE status='running'")
+            # Compatibility with earlier runtimes which acknowledged a durable
+            # trigger only AFTER awaiting the model. Any persisted attempt has
+            # already spent its opportunity, including uncertain/cancelled ones.
+            for row in u.connection.execute('SELECT character_id,trigger_ids_json FROM decision_runs'):
+                for trigger in json.loads(row[1]):
+                    if isinstance(trigger,str) and trigger.startswith('batch:'):
+                        u.connection.executemany('UPDATE decision_triggers SET consumed=1 WHERE trigger_id=? AND character_id=?',
+                                                 [(key,row[0]) for key in trigger[6:].split(',') if key])
             u.commit()
 
     async def request(self, trigger_id, *, character_id='default'):
@@ -50,8 +59,24 @@ class DecisionCoordinator:
             if len(recent) >= self.daily_budget: return {'status':'budget_exhausted'}
             if recent and to_epoch_ms(now)-max(r[0] for r in recent) < self.cooldown*1000: return {'status':'cooldown'}
             triggers = sorted(self.pending.pop(char,set()))
+            durable=set()
+            explicit=[]
+            for trigger in triggers:
+                if not trigger.startswith('batch:'):
+                    explicit.append(trigger)
+                    continue
+                for key in trigger[6:].split(','):
+                    row=u.connection.execute('SELECT consumed FROM decision_triggers WHERE trigger_id=? AND character_id=?',(key,char)).fetchone()
+                    require(row is not None,'unknown durable decision trigger')
+                    if not row[0]: durable.add(key)
+            triggers=sorted(explicit+(['batch:'+','.join(sorted(durable))] if durable else []))
+            if not triggers: return {'status':'no_triggers'}
             u.connection.execute('INSERT INTO decision_runs (decision_id,character_id,basis_state_version,basis_plan_version,basis_config_revision,started_at_ms,trigger_ids_json,status) VALUES (?,?,?,?,?,?,?,?)',
                 (decision_id,char,state.state_version,state.plan_version,state.config_revision,to_epoch_ms(now),json_text(triggers),'running'))
+            # Claim exactly the persisted batch in the SAME transaction as its
+            # attempt record, before crossing the uncertain external RPC edge.
+            u.connection.executemany('UPDATE decision_triggers SET consumed=1 WHERE trigger_id=? AND character_id=?',
+                                     [(key,char) for key in sorted(durable)])
             u.commit()
         self.last_monotonic[char] = mono
         try:

@@ -1,0 +1,160 @@
+[
+  {
+    "kind": "Tool",
+    "name": "manage_goal_v4",
+    "handler": "handle_manage_goal",
+    "parameters": [
+      {
+        "name": "'action'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'操作类型: create / list / get / update / pause / resume / complete / cancel / delete'",
+        "required": "True"
+      },
+      {
+        "name": "'goal_id'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'目标 ID（除 create 和 list 外都需要）'",
+        "required": "False"
+      },
+      {
+        "name": "'name'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'目标名称（create 时必需）'",
+        "required": "False"
+      },
+      {
+        "name": "'description'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'目标描述（create 时必需）'",
+        "required": "False"
+      },
+      {
+        "name": "'goal_type'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'目标类型: health_check / social_maintenance / learn_topic / custom'",
+        "required": "False"
+      },
+      {
+        "name": "'priority'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'优先级: high / medium / low'",
+        "required": "False"
+      },
+      {
+        "name": "'time_window'",
+        "param_type": "ToolParamType.STRING",
+        "description": "\"时间窗口，格式 'HH:MM-HH:MM'（如 '09:00-10:30'）\"",
+        "required": "False"
+      },
+      {
+        "name": "'deadline_hours'",
+        "param_type": "ToolParamType.FLOAT",
+        "description": "'截止时间（从现在开始的小时数）'",
+        "required": "False"
+      },
+      {
+        "name": "'parameters'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'目标参数（JSON 字符串）'",
+        "required": "False"
+      }
+    ]
+  },
+  {
+    "kind": "Tool",
+    "name": "get_planning_status_v4",
+    "handler": "handle_get_planning_status",
+    "parameters": [
+      {
+        "name": "'detailed'",
+        "param_type": "ToolParamType.BOOLEAN",
+        "description": "'是否显示详细信息'",
+        "required": "False"
+      }
+    ]
+  },
+  {
+    "kind": "Tool",
+    "name": "generate_schedule_v4",
+    "handler": "handle_generate_schedule",
+    "parameters": [
+      {
+        "name": "'schedule_type'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'日程类型: daily / weekly / monthly'",
+        "required": "True"
+      },
+      {
+        "name": "'auto_apply'",
+        "param_type": "ToolParamType.BOOLEAN",
+        "description": "'是否立即应用日程（默认 true）'",
+        "required": "False"
+      }
+    ]
+  },
+  {
+    "kind": "Tool",
+    "name": "apply_schedule_v4",
+    "handler": "handle_apply_schedule",
+    "parameters": [
+      {
+        "name": "'schedule_data'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'日程数据（从 generate_schedule 获取，JSON 字符串）'",
+        "required": "True"
+      }
+    ]
+  },
+  {
+    "kind": "Tool",
+    "name": "update_schedule_v4",
+    "handler": "handle_update_schedule",
+    "parameters": [
+      {
+        "name": "'description'",
+        "param_type": "ToolParamType.STRING",
+        "description": "'日程变更的自然语言描述（如\"下午两点一起学习\"、\"周末打游戏\"）'",
+        "required": "True"
+      }
+    ]
+  },
+  {
+    "kind": "Command",
+    "name": "planning_v4",
+    "handler": "handle_planning_command",
+    "parameters": [],
+    "pattern": "(?P<planning_cmd>^/(plan|规划).*$)"
+  },
+  {
+    "kind": "EventHandler",
+    "name": "autonomous_planner_v4",
+    "handler": "handle_on_start",
+    "parameters": []
+  },
+  {
+    "kind": "API",
+    "name": "get_current_activity",
+    "handler": "api_get_current_activity",
+    "parameters": [],
+    "version": "1",
+    "public": true
+  },
+  {
+    "kind": "HookHandler",
+    "name": "maisaka.planner.before_request",
+    "handler": "handle_inject_schedule",
+    "parameters": []
+  },
+  {
+    "kind": "HookHandler",
+    "name": "maisaka.replyer.before_request",
+    "handler": "handle_inject_replyer",
+    "parameters": []
+  },
+  {
+    "kind": "HookHandler",
+    "name": "send_service.before_send",
+    "handler": "handle_sleep_silence",
+    "parameters": []
+  }
+]

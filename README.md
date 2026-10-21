@@ -1,204 +1,107 @@
 # maibot-maivita-plugin
 
-MaiVita 是一个 MaiBot 插件，为麦麦提供自主日程规划、当前活动感知和固定睡眠能力。插件根据角色人设、近期聊天、历史日程和已确认约定生成生活安排，并向 planner、replyer 提供角色当前正在做什么的上下文。
+MaiVita 是 MaiBot 的生活状态引擎，维护角色共享的当前活动、计划、睡眠和历史事件，为 planner、replyer 与其他插件提供一致的公开生活上下文。
 
-- 当前版本：`0.1.0`
-- MaiBot：`1.2.3–1.99.99`（Manifest 声明范围）
-- Plugin SDK：`2.15.0–2.99.99`（Manifest 声明范围）
-- 配置版本：`1`
+- 当前版本：`0.3.0`
+- Host：`1.3.12`，固定提交 `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`
+- Plugin SDK：`2.15.0`
+- 配置版本：`3`；SQLite Schema：`4`；跨插件契约：`1.0.0`
 - 项目地址：[DavidBlackCN/maibot-maivita-plugin](https://github.com/DavidBlackCN/maibot-maivita-plugin)
 
-声明范围不代表其中所有版本均已完成兼容确认。当前入口保留日程与固定睡眠，自主睡眠和混合规划尚未接入。可信管理回执、频率归属撤销和 Owner Auth 身份接口未接通，相应能力拒绝例外发送、停用调频或拒绝身份授权。当前不支持直接接管已有生产实例。
+本版用于独立实例与超级 MaiBot 核心插件联合测试。Integration Ready 必须以[验收报告](docs/development/I1_INTEGRATION_READY_REPORT.md)的实际自动化结果为准，不代表生产切换许可。长期观察和真实生态联调统一在联合测试阶段进行，完成本轮后冻结独立功能开发。
 
 ## 功能
 
-### 自主日程生成
+### 单一生活状态
 
-- 使用 MaiBot 模型路由生成符合角色人设、兴趣和生活阶段的日程。
-- 将近期聊天、历史日程、知识库与已确认约定分层提供给模型。
-- 支持定时生成、手动重新生成和临时附加自然语言要求。
-- 允许休息、通勤和自由时间，不强制填满全天。
-- 使用统一生成协调器，避免命令、Tool 和自动调度重复生成。
+- 各聊天流读取同一持久生活状态，公开摘要不暴露私密约定或来源。
+- 严格区分计划、实际活动、睡眠会话与历史事件；模型不能补造实际历史、授权或履约证据。
+- 以状态版本、幂等命令与 SQLite 事务保护状态/历史/outbox 原子一致。
+- 重启按已提交 deadline 恢复；无法观察的停机活动保持未知。
 
-### 程序级固定睡眠
+### 规划与睡眠
 
-实际睡眠窗口由 `compatibility.legacy_sleep_start_time` 和 `legacy_sleep_end_time` 指定：
+- 正式 lifecycle 接入现有 R1–R4 Life Runtime、混合规划、睡眠、连续性与查询模块。
+- 模型通过 SDK `llm.generate` 显式任务/模型路由，严格 JSON、候选校验、预算、超时和陈旧结果拒绝；不自动重试未知结果。
+- 查询不调用模型；睡眠计时独立恢复，模型不定时轮询睡眠状态。
+- 旧固定睡眠引擎作为 `legacy` 配置选项保留，必须经过受控离线切换。
 
-```toml
-[sleep]
-mode = "legacy_fixed"
+### 宿主接线与安全降级
 
-[compatibility]
-legacy_sleep_start_time = "01:00"
-legacy_sleep_end_time = "08:00"
-```
-
-睡眠活动由程序锁定时间和内部标记，自然描述由模型生成。缺失、重复、时间非法或与普通活动冲突的日程会被修正或拒绝应用；支持 `23:00–07:00` 等跨午夜窗口。时间起点为 `00:00–23:59`，区间终点额外支持 `24:00`。
-
-`routine.preferred_sleep_time` / `preferred_wake_time` 不改变当前入口的固定窗口。关闭固定睡眠使用 `sleep.mode = "disabled"`。
-
-### 严格校验与安全落库
-
-```text
-上下文构建 → 模型生成 → 解析与归一化 → 固定睡眠约束 → 日程校验 → 应用前检查 → 批量落库
-```
-
-非法时间、活动重叠、睡眠冲突和约定丢失等错误会阻止应用。批量创建失败时补偿回滚，避免留下半份日程。配置不兼容、数据目录不明确、已有旧插件写入或写入锁被占用时拒绝启动。
-
-### 当前活动与睡眠静默
-
-- 向 `maisaka.planner.before_request` 和 `maisaka.replyer.before_request` 注入当前活动。
-- 提供当前活动插件 API，返回活动、后续安排与 `sleeping/awake` 状态。
-- 睡眠期间暂停本插件的主动消息，并通过 `send_service.before_send` 阻断模型出站消息。
-- 缺少可信发送回执时，命令回复不享有睡眠静默例外。
-- 缺少按插件归属撤销的频率接口时，不修改 Host 全局频率值；配置中的频率系数不能视为已生效。
-
-### 人设更新与兼容路由
-
-角色配置更新后重新读取 bot profile，后续日程使用新的昵称、人设和兴趣。新旧完整当前活动 API 路由保留；不要同时启用旧完整规划插件。
+- API、只读 Tool、命令和 Hook 使用真实 SDK/Runner 注册。
+- 新旧完整当前活动 API 路由投影到唯一被选引擎。
+- 无可信管理回执时，睡眠发送不设例外；无归属撤销接口时，调频关闭。
+- Owner Auth、统一策略和主动社交尚无已核实传输，接口形状冻结，功能关闭；管理写入安全拒绝，不从提示词或参数推导权限。
 
 ## 安装
 
-### 1. 放置插件
-
-将仓库克隆到 MaiBot 的插件目录：
-
-```bash
-git clone https://github.com/DavidBlackCN/maibot-maivita-plugin.git
-```
-
-```text
-MaiBot/
-└── plugins/
-    └── maibot-maivita-plugin/
-        ├── _manifest.json
-        ├── plugin.py
-        ├── config_models.py
-        └── config.example.toml
-```
-
-停止旧完整规划插件，使用独立实例和空数据目录首次安装；不要从旧实例复制运行数据库或凭据。
-
-### 2. 创建配置
-
-根据 [`config.example.toml`](config.example.toml) 创建新的 `config.toml`，保留 `config_version = "1"`。启用前至少填写共享写入锁路径和管理员 ID：
+1. 使用新的隔离 Host 实例，检查上述固定 Host/SDK。官方 Host 锁文件可能仍为 SDK 2.12.0，需在独立环境明确安装 2.15.0，不修改 Host 源码或锁文件。
+2. 将仓库或已通过门禁的包放入插件目录，同一实例只保留一个 MaiVita ID；停止旧完整规划插件。
+3. 从 [config.example.toml](config.example.toml) 新建配置。默认禁用，显式填写实例确认、绝对共享写入锁与会话白名单后再启用。
 
 ```toml
 [plugin]
 enabled = true
-config_version = "1"
+config_version = "3"
 
-[admin]
-legacy_admin_users = ["your-user-id"]
+[engine]
+mode = "life"
 
-[storage]
-data_dir = ""
+[instance]
+acknowledgement = "isolated-test-instance"
 writer_lock = "D:/MaiBot/instance-locks/maivita.lock"
+allowed_streams = ["your-dedicated-stream-id"]
+timezone = "Asia/Shanghai"
+frequency_enabled = false
+owner_auth_enabled = false
+privileged_writes_enabled = false
 ```
 
-`writer_lock` 必须是绝对路径；同一部署的所有 MaiVita 代码或数据目录共用此路径。持久化目录优先使用宿主注入的绝对 `ctx.paths.data_dir`，否则必须显式配置绝对 `storage.data_dir`。没有明确数据目录就拒绝启动，不回退到源码目录。
+模型提供方和密钥只在 Host 专用 `model_config.toml` 中管理。详见[安装与引擎切换](docs/INSTALL.md)。配置 1/2 不自动升级，不能只改版本号或复制旧运行数据库。
 
-管理员列表为空时，默认拒绝 `/plan` 命令。`compatibility.legacy_empty_admin_all` 仅保留旧配置的开放命令语义，不代表 Owner 身份授权。
+## 命令与 Tool
 
-### 3. 检查模型并启动
+life 模式支持 `/maivita`、`/plan`、`/规划` 的以下只读查询，限明确白名单内会话。命令走正常发送权限，睡眠时不会唤醒或绕过静默。
 
-默认使用 MaiBot 的 `replyer` 模型任务：
-
-```toml
-[models.strategic]
-mode = "task"
-task = "replyer"
-model = ""
-```
-
-模型提供方和密钥由 Host 的 `model_config.toml` 管理，不写入插件配置。确认宿主已授权 Manifest 所需能力，再启动 MaiBot。数据库、模型日志和图片位于持久化数据目录中的 `goals.db`、`llm_logs/`、`images/`。
-
-### 从旧版本更新
-
-先停用旧实例并备份旧配置与数据库，再使用新版示例重建配置。不能只改配置版本号，也不能用旧配置整体覆盖新配置。仅 `5.1.0` 格式可用转换器处理明确指定的配置副本：
-
-```bash
-python -m pip install -r tools/requirements.txt
-python tools/convert_config.py old-config-copy.toml new-config-copy.toml
-```
-
-转换器拒绝未知字段、不覆盖已有目标、不更改源文件；结果仍需检查数据目录、共享写入锁和权限。转换配置不等于迁移数据库或启用新引擎。
-
-## 命令
-
-命令入口支持 `/plan` 和 `/规划`，子命令使用英文，受管理员配置和会话范围约束。
-
-| 命令 | 说明 |
+| 子命令 | 说明 |
 |---|---|
-| `/plan`、`/plan help` | 显示帮助 |
-| `/plan status` | 查看今日日程 |
-| `/plan list` | 图片展示日程，失败时回退文字 |
-| `/plan frequency`、`/plan freq` | 查看频率配置与 Host 当前值；不表示拥有调频权限 |
-| `/plan regenerate` | 后台重新生成今日日程，立即返回任务信息 |
-| `/plan regenerate <额外要求>` | 为本次生成附加自然语言要求 |
-| `/plan delete <序号或 goal_id>` | 删除指定目标 |
-| `/plan clear [days]` | 清理旧日程，默认保留今天 |
+| `status` | 当前公开活动和睡眠状态 |
+| `plan` | 计划和公开安排 |
+| `availability` | 忙闲与下次到期时间 |
+| `diagnostics` | 版本、降级、最近模型状态 |
 
-也提供日程生成、应用、状态查询、目标管理与日程更新 Tool。命令与 Tool 共用校验、生成互斥和持久化逻辑。
+`maivita_status` Tool 提供同样的公开查询；旧状态 Tool 和当前活动 API 保留兼容。旧变更 Tool、重规划/唤醒管理 API 当前明确拒绝。legacy 模式注册旧组件，并在正式边界限制为只读命令/Tool；不伪造新版 LifeState。
 
-## 配置
-
-完整字段和默认值见 [`config.example.toml`](config.example.toml)，配置校验由 `config_models.py` 声明。
+## 配置与数据
 
 | 配置 | 说明 |
 |---|---|
-| `character.timezone` | IANA 时区，例如 `Asia/Shanghai` |
-| `character.life_context` | 角色生活阶段和长期背景 |
-| `planning.mode` | 当前仅接受 `legacy` |
-| `planning.daily_enabled` / `daily_trigger_time` | 自动生成开关和每日触发时间 |
-| `planning.history_days` | 日程历史回看天数 |
-| `planning.max_daily_items` | 每日日程条数上限 |
-| `models.generation_timeout` | 模型调用超时秒数 |
-| `models.generation_max_retries` | 明确 Provider 错误时的有限重试次数；能力 RPC 超时不自动重试 |
-| `models.strategic` | 模型任务路由或指定模型 |
-| `integration.allowed_streams` | 注入与命令会话范围，留空不限制 |
-| `integration.inject_schedule` / `inject_into_replyer` | planner / replyer 注入开关 |
-| `admin.legacy_admin_users` | 命令管理员 ID 列表，留空默认拒绝 |
-| `storage.writer_lock` | 同一部署共用的绝对写入锁路径 |
-| `storage.data_dir` | 无宿主数据目录时的绝对备用目录 |
-| `observability.model_logs_enabled` | 模型日志开关 |
+| `engine.mode` | `life` 或 `legacy`，不能在线直接切换 |
+| `instance.writer_lock` | 同一部署共用绝对路径，启用后绑定权威记录 |
+| `instance.allowed_streams` | 显式会话白名单，禁止通配符 |
+| `model.task_name` / `model_name` | Host 路由任务与可选模型名 |
+| `model.generate_on_start` | 每次加载请求一次决策，默认 false |
+| `model.daily_budget` | 协调器 24 小时请求预算，默认 8 |
+| `model.timeout_seconds` | 单次请求上限，默认 25 秒 |
+| `legacy` | 旧配置 1 的显式嵌套配置，仍需管理员；频率写入关闭 |
 
-指定具体模型时，使用 `mode = "model"` 和 Host 配置中的模型名称。此模式依赖 Host 内部模型接口，兼容性受宿主版本影响；任务路由仍为默认方式。
+SDK 授予的数据根中，`life/maivita.db` 与 `legacy/goals.db` 分离。`engine-authority.json` 指定唯一生效引擎，切换票据绑定源 revision、目标配置、共享锁与回滚快照。新旧调度器不能并行。
 
-## 公共 API
+## 备份与回滚
 
-| 完整路由 | 说明 |
-|---|---|
-| `davidblackcn.maibot-maivita-plugin.get_current_activity` | 当前活动与后续安排 |
-| `davidblackcn.maibot-autonomous-planning-plugin.get_current_activity` | 保留旧消费者兼容路由 |
+离线切换使用 `tools/switch_engine.py`，先取得共享锁、备份已有引擎库并校验，再生成新配置与票据；不覆盖源配置或自动启动 Host。回切需要新的反向票据，不将新库改名交给旧引擎。迁移只接受显式离线快照，歧义行保留并阻止自主激活。
 
-两个路由读取同一引擎。旧路由兼容不要求同时安装旧完整规划插件；启用双写入者会被拒绝。
+参阅[迁移计划](docs/development/MIGRATION_PLAN.md)、[回滚](docs/ROLLBACK.md)、[已知限制](docs/LIMITATIONS.md)和[接口契约](docs/CONTRACTS.md)。
 
-## 备份与恢复
+## 验证
 
-工具只读取显式指定的路径，没有默认业务数据路径：
-
-```bash
-python tools/r0_migrate.py dry-run --source /absolute/source/goals.db --output /absolute/snapshot/goals.db
-python tools/r0_migrate.py backup --source /absolute/source/goals.db --output /absolute/backup/goals.db
-python tools/r0_migrate.py restore --source /absolute/backup/goals.db --sha256 <SHA256> --output /absolute/restore/goals.db
+```text
+python -m pip install -r requirements-i0.txt
+python tools/verify_ready.py
 ```
 
-目标必须是源目录之外的新文件。备份采用 SQLite 一致快照并校验结构、完整性和 SHA-256；dry-run 只预检与准备快照，不激活数据迁移。恢复到独立空目录，不覆盖运行库，不拼接 WAL/SHM 文件。
+CI 无凭据运行静态、单元及固定原始 Runner 检查；完整 Host 与有限真模型在受控本地实例单独验收，不把 CI 通过冒充模型或生态验收。开发任务和历史报告保留在 [docs/development](docs/development/DEVELOPMENT_PLAN_R0-R4.md)。
 
-回退前先停止当前实例并保留新增记录，再使用匹配的旧程序、旧配置和已核验旧库。不要让新旧调度器并行，也不要把不同 Schema 的数据库改名后交给旧程序。
+## 鸣谢与许可
 
-## 更新记录
-
-版本变化见 [CHANGELOG](docs/CHANGELOG.md)，来源与继承关系见 [SOURCES](docs/SOURCES.md)。
-
-## 鸣谢
-
-- [MaiBot](https://github.com/Mai-with-u/MaiBot) 及其插件 SDK。
-- [DavidBlackCN/maibot-autonomous-planning-plugin](https://github.com/DavidBlackCN/maibot-autonomous-planning-plugin)，MaiVita 的直接代码基线。
-- [xuqian13/autonomous_planning_plugin](https://github.com/xuqian13/autonomous_planning_plugin)，原作者靓仔 / xuqian13 及历次贡献者。
-- [cateyemizuki/autonomous_planning_plugin](https://github.com/cateyemizuki/autonomous_planning_plugin)，SDK、Hook 与数据目录修复参考。
-
-## 许可
-
-[GNU Affero General Public License v3.0](LICENSE)
+感谢 [MaiBot](https://github.com/Mai-with-u/MaiBot)、[自主规划插件](https://github.com/DavidBlackCN/maibot-autonomous-planning-plugin)、[xuqian13](https://github.com/xuqian13/autonomous_planning_plugin) 和 [cateyemizuki](https://github.com/cateyemizuki/autonomous_planning_plugin)。保留原作者署名与 [AGPL-3.0](LICENSE)，完整来源见 [SOURCES](docs/SOURCES.md)，版本变化见 [CHANGELOG](docs/CHANGELOG.md)。

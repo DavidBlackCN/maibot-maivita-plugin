@@ -1,0 +1,363 @@
+{
+  "IdentityRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1.0.0",
+        "default": "1.0.0",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "request_id": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Request Id",
+        "type": "string"
+      },
+      "context_ref": {
+        "maxLength": 256,
+        "minLength": 1,
+        "title": "Context Ref",
+        "type": "string"
+      },
+      "action": {
+        "enum": [
+          "read_private",
+          "wake",
+          "interrupt_sleep",
+          "replan",
+          "configure"
+        ],
+        "title": "Action",
+        "type": "string"
+      },
+      "character_id": {
+        "const": "default",
+        "default": "default",
+        "title": "Character Id",
+        "type": "string"
+      },
+      "stream_id": {
+        "maxLength": 256,
+        "minLength": 1,
+        "title": "Stream Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "request_id",
+      "context_ref",
+      "action",
+      "stream_id"
+    ],
+    "title": "IdentityRequest",
+    "type": "object"
+  },
+  "IdentityDecision": {
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1.0.0",
+        "default": "1.0.0",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "request_id": {
+        "title": "Request Id",
+        "type": "string"
+      },
+      "verified": {
+        "title": "Verified",
+        "type": "boolean"
+      },
+      "subject_ref": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Subject Ref"
+      },
+      "issuer": {
+        "title": "Issuer",
+        "type": "string"
+      },
+      "stream_id": {
+        "title": "Stream Id",
+        "type": "string"
+      },
+      "issued_at": {
+        "format": "date-time",
+        "title": "Issued At",
+        "type": "string"
+      },
+      "expires_at": {
+        "format": "date-time",
+        "title": "Expires At",
+        "type": "string"
+      },
+      "proof_ref": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Proof Ref"
+      }
+    },
+    "required": [
+      "request_id",
+      "verified",
+      "subject_ref",
+      "issuer",
+      "stream_id",
+      "issued_at",
+      "expires_at",
+      "proof_ref"
+    ],
+    "title": "IdentityDecision",
+    "type": "object"
+  },
+  "PolicyRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1.0.0",
+        "default": "1.0.0",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "request_id": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Request Id",
+        "type": "string"
+      },
+      "context_ref": {
+        "maxLength": 256,
+        "minLength": 1,
+        "title": "Context Ref",
+        "type": "string"
+      },
+      "action": {
+        "enum": [
+          "read_private",
+          "wake",
+          "interrupt_sleep",
+          "replan",
+          "configure"
+        ],
+        "title": "Action",
+        "type": "string"
+      },
+      "character_id": {
+        "const": "default",
+        "default": "default",
+        "title": "Character Id",
+        "type": "string"
+      },
+      "stream_id": {
+        "maxLength": 256,
+        "minLength": 1,
+        "title": "Stream Id",
+        "type": "string"
+      },
+      "identity_proof_ref": {
+        "minLength": 1,
+        "title": "Identity Proof Ref",
+        "type": "string"
+      },
+      "state_version": {
+        "minimum": 0,
+        "title": "State Version",
+        "type": "integer"
+      },
+      "config_revision": {
+        "minimum": 0,
+        "title": "Config Revision",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "request_id",
+      "context_ref",
+      "action",
+      "stream_id",
+      "identity_proof_ref",
+      "state_version",
+      "config_revision"
+    ],
+    "title": "PolicyRequest",
+    "type": "object"
+  },
+  "PolicyDecision": {
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1.0.0",
+        "default": "1.0.0",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "request_id": {
+        "title": "Request Id",
+        "type": "string"
+      },
+      "allowed": {
+        "title": "Allowed",
+        "type": "boolean"
+      },
+      "reason_code": {
+        "title": "Reason Code",
+        "type": "string"
+      },
+      "state_version": {
+        "minimum": 0,
+        "title": "State Version",
+        "type": "integer"
+      },
+      "config_revision": {
+        "minimum": 0,
+        "title": "Config Revision",
+        "type": "integer"
+      },
+      "expires_at": {
+        "format": "date-time",
+        "title": "Expires At",
+        "type": "string"
+      }
+    },
+    "required": [
+      "request_id",
+      "allowed",
+      "reason_code",
+      "state_version",
+      "config_revision",
+      "expires_at"
+    ],
+    "title": "PolicyDecision",
+    "type": "object"
+  },
+  "SocialEvent": {
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1.0.0",
+        "default": "1.0.0",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "event_id": {
+        "title": "Event Id",
+        "type": "string"
+      },
+      "character_id": {
+        "const": "default",
+        "default": "default",
+        "title": "Character Id",
+        "type": "string"
+      },
+      "event_type": {
+        "enum": [
+          "life.wakeup",
+          "life.activity.started",
+          "life.activity.ended",
+          "life.sleep.started",
+          "life.plan.revised"
+        ],
+        "title": "Event Type",
+        "type": "string"
+      },
+      "state_version": {
+        "minimum": 0,
+        "title": "State Version",
+        "type": "integer"
+      },
+      "event_index": {
+        "minimum": 0,
+        "title": "Event Index",
+        "type": "integer"
+      },
+      "occurred_at": {
+        "format": "date-time",
+        "title": "Occurred At",
+        "type": "string"
+      },
+      "recorded_at": {
+        "format": "date-time",
+        "title": "Recorded At",
+        "type": "string"
+      },
+      "expires_at": {
+        "format": "date-time",
+        "title": "Expires At",
+        "type": "string"
+      },
+      "visibility": {
+        "const": "public_summary",
+        "default": "public_summary",
+        "title": "Visibility",
+        "type": "string"
+      },
+      "summary": {
+        "maxLength": 500,
+        "title": "Summary",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id",
+      "event_type",
+      "state_version",
+      "event_index",
+      "occurred_at",
+      "recorded_at",
+      "expires_at",
+      "summary"
+    ],
+    "title": "SocialEvent",
+    "type": "object"
+  },
+  "SocialAck": {
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1.0.0",
+        "default": "1.0.0",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "event_id": {
+        "title": "Event Id",
+        "type": "string"
+      },
+      "consumer_id": {
+        "title": "Consumer Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "accepted",
+          "duplicate",
+          "expired",
+          "rejected"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id",
+      "consumer_id",
+      "status"
+    ],
+    "title": "SocialAck",
+    "type": "object"
+  }
+}

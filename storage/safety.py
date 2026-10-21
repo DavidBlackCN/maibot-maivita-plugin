@@ -175,3 +175,10 @@ class WriterLease:
         if self.file is not None:
             self.file.close()
             self.file = None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *_):
+        self.release()

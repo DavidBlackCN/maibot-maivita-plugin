@@ -1,6 +1,6 @@
 """MaiVita. AGPL-3.0; see docs/SOURCES.md."""
 __all__ = ["MaiVitaPlugin", "create_plugin"]
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 
 def __getattr__(name):

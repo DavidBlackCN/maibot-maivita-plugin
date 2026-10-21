@@ -124,10 +124,8 @@ class DevelopmentRuntime:
         # Coalesce all durable triggers into one model call. Coordinator still
         # enforces daily budget/cooldown; pending rows survive deferral.
         result=await self.coordinator.request('batch:'+','.join(ids))
-        if result['status'] not in ('cooldown','budget_exhausted'):
-            with self.database.unit_of_work() as u:
-                u.connection.executemany('UPDATE decision_triggers SET consumed=1 WHERE trigger_id=?',[(key,) for key in ids])
-                u.commit()
+        # Coordinator durably claims the batch before RPC. Post-await claiming
+        # would replay a cancelled/unknown model request after restart.
         return result
 
     async def run(self):

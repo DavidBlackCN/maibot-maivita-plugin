@@ -1,0 +1,12 @@
+{
+  "legacy_plugin.py": "d427b96b1516d325464cbc53ab630db26f4c5292fc7a09fdaf92c0acde2f9ca7",
+  "LICENSE": "6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75",
+  "storage/migrations/001_initial.sql": "7e86adaa73ab73119a9b2992710d2c004c726d7af415e159d1f541e387952c91",
+  "tests/fixtures/host_contracts/LICENSE": "e57f1c320b8cf8798a7d2ff83a6f9e06a33a03585f6e065fea97f1d86db84052",
+  "tests/fixtures/host_contracts/src/services/send_service.py": "cf3bdd6f4fa460c0e7fbb5f5c246cc262aa38a50c3a28993ffc4faa2c9ba390d",
+  "tests/fixtures/host_contracts/src/plugin_runtime/capabilities/components.py": "617dec0ccdd9eeb1c1b1031c7416a64a2b8855196ac44950278c1b2d5f91ad0e",
+  "tests/fixtures/host_contracts/src/plugin_runtime/capabilities/core.py": "c49b3a67569f624af3ae6c7315987a68663c08b3bfc2069a4e5f378e6c901c59",
+  "tests/fixtures/host_contracts/src/plugin_runtime/capabilities/data.py": "c38ca55c3730453f09dcb9a10a50409269f909b0e47ced1a4e58786cda4eab55",
+  "tests/fixtures/host_contracts/src/plugin_runtime/host/api_registry.py": "e5909b85d6d6c48f7ceb82015e1dfdb4df929334703545ba86d7b6e7aee7a1b4",
+  "tests/fixtures/host_contracts/src/plugin_runtime/host/hook_dispatcher.py": "da0bf3f47a7f6fadcdc2014e6f27a082cf01015855ef5b20e8d7add19ae4d1f1"
+}
