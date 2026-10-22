@@ -11,12 +11,12 @@ package = types.ModuleType("maibot_autonomous_planning_plugin")
 package.__path__ = [str(ROOT)]
 sys.modules.setdefault("maibot_autonomous_planning_plugin", package)
 
-from maibot_autonomous_planning_plugin.config_models import ScheduleFrequencyConfig
-from maibot_autonomous_planning_plugin.core.frequency import (
+from maibot_autonomous_planning_plugin.maivita.legacy.config_models import ScheduleFrequencyConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.core.frequency import (
     base_frequency_at,
     rule_boundaries,
 )
-from maibot_autonomous_planning_plugin.services.command_service import CommandService
+from maibot_autonomous_planning_plugin.maivita.legacy.services.command_service import CommandService
 
 
 class FrequencyRuleTests(unittest.TestCase):
@@ -133,7 +133,7 @@ class FrequencyCommandTests(unittest.IsolatedAsyncioTestCase):
         )
         manager = SimpleNamespace(get_schedule_goals=lambda **_kwargs: [goal])
         with patch(
-            "maibot_autonomous_planning_plugin.services.command_service.get_goal_manager",
+            "maibot_autonomous_planning_plugin.maivita.legacy.services.command_service.get_goal_manager",
             return_value=manager,
         ):
             await service._handle_frequency("s", "qq", "42", "u")
@@ -178,7 +178,7 @@ class FrequencyCommandTests(unittest.IsolatedAsyncioTestCase):
         )
         manager = SimpleNamespace(get_schedule_goals=lambda **_kwargs: [goal])
         with patch(
-            "maibot_autonomous_planning_plugin.services.command_service.get_goal_manager",
+            "maibot_autonomous_planning_plugin.maivita.legacy.services.command_service.get_goal_manager",
             return_value=manager,
         ):
             await service._handle_frequency("s", "qq", "42", "u")
@@ -214,7 +214,7 @@ class FrequencyCommandTests(unittest.IsolatedAsyncioTestCase):
         )
         manager = SimpleNamespace(get_schedule_goals=lambda **_kwargs: [goal])
         with patch(
-            "maibot_autonomous_planning_plugin.services.command_service.get_goal_manager",
+            "maibot_autonomous_planning_plugin.maivita.legacy.services.command_service.get_goal_manager",
             return_value=manager,
         ):
             await service._handle_frequency("s", "qq", "42", "u")

@@ -8,9 +8,7 @@ import types
 import tomli_w
 
 root = Path(__file__).resolve().parents[1]
-package = types.ModuleType("maivita")
-package.__path__ = [str(root)]
-sys.modules.setdefault("maivita", package)
+sys.path.insert(0, str(root))
 from maivita.compatibility.config import convert_legacy
 
 

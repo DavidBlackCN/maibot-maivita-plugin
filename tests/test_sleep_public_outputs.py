@@ -3,8 +3,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from maibot_autonomous_planning_plugin.services.command_service import CommandService
-from maibot_autonomous_planning_plugin.services.inject_service import InjectService
+from maibot_autonomous_planning_plugin.maivita.legacy.services.command_service import CommandService
+from maibot_autonomous_planning_plugin.maivita.legacy.services.inject_service import InjectService
 
 
 LOCKED_PARAMS = {
@@ -66,7 +66,7 @@ class SleepCommandOutputTests(unittest.IsolatedAsyncioTestCase):
         service, manager, plugin = self._service_and_manager()
 
         with patch(
-            "maibot_autonomous_planning_plugin.services.command_service.get_goal_manager",
+            "maibot_autonomous_planning_plugin.maivita.legacy.services.command_service.get_goal_manager",
             return_value=manager,
         ):
             await service._handle_status("stream")
@@ -87,11 +87,11 @@ class SleepCommandOutputTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "maibot_autonomous_planning_plugin.services.command_service.get_goal_manager",
+                "maibot_autonomous_planning_plugin.maivita.legacy.services.command_service.get_goal_manager",
                 return_value=manager,
             ),
             patch(
-                "maibot_autonomous_planning_plugin.services.command_service."
+                "maibot_autonomous_planning_plugin.maivita.legacy.services.command_service."
                 "ScheduleImageGenerator.generate_schedule_image",
                 side_effect=fake_image,
             ),
@@ -105,7 +105,7 @@ class SleepCommandOutputTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn(forbidden, visible)
 
     def test_safe_generated_sleep_description_is_preserved(self):
-        from maibot_autonomous_planning_plugin.core.activity_state import public_activity_text
+        from maibot_autonomous_planning_plugin.maivita.legacy.core.activity_state import public_activity_text
 
         name, description = public_activity_text(
             "睡觉", "抱着枕头安稳地睡着，直到清晨自然醒来。", LOCKED_PARAMS
@@ -138,7 +138,7 @@ class SleepInjectionOutputTests(unittest.IsolatedAsyncioTestCase):
         service._schedule_cache = FakeCache()
 
         with patch(
-            "maibot_autonomous_planning_plugin.services.inject_service.get_goal_manager",
+            "maibot_autonomous_planning_plugin.maivita.legacy.services.inject_service.get_goal_manager",
             return_value=manager,
         ):
             current_name, current_description, future, _goal_type = (

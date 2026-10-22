@@ -13,9 +13,9 @@ import tomli_w
 root = Path(__file__).resolve().parents[1]
 package = types.ModuleType('maivita_switch'); package.__path__ = [str(root)]
 sys.modules.setdefault(package.__name__, package)
-from maivita_switch.activation import EngineAuthority, atomic_record, config_digest, read_record
-from maivita_switch.integration_config import IntegrationConfig
-from maivita_switch.storage.safety import WriterLease
+from maivita_switch.maivita.host.activation import EngineAuthority, atomic_record, config_digest, read_record
+from maivita_switch.maivita.host.integration_config import IntegrationConfig
+from maivita_switch.maivita.life.storage.safety import WriterLease
 
 
 def prepare(config_path, data_dir, target, output):

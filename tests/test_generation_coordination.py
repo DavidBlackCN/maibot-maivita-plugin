@@ -3,14 +3,14 @@ import json
 import unittest
 from unittest.mock import AsyncMock
 
-from maibot_autonomous_planning_plugin.core.exceptions import LLMInvalidResponseError, LLMTimeoutError
-from maibot_autonomous_planning_plugin.core.models import ScheduleType
-from maibot_autonomous_planning_plugin.planner.generation_coordinator import (
+from maibot_autonomous_planning_plugin.maivita.legacy.core.exceptions import LLMInvalidResponseError, LLMTimeoutError
+from maibot_autonomous_planning_plugin.maivita.legacy.core.models import ScheduleType
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.generation_coordinator import (
     GenerationInProgressError,
     ScheduleGenerationCoordinator,
 )
-from maibot_autonomous_planning_plugin.planner.schedule_generator import ScheduleGenerator
-from maibot_autonomous_planning_plugin.services.command_service import CommandService
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.schedule_generator import ScheduleGenerator
+from maibot_autonomous_planning_plugin.maivita.legacy.services.command_service import CommandService
 
 
 class GenerationCoordinatorTests(unittest.IsolatedAsyncioTestCase):
@@ -111,7 +111,7 @@ class GenerationCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             raise RuntimeError("background boom")
 
         with self.assertLogs(
-            "maibot_autonomous_planning_plugin.planner.generation_coordinator",
+            "maibot_autonomous_planning_plugin.maivita.legacy.planner.generation_coordinator",
             level="ERROR",
         ) as captured:
             self.coordinator.start_background(broken, source="command.regenerate")
@@ -166,7 +166,7 @@ class ScheduleGeneratorTimeoutTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertLogs(
-            "maibot_autonomous_planning_plugin.planner.schedule_generator",
+            "maibot_autonomous_planning_plugin.maivita.legacy.planner.schedule_generator",
             level="INFO",
         ) as captured:
             items = await generator._call_llm("prompt", round_num=1)

@@ -4,12 +4,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from maibot_autonomous_planning_plugin.planner.model_selection import (
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.model_selection import (
     ConfiguredModelNotFoundError,
     ScheduleModelSelection,
 )
-from maibot_autonomous_planning_plugin.planner.schedule_generator import ScheduleGenerator
-from maibot_autonomous_planning_plugin.planner import pinned_model_adapter
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.schedule_generator import ScheduleGenerator
+from maibot_autonomous_planning_plugin.maivita.legacy.planner import pinned_model_adapter
 
 
 class FakeGoalManager:
@@ -74,7 +74,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
         llm = FakeLLM()
         generator = make_generator({"model_mode": "task", "model_task": "replyer"}, llm)
         with self.assertLogs(
-            "maibot_autonomous_planning_plugin.planner.schedule_generator", level="INFO"
+            "maibot_autonomous_planning_plugin.maivita.legacy.planner.schedule_generator", level="INFO"
         ) as captured:
             await generator._call_llm("prompt")
         self.assertEqual(llm.calls[0]["model"], "replyer")
@@ -110,7 +110,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
                 "resolved_model": "P01-gpt-5.6-terra",
             })
             with patch(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter._generate_with_pinned_model",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter._generate_with_pinned_model",
                 pinned,
             ):
                 await generator._call_llm("prompt")
@@ -138,7 +138,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
                 "resolved_model": "P01-gpt-5.6-terra",
             })
             with patch(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter._generate_with_pinned_model",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter._generate_with_pinned_model",
                 pinned,
             ):
                 await generator._call_llm("prompt")
@@ -161,7 +161,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
                 "resolved_model": "deepseek-v4-pro",
             })
             with patch(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter._generate_with_pinned_model",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter._generate_with_pinned_model",
                 pinned,
             ):
                 items = await generator._call_llm("prompt")
@@ -182,7 +182,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
                 "resolved_model": "expected",
             })
             with patch(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter._generate_with_pinned_model",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter._generate_with_pinned_model",
                 pinned,
             ):
                 with self.assertRaisesRegex(ConfiguredModelNotFoundError, "actual_model=unexpected"):
@@ -203,7 +203,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
                 "resolved_model": "expected",
             })
             with patch(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter._generate_with_pinned_model",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter._generate_with_pinned_model",
                 pinned,
             ):
                 with self.assertRaisesRegex(ConfiguredModelNotFoundError, "未返回实际模型名"):
@@ -218,7 +218,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
             )
             pinned = AsyncMock()
             with patch(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter._generate_with_pinned_model",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter._generate_with_pinned_model",
                 pinned,
             ):
                 with self.assertRaisesRegex(ConfiguredModelNotFoundError, "missing"):
@@ -261,7 +261,7 @@ class ModelSelectionTests(unittest.IsolatedAsyncioTestCase):
             return_value=(FakeTaskConfig, FakeOrchestrator),
         ):
             with self.assertLogs(
-                "maibot_autonomous_planning_plugin.planner.pinned_model_adapter",
+                "maibot_autonomous_planning_plugin.maivita.legacy.planner.pinned_model_adapter",
                 level="INFO",
             ) as captured:
                 result = await pinned_model_adapter._generate_with_pinned_model(

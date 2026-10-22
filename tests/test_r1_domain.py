@@ -6,14 +6,14 @@ import sys
 import unittest
 
 from r1_support import ROOT, AT, activity, clock, sleeping, state
-from maibot_autonomous_planning_plugin.domain.clock import (
+from maibot_autonomous_planning_plugin.maivita.life.domain.clock import (
     AmbiguousLocalTime, NonexistentLocalTime, SystemClock, UTC, as_utc,
     from_epoch_ms, local_day_bounds, resolve_local, to_epoch_ms, to_local,
 )
-from maibot_autonomous_planning_plugin.domain.constraints import (
+from maibot_autonomous_planning_plugin.maivita.life.domain.constraints import (
     validate_activity_transition, validate_aggregate, validate_state_transition,
 )
-from maibot_autonomous_planning_plugin.domain.models import (
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import (
     Activity, Category, Commitment, DomainError, Habit, LifeEvent, LifeGoal, LifeState, LifeSummary,
     Plan, Preference, ScheduleItem, ScheduleRevision, SleepSegment, SleepSession, json_text,
 )
@@ -70,7 +70,7 @@ class DomainTests(unittest.TestCase):
         script = (
             "import sys,types; from pathlib import Path; "
             "p=types.ModuleType('standalone'); p.__path__=[sys.argv[1]]; sys.modules['standalone']=p; "
-            "sys.modules['maibot_sdk']=None; from standalone.domain import models,clock,constraints; "
+            "sys.modules['maibot_sdk']=None; from standalone.maivita.life.domain import models,clock,constraints; "
             "assert models.Category.OTHER == 'other'"
         )
         subprocess.run([sys.executable, "-I", "-c", script, str(ROOT)], check=True, capture_output=True)

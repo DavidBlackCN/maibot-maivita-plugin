@@ -1,6 +1,6 @@
 # MaiVita Integration-Ready 候选安装
 
-仅用于独立空实例和后续超级 MaiBot 核心插件联合测试，不接管生产实例。版本 0.3.0、配置 3、数据库 Schema 4、契约 1.0.0。固定 Host 1.3.12 / `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`、SDK 2.15.0；Host 原 uv.lock 的 SDK 2.12.0 需在独立环境明确覆盖，不改 Host 锁文件。
+仅用于独立空实例和后续超级 MaiBot 核心插件联合测试，不接管生产实例。版本 0.3.1、配置 3、数据库 Schema 4、契约 1.0.0。固定 Host 1.3.12 / `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`、SDK 2.15.0；Host 原 uv.lock 的 SDK 2.12.0 需在独立环境明确覆盖，不改 Host 锁文件。
 
 1. 停止旧完整规划插件，安装本包的唯一 MaiVita ID。保留旧代码和数据库，不同版本不得同时运行。隔离环境须有 Manifest 声明的 pillow、pytz、tzdata；若 uv 创建的环境没有 pip，先用 uv pip 在该环境安装这些依赖，不能假设 Host 自动安装必定成功。
 2. 从 config.example.toml 创建新配置，默认 disabled。填写 instance.acknowledgement=`isolated-test-instance`、全实例共用的绝对 writer_lock、明确 allowed_streams；禁止通配符。
@@ -17,7 +17,7 @@ python tools/switch_engine.py --config <绝对配置路径> --data-dir <SDK授�
 
 工具取得同一 writer_lock，保存所有已有引擎库的一致快照及 checksum，产生绑定源 revision、目标模式及完整配置摘要的切换票据；不改原配置、不启动 Host。检查输出后替换配置并显式重载。切回 life 同理，需要新的票据；不能只改 mode。首次空实例可直接激活指定的一个引擎。
 
-旧库导入仅针对已验证的离线快照，使用 stage_legacy.py 的显式 snapshot/target/source-id/timezone/writer-lock 和 --development-staging；目标为 life/maivita.db，旧引擎必须停写。歧义行保留并阻止自主激活，不猜测约定或真实历史。详情见迁移计划及 ROLLBACK。
+旧库导入仅针对已验证的离线快照，使用 stage_legacy.py 的显式 snapshot/target/source-id/timezone/writer-lock 和 --development-staging；目标为 life/maivita.db，旧引擎必须停写。歧义行保留并阻止自主激活，不猜测约定或真实历史。完整参数见 `python tools/stage_legacy.py --help`，恢复步骤见 [ROLLBACK](ROLLBACK.md)。
 
 ## 复现完整 Host 验证
 

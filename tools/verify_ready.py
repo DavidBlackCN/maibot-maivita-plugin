@@ -9,7 +9,7 @@ import sys
 import types
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
-from development.package import runtime_manifest
+from tools.package import runtime_manifest
 
 
 def verification_manifest():
@@ -29,8 +29,8 @@ def main():
             ast.parse(text,filename=name); compile(text,name,'exec',dont_inherit=True)
         elif name.endswith('.json'): json.loads((root/name).read_text(encoding='utf-8'))
     package=types.ModuleType('maivita_static'); package.__path__=[str(root)]; sys.modules[package.__name__]=package
-    from maivita_static.integration_config import IntegrationConfig
-    from maivita_static.integrations import contracts
+    from maivita_static.maivita.host.integration_config import IntegrationConfig
+    from maivita_static.maivita.integrations import contracts
     import tomllib
     config=IntegrationConfig.model_validate(tomllib.loads((root/'config.example.toml').read_text(encoding='utf-8')))
     assert not config.plugin.enabled and config.engine.mode=='life'

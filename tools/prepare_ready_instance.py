@@ -10,7 +10,7 @@ import sys
 import tomlkit
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
-from development.package import stage,HOST_COMMIT
+from tools.package import stage,HOST_COMMIT
 
 
 def main():

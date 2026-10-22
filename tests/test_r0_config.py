@@ -9,10 +9,10 @@ import tomllib
 import unittest
 from r0_support import ROOT
 
-from maibot_autonomous_planning_plugin.compatibility.config import convert_legacy
-from maibot_autonomous_planning_plugin.compatibility.legacy_config import AutonomousPlanningV4Config as LegacyConfig
-from maibot_autonomous_planning_plugin.config_models import MaiVitaConfig
-from maibot_autonomous_planning_plugin.services.command_service import CommandService
+from maibot_autonomous_planning_plugin.maivita.compatibility.config import convert_legacy
+from maibot_autonomous_planning_plugin.maivita.compatibility.legacy_config import AutonomousPlanningV4Config as LegacyConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.config_models import MaiVitaConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.services.command_service import CommandService
 from types import SimpleNamespace as NS
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,13 +83,13 @@ class ConfigTests(unittest.TestCase):
     def test_T01_original_license_and_legacy_entry_preserved(self):
         import hashlib
         baseline = json.loads((ROOT / "tests/fixtures/preserved-files.json").read_text(encoding="utf-8"))
-        for name in ("LICENSE", "legacy_plugin.py"):
+        for name in ("LICENSE", "tests/fixtures/provenance/legacy_plugin.r0.py"):
             self.assertEqual(hashlib.sha256((ROOT / name).read_bytes()).hexdigest(), baseline[name])
         self.assertFalse((ROOT / "data").exists())
 
     def test_T04_all_legacy_public_parameters_remain(self):
         fixture = json.loads((ROOT / "tests" / "fixtures" / "legacy_entrypoints.json").read_text(encoding="utf-8"))
-        module = ast.parse((ROOT / "legacy_plugin.py").read_text(encoding="utf-8"))
+        module = ast.parse((ROOT / "maivita/legacy/plugin.py").read_text(encoding="utf-8"))
         methods = {method.name: method for cls in module.body if isinstance(cls, ast.ClassDef)
                    for method in cls.body if isinstance(method, ast.AsyncFunctionDef)}
         for entry in fixture:

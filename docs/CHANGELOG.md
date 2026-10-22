@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.3.1 — 2026-10-22
+
+- 将平铺运行模块收拢到 maivita/host、life、legacy、shared、compatibility、integrations，更新导入、CLI、CI 和打包白名单。
+- 同步修正插件/图片资源根和旧模型配置定位；旧调度器派生缓存使用授权数据目录，未加载时拒绝构造。
+- 保留原始 R0 入口的逐字节来源 fixture 和 SQL 001 哈希，配置、数据库与跨插件契约版本不变。
+- 搬迁版本重新进行自动化验收，范围见 [ACCEPTANCE](ACCEPTANCE.md)；未新增生活模拟功能。
+- 移除公开仓库和安装包中的内部架构、设计、工作计划、提示词及过程报告，保留必要使用说明。
+
 ## 0.3.0 — 2026-10-21
 
 - 正式入口按配置 3 选择唯一 life/legacy delegate，新 Runtime 接入真实 SDK 生命周期、ModelPort、API/Tool/Command/Hook。

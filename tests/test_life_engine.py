@@ -9,13 +9,13 @@ import sys
 import unittest
 
 from r1_support import AT,clock
-from maibot_autonomous_planning_plugin.domain.commands import Command
-from maibot_autonomous_planning_plugin.domain.models import Commitment,DomainError
-from maibot_autonomous_planning_plugin.life_state.engine import LifeStateEngine
-from maibot_autonomous_planning_plugin.life_state.projections import LifeQueries,QueryScope
-from maibot_autonomous_planning_plugin.life_state.recovery import RecoveryService
-from maibot_autonomous_planning_plugin.compatibility.life_bridge import LegacyLifeBridge
-from maibot_autonomous_planning_plugin.storage.life_database import LifeDatabase
+from maibot_autonomous_planning_plugin.maivita.life.domain.commands import Command
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import Commitment,DomainError
+from maibot_autonomous_planning_plugin.maivita.life.life_state.engine import LifeStateEngine
+from maibot_autonomous_planning_plugin.maivita.life.life_state.projections import LifeQueries,QueryScope
+from maibot_autonomous_planning_plugin.maivita.life.life_state.recovery import RecoveryService
+from maibot_autonomous_planning_plugin.maivita.compatibility.life_bridge import LegacyLifeBridge
+from maibot_autonomous_planning_plugin.maivita.life.storage.life_database import LifeDatabase
 
 
 class EngineFixture:
@@ -45,9 +45,9 @@ import os,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(sys.argv[1])/'tests'))
 from r1_support import clock
-from maibot_autonomous_planning_plugin.storage.life_database import LifeDatabase
-from maibot_autonomous_planning_plugin.life_state.engine import LifeStateEngine
-from maibot_autonomous_planning_plugin.domain.commands import Command
+from maibot_autonomous_planning_plugin.maivita.life.storage.life_database import LifeDatabase
+from maibot_autonomous_planning_plugin.maivita.life.life_state.engine import LifeStateEngine
+from maibot_autonomous_planning_plugin.maivita.life.domain.commands import Command
 def fault(point):
     if point==sys.argv[3]: os._exit(71)
 db=LifeDatabase(Path(sys.argv[2]),clock=clock())

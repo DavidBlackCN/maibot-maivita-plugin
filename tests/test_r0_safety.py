@@ -12,8 +12,8 @@ import unittest
 from unittest.mock import patch
 from r0_support import ROOT
 
-from maibot_autonomous_planning_plugin.database.goal_db import GoalDatabase
-from maibot_autonomous_planning_plugin.storage.safety import (
+from maibot_autonomous_planning_plugin.maivita.legacy.database.goal_db import GoalDatabase
+from maibot_autonomous_planning_plugin.maivita.life.storage.safety import (
     WriterLease, discover, fingerprint, inspect_database, resolve_data_dir, restore, snapshot,
 )
 from types import SimpleNamespace as NS
@@ -80,7 +80,7 @@ class StorageTests(unittest.TestCase):
         self.assertFalse(inspect_database(self.source)["valid_legacy_schema"])
 
     def test_T02_failed_backup_does_not_allow_database_initialization(self):
-        with patch("maibot_autonomous_planning_plugin.storage.safety.snapshot", side_effect=OSError("disk full")):
+        with patch("maibot_autonomous_planning_plugin.maivita.life.storage.safety.snapshot", side_effect=OSError("disk full")):
             with self.assertRaisesRegex(OSError, "disk full"):
                 GoalDatabase(str(self.source))
 
@@ -132,7 +132,7 @@ class StorageTests(unittest.TestCase):
     def test_T05_single_writer_cross_process_release_and_crash_recovery(self):
         lease = WriterLease(self.root / "writer.lock")
         lease.acquire()
-        script = "from storage.safety import WriterLease; from pathlib import Path; import sys,os; x=WriterLease(Path(sys.argv[1])); x.acquire(); os._exit(0)"
+        script = "from maivita.life.storage.safety import WriterLease; from pathlib import Path; import sys,os; x=WriterLease(Path(sys.argv[1])); x.acquire(); os._exit(0)"
         command = [sys.executable, "-c", script, str(lease.path)]
         blocked = subprocess.run(command, cwd=ROOT, capture_output=True)
         self.assertNotEqual(blocked.returncode, 0)

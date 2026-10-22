@@ -8,10 +8,10 @@ import types
 root=Path(__file__).resolve().parents[1]
 package=types.ModuleType('maivita_staging'); package.__path__=[str(root)]
 sys.modules.setdefault(package.__name__,package)
-from maivita_staging.storage.life_database import LifeDatabase
-from maivita_staging.storage.safety import WriterLease
-from maivita_staging.storage.legacy_import import import_snapshot
-from maivita_staging.life_state.engine import LifeStateEngine
+from maivita_staging.maivita.life.storage.life_database import LifeDatabase
+from maivita_staging.maivita.life.storage.safety import WriterLease
+from maivita_staging.maivita.life.storage.legacy_import import import_snapshot
+from maivita_staging.maivita.life.life_state.engine import LifeStateEngine
 
 
 def main():

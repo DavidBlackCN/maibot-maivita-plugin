@@ -7,7 +7,7 @@ import sys
 from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from storage.safety import discover, inspect_database, snapshot, restore
+from maivita.life.storage.safety import discover, inspect_database, snapshot, restore
 
 
 def main(argv=None):

@@ -27,14 +27,7 @@ llm_logs/
 images/
 
 # Local archives and validation assets
-/docs/development/original-*
-/docs/development/original.gitignore
-/docs/development/README.publish.md
-/docs/development/repository-*.json
-/docs/development/REPOSITORY_REPORT.md
-/development/manifest.json
-/development/config.example.toml
-/development/webui.json
+/docs/development
 /.integration/
 /evidence/
 /dist/
@@ -54,6 +47,7 @@ images/
 !/tools/i1_full_host_entry.py
 !/tools/prepare_ready_instance.py
 !/tools/verify_ready.py
+!/tools/package.py
 !/tools/build_ready.py
 !/tools/rehearse_ready.py
 !/tools/audit_ready.py

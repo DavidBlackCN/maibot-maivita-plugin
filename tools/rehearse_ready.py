@@ -16,8 +16,8 @@ from uuid import uuid4
 from switch_engine import prepare
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
-from development.package import runtime_manifest
-from storage.safety import WriterLease
+from tools.package import runtime_manifest
+from maivita.life.storage.safety import WriterLease
 
 
 def main():

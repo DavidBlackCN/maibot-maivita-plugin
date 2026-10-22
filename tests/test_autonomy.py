@@ -5,11 +5,11 @@ from pathlib import Path
 import unittest
 
 from test_life_engine import EngineFixture
-from maibot_autonomous_planning_plugin.coordinator.decisions import DecisionCoordinator
-from maibot_autonomous_planning_plugin.domain.models import DomainError
-from maibot_autonomous_planning_plugin.integrations.authorization import Identity,LocalPolicy,WakeAuthorization
-from maibot_autonomous_planning_plugin.life_state.recovery import RecoveryService
-from maibot_autonomous_planning_plugin.life_state.runtime import DevelopmentRuntime,LifeRuntimeConfig
+from maibot_autonomous_planning_plugin.maivita.life.coordinator.decisions import DecisionCoordinator
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import DomainError
+from maibot_autonomous_planning_plugin.maivita.integrations.authorization import Identity,LocalPolicy,WakeAuthorization
+from maibot_autonomous_planning_plugin.maivita.life.life_state.recovery import RecoveryService
+from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import DevelopmentRuntime,LifeRuntimeConfig
 
 
 class AutonomyTests(EngineFixture,unittest.IsolatedAsyncioTestCase):

@@ -1,2 +1,2 @@
-"""MaiVita SDK entry point; engine selection is explicit and offline controlled."""
-from .entrypoint import MaiVitaPlugin, create_plugin
+"""MaiVita SDK entry; all implementation lives in maivita/."""
+from .maivita.host.entrypoint import MaiVitaPlugin, create_plugin

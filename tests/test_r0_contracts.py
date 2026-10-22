@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock
 
 from r0_support import ROOT, host_classes
 from maibot_sdk.context import PluginContext, PluginPaths
-from maibot_autonomous_planning_plugin.legacy_plugin import MaiVitaPlugin
-from maibot_autonomous_planning_plugin.config_models import MaiVitaConfig
-from maibot_autonomous_planning_plugin.services.inject_service import InjectService
-from maibot_autonomous_planning_plugin.integrations.safety import OwnedFrequency, ReplyPermits, PLUGIN_ID, OLD_ID
+from maibot_autonomous_planning_plugin.maivita.legacy.plugin import MaiVitaPlugin
+from maibot_autonomous_planning_plugin.maivita.legacy.config_models import MaiVitaConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.services.inject_service import InjectService
+from maibot_autonomous_planning_plugin.maivita.integrations.safety import OwnedFrequency, ReplyPermits, PLUGIN_ID, OLD_ID
 
 
 def injection_service(plugin):

@@ -8,10 +8,10 @@ import unittest
 
 from test_life_engine import EngineFixture
 from r1_support import AT,ROOT
-from maibot_autonomous_planning_plugin.domain.models import DomainError
-from maibot_autonomous_planning_plugin.storage.legacy_import import import_snapshot
-from maibot_autonomous_planning_plugin.storage.schema import migrate,migrations,validate_schema
-from maibot_autonomous_planning_plugin.storage.life_database import LifeDatabase,connect
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import DomainError
+from maibot_autonomous_planning_plugin.maivita.life.storage.legacy_import import import_snapshot
+from maibot_autonomous_planning_plugin.maivita.life.storage.schema import migrate,migrations,validate_schema
+from maibot_autonomous_planning_plugin.maivita.life.storage.life_database import LifeDatabase,connect
 
 
 class ImportTests(EngineFixture,unittest.TestCase):
@@ -75,11 +75,11 @@ class ImportTests(EngineFixture,unittest.TestCase):
             self.assertEqual(c.execute('SELECT migration_run_id FROM migration_runs').fetchone()[0],'r')
             self.assertEqual(c.execute('PRAGMA foreign_keys').fetchone()[0],1)
         archived=json.loads((ROOT/'tests/fixtures/preserved-files.json').read_text(encoding='utf-8'))
-        self.assertEqual(hashlib.sha256((ROOT/'storage/migrations/001_initial.sql').read_bytes()).hexdigest(),archived['storage/migrations/001_initial.sql'])
+        self.assertEqual(hashlib.sha256((ROOT/'maivita/life/storage/migrations/001_initial.sql').read_bytes()).hexdigest(),archived['maivita/life/storage/migrations/001_initial.sql'])
 
     def test_populated_circular_foreign_keys_survive_table_rebuild(self):
         from r1_support import state,activity
-        from maibot_autonomous_planning_plugin.storage.repositories import SPECS
+        from maibot_autonomous_planning_plugin.maivita.life.storage.repositories import SPECS
         path=Path(self.temp.name).resolve()/'populated-schema1.db'; path.touch()
         with closing(connect(path)) as c:
             migrate(c,self.clock,migrations()[:1])

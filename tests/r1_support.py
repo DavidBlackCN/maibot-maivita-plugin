@@ -2,8 +2,8 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 
 from r0_support import ROOT
-from maibot_autonomous_planning_plugin.domain.clock import ManualClock, UTC
-from maibot_autonomous_planning_plugin.domain.models import Activity, LifeState, SleepSegment, SleepSession
+from maibot_autonomous_planning_plugin.maivita.life.domain.clock import ManualClock, UTC
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import Activity, LifeState, SleepSegment, SleepSession
 
 AT = datetime(2026, 10, 21, 12, tzinfo=UTC)
 

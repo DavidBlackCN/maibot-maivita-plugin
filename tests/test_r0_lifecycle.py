@@ -9,11 +9,11 @@ from unittest.mock import AsyncMock, patch
 
 from r0_support import ROOT
 from maibot_sdk.context import PluginContext, PluginPaths
-from maibot_autonomous_planning_plugin.legacy_plugin import MaiVitaPlugin
-from maibot_autonomous_planning_plugin.config_models import MaiVitaConfig
-from maibot_autonomous_planning_plugin.planner.goal_manager import close_goal_manager, get_goal_manager
-from maibot_autonomous_planning_plugin.storage.safety import WriterLease
-from maibot_autonomous_planning_plugin.integrations.safety import OLD_ID, PLUGIN_ID
+from maibot_autonomous_planning_plugin.maivita.legacy.plugin import MaiVitaPlugin
+from maibot_autonomous_planning_plugin.maivita.legacy.config_models import MaiVitaConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.goal_manager import close_goal_manager, get_goal_manager
+from maibot_autonomous_planning_plugin.maivita.life.storage.safety import WriterLease
+from maibot_autonomous_planning_plugin.maivita.integrations.safety import OLD_ID, PLUGIN_ID
 
 
 class LifecycleTests(unittest.IsolatedAsyncioTestCase):
@@ -104,7 +104,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_T05_partial_start_failure_releases_lease_without_tasks(self):
         plugin = self.make_plugin()
-        with patch("maibot_autonomous_planning_plugin.legacy_plugin.ToolsService", side_effect=RuntimeError("startup failure")):
+        with patch("maibot_autonomous_planning_plugin.maivita.legacy.plugin.ToolsService", side_effect=RuntimeError("startup failure")):
             with self.assertRaisesRegex(RuntimeError, "startup failure"):
                 await plugin.on_load()
         self.assertEqual(plugin._bg_tasks, [])

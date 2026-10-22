@@ -10,12 +10,12 @@ package = types.ModuleType("maibot_autonomous_planning_plugin")
 package.__path__ = [str(ROOT)]
 sys.modules.setdefault("maibot_autonomous_planning_plugin", package)
 
-from maibot_autonomous_planning_plugin.core.models import Schedule, ScheduleItem, ScheduleType
-from maibot_autonomous_planning_plugin.planner.schedule_generator import ScheduleGenerator
-from maibot_autonomous_planning_plugin.planner.goal_manager import GoalManager
-from maibot_autonomous_planning_plugin.services.proactive_service import ProactiveService
-from maibot_autonomous_planning_plugin.core.frequency import calculate_frequency
-from maibot_autonomous_planning_plugin.config_models import ScheduleFrequencyConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.core.models import Schedule, ScheduleItem, ScheduleType
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.schedule_generator import ScheduleGenerator
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.goal_manager import GoalManager
+from maibot_autonomous_planning_plugin.maivita.legacy.services.proactive_service import ProactiveService
+from maibot_autonomous_planning_plugin.maivita.legacy.core.frequency import calculate_frequency
+from maibot_autonomous_planning_plugin.maivita.legacy.config_models import ScheduleFrequencyConfig
 
 
 class FakeGoalManager:

@@ -3,15 +3,15 @@ from pathlib import Path
 import unittest
 
 from test_life_engine import EngineFixture
-from maibot_autonomous_planning_plugin.domain.models import DomainError
-from maibot_autonomous_planning_plugin.integrations.life_api import LifeAPI
-from maibot_autonomous_planning_plugin.life_state.projections import QueryScope
-from maibot_autonomous_planning_plugin.life_state.runtime import DevelopmentRuntime
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import DomainError
+from maibot_autonomous_planning_plugin.maivita.integrations.life_api import LifeAPI
+from maibot_autonomous_planning_plugin.maivita.life.life_state.projections import QueryScope
+from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import DevelopmentRuntime
 
 
 class LifeAPITests(EngineFixture,unittest.IsolatedAsyncioTestCase):
     async def test_legacy_tools_propose_plan_goals_and_explicit_preserved_delete(self):
-        from maibot_autonomous_planning_plugin.compatibility.life_tools import LifeToolAdapter
+        from maibot_autonomous_planning_plugin.maivita.compatibility.life_tools import LifeToolAdapter
         async def model(*args): self.fail('mapping must not call LLM')
         async def allow(*args): return True
         runtime=DevelopmentRuntime(self.db,model,lock_path=Path(self.temp.name).resolve()/'writer.lock').start()
@@ -69,8 +69,8 @@ class LifeAPITests(EngineFixture,unittest.IsolatedAsyncioTestCase):
         finally: await runtime.close()
 
     async def test_config_projection_preserves_disabled_and_rejects_old_allow_all(self):
-        from maibot_autonomous_planning_plugin.config_models import MaiVitaConfig
-        from maibot_autonomous_planning_plugin.life_state.runtime import LifeRuntimeConfig
+        from maibot_autonomous_planning_plugin.maivita.legacy.config_models import MaiVitaConfig
+        from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import LifeRuntimeConfig
         config=MaiVitaConfig()
         self.assertEqual(LifeRuntimeConfig.from_r0(config).sleep_mode,'legacy_fixed')
         config.sleep.mode='disabled'

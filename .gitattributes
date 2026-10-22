@@ -3,7 +3,7 @@
 *.png binary
 *.gif binary
 # These immutable provenance fixtures are verified by their original byte hash.
-legacy_plugin.py -text
-storage/migrations/001_initial.sql -text
+tests/fixtures/provenance/legacy_plugin.r0.py -text
+maivita/life/storage/migrations/001_initial.sql -text
 LICENSE -text
 tests/fixtures/host_contracts/** -text

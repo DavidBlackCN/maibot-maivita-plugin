@@ -2,13 +2,13 @@
 
 MaiVita 是 MaiBot 的生活状态引擎，维护角色共享的当前活动、计划、睡眠和历史事件，为 planner、replyer 与其他插件提供一致的公开生活上下文。
 
-- 当前版本：`0.3.0`
+- 当前版本：`0.3.1`
 - Host：`1.3.12`，固定提交 `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`
 - Plugin SDK：`2.15.0`
 - 配置版本：`3`；SQLite Schema：`4`；跨插件契约：`1.0.0`
 - 项目地址：[DavidBlackCN/maibot-maivita-plugin](https://github.com/DavidBlackCN/maibot-maivita-plugin)
 
-本版用于独立实例与超级 MaiBot 核心插件联合测试。Integration Ready 必须以[验收报告](docs/development/I1_INTEGRATION_READY_REPORT.md)的实际自动化结果为准，不代表生产切换许可。长期观察和真实生态联调统一在联合测试阶段进行，完成本轮后冻结独立功能开发。
+本版用于独立实例与超级 MaiBot 核心插件联合测试。Integration Ready 的范围见[验收说明](docs/ACCEPTANCE.md)及[验收状态](docs/integration-ready.json)，不代表生产切换许可。长期观察和真实生态联调统一在联合测试阶段进行，独立功能开发保持冻结。
 
 ## 功能
 
@@ -91,7 +91,21 @@ SDK 授予的数据根中，`life/maivita.db` 与 `legacy/goals.db` 分离。`en
 
 离线切换使用 `tools/switch_engine.py`，先取得共享锁、备份已有引擎库并校验，再生成新配置与票据；不覆盖源配置或自动启动 Host。回切需要新的反向票据，不将新库改名交给旧引擎。迁移只接受显式离线快照，歧义行保留并阻止自主激活。
 
-参阅[迁移计划](docs/development/MIGRATION_PLAN.md)、[回滚](docs/ROLLBACK.md)、[已知限制](docs/LIMITATIONS.md)和[接口契约](docs/CONTRACTS.md)。
+参阅[安装与数据导入](docs/INSTALL.md)、[回滚](docs/ROLLBACK.md)、[已知限制](docs/LIMITATIONS.md)和[接口契约](docs/CONTRACTS.md)。
+
+## 源码导航
+
+运行实现统一收拢到 `maivita/`，根目录保留 SDK 入口、配置与维护工具：
+
+| 分类 | 路径 |
+|---|---|
+| 宿主适配 | `maivita/host/`：生命周期、模型路由、配置与引擎权威 |
+| 新生活引擎 | `maivita/life/`：领域、状态、规划、协调、连续性、事件与存储 |
+| 旧兼容引擎 | `maivita/legacy/`：旧日程、固定睡眠及相应服务 |
+| 共享与边界 | `maivita/shared/`、`maivita/compatibility/`、`maivita/integrations/` |
+| 验证与维护 | `tests/`、`integration_tests/`、`tools/`、`.github/`、`docs/` |
+
+旧引擎仅在受控选择后执行；部分外部端口只有隔离测试，真实传输仍关闭。完整目录树和启用边界见[源码目录说明](docs/SOURCE_LAYOUT.md)。
 
 ## 验证
 
@@ -100,7 +114,7 @@ python -m pip install -r requirements-i0.txt
 python tools/verify_ready.py
 ```
 
-CI 无凭据运行静态、单元及固定原始 Runner 检查；完整 Host 与有限真模型在受控本地实例单独验收，不把 CI 通过冒充模型或生态验收。开发任务和历史报告保留在 [docs/development](docs/development/DEVELOPMENT_PLAN_R0-R4.md)。
+CI 无凭据运行静态、单元及固定原始 Runner 检查；完整 Host 与有限真模型在受控本地实例单独验收，不把 CI 通过冒充模型或生态验收。内部设计、工作计划、提示词和过程报告不随仓库及安装包分发。
 
 ## 鸣谢与许可
 

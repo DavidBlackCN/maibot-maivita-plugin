@@ -10,7 +10,7 @@ import zipfile
 import subprocess
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
-from development.package import runtime_manifest,file_manifest,entries,build_zip,HOST_COMMIT
+from tools.package import runtime_manifest,file_manifest,entries,build_zip,HOST_COMMIT
 from verify_ready import verification_manifest
 
 
@@ -41,7 +41,7 @@ def evaluate():
         'contract_version':'1.0.0','long_observation':'deferred_to_joint_core_plugin_testing',
         'real_ecosystem':'not_run_deferred_to_joint_testing','production_switch':False,'independent_feature_development':'frozen'}
     (directory/'acceptance.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
-    public={'status':'integration_ready' if ready else 'not_ready','plugin_version':'0.3.0',
+    public={'status':'integration_ready' if ready else 'not_ready','plugin_version':'0.3.1',
         'host_commit':HOST_COMMIT,'sdk':'2.15.0','config_version':'3','schema_version':4,'contract_version':'1.0.0',
         'checks':checks,'source_fingerprints_match':fingerprint,
         'runtime_manifest_sha256':hashlib.sha256(json.dumps(runtime,sort_keys=True).encode()).hexdigest(),
@@ -71,7 +71,7 @@ def main():
                 for name,data in actual.items():
                     path=destination/name; assert path.resolve().is_relative_to(destination)
                     path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(data)
-                code="import importlib.util,sys,pathlib; p=pathlib.Path(sys.argv[1]);s=importlib.util.spec_from_file_location('ready_pkg',p/'__init__.py',submodule_search_locations=[str(p)]);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);from ready_pkg.plugin import create_plugin;q=create_plugin();assert q.get_components();assert q.config.plugin.config_version=='3' and not q.config.plugin.enabled;assert m.__version__=='0.3.0'"
+                code="import importlib.util,sys,pathlib; p=pathlib.Path(sys.argv[1]);s=importlib.util.spec_from_file_location('ready_pkg',p/'__init__.py',submodule_search_locations=[str(p)]);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);from ready_pkg.plugin import create_plugin;q=create_plugin();assert q.get_components();assert q.config.plugin.config_version=='3' and not q.config.plugin.enabled;assert m.__version__=='0.3.1'"
                 subprocess.run([sys.executable,'-I','-c',code,str(destination)],cwd=destination,check=True,timeout=20)
         verification={'passed':True,'artifact':args.output.name,'sha256':checksum,'files':len(actual),
             'bytes':args.output.stat().st_size,'exact_source_match':True,'fresh_process_import':True,'default_disabled':True,

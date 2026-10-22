@@ -10,18 +10,18 @@ package = types.ModuleType("maibot_autonomous_planning_plugin")
 package.__path__ = [str(ROOT)]
 sys.modules.setdefault("maibot_autonomous_planning_plugin", package)
 
-from maibot_autonomous_planning_plugin.core.activity_state import (
+from maibot_autonomous_planning_plugin.maivita.legacy.core.activity_state import (
     PUBLIC_SLEEP_DESCRIPTION,
     PUBLIC_SLEEP_NAME,
     is_locked_sleep,
     public_activity_text,
     public_error_text,
 )
-from maibot_autonomous_planning_plugin.planner.generator.validator import ScheduleSemanticValidator
-from maibot_autonomous_planning_plugin.planner.generator.config import ScheduleGeneratorConfig
-from maibot_autonomous_planning_plugin.planner.generator.prompt_builder import PromptBuilder
-from maibot_autonomous_planning_plugin.planner.schedule_constraints import normalize_daily_schedule
-from maibot_autonomous_planning_plugin.utils.time_utils import TimeParseError, TimeRange, parse_hhmm
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.generator.validator import ScheduleSemanticValidator
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.generator.config import ScheduleGeneratorConfig
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.generator.prompt_builder import PromptBuilder
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.schedule_constraints import normalize_daily_schedule
+from maibot_autonomous_planning_plugin.maivita.shared.utils.time_utils import TimeParseError, TimeRange, parse_hhmm
 
 
 class TimeConstraintTests(unittest.TestCase):

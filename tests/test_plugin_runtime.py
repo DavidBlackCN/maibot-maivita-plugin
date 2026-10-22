@@ -9,7 +9,7 @@ package.__path__ = [str(ROOT)]
 sys.modules.setdefault("maibot_autonomous_planning_plugin", package)
 
 try:
-    from maibot_autonomous_planning_plugin.legacy_plugin import AutonomousPlanningPluginV4
+    from maibot_autonomous_planning_plugin.maivita.legacy.plugin import AutonomousPlanningPluginV4
 except ModuleNotFoundError as exc:
     if exc.name == "maibot_sdk":
         raise unittest.SkipTest("maibot_sdk 未安装，跳过 SDK 生命周期/Hook 集成测试") from exc
@@ -86,7 +86,7 @@ class PluginRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_sleep_send_hook_allows_scoped_command_reply_only(self):
         plugin = AutonomousPlanningPluginV4.__new__(AutonomousPlanningPluginV4)
         plugin.is_sleeping_now = lambda: True
-        from maibot_autonomous_planning_plugin.integrations.safety import ReplyPermits
+        from maibot_autonomous_planning_plugin.maivita.integrations.safety import ReplyPermits
         plugin._reply_permits = ReplyPermits()
         observed = []
 

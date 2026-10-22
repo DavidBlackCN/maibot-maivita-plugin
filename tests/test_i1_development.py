@@ -9,11 +9,11 @@ import unittest
 
 import r0_support
 from maibot_sdk.context import PluginContext,PluginPaths
-from maibot_autonomous_planning_plugin.development.config import DevelopmentConfig
-from maibot_autonomous_planning_plugin.development.model_port import SDKModelPort,parse_candidate
-from maibot_autonomous_planning_plugin.development.plugin import MaiVitaDevelopmentPlugin,BEGIN
-from maibot_autonomous_planning_plugin.domain.commands import Command
-from maibot_autonomous_planning_plugin.storage.safety import WriterLease
+from maibot_autonomous_planning_plugin.maivita.host.config import DevelopmentConfig
+from maibot_autonomous_planning_plugin.maivita.host.model_port import SDKModelPort,parse_candidate
+from maibot_autonomous_planning_plugin.maivita.host.plugin import MaiVitaDevelopmentPlugin,BEGIN
+from maibot_autonomous_planning_plugin.maivita.life.domain.commands import Command
+from maibot_autonomous_planning_plugin.maivita.life.storage.safety import WriterLease
 
 
 def settings(work,**model):
@@ -54,7 +54,7 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([p.name for p in self.work.rglob('*.db')],['maivita.db'])
 
     async def test_failure_after_runtime_start_cleans_worker_and_both_leases(self):
-        from maibot_autonomous_planning_plugin.life_state.runtime import DevelopmentRuntime
+        from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import DevelopmentRuntime
         original=DevelopmentRuntime.start
         def fail(runtime): original(runtime); raise RuntimeError('partial load failure')
         with patch.object(DevelopmentRuntime,'start',fail):
@@ -148,14 +148,23 @@ class DevelopmentConfigTests(unittest.TestCase):
             with self.subTest(value=value),self.assertRaises(ValueError): DevelopmentConfig.model_validate({section:value})
 
     def test_package_is_allowlisted_self_contained_and_not_released_without_acceptance(self):
-        from maibot_autonomous_planning_plugin.development.package import stage,build_zip,file_manifest
+        from maibot_autonomous_planning_plugin.tools.package import stage,build_zip,file_manifest
         with tempfile.TemporaryDirectory(prefix='maivita-i1-package-') as temp:
             directory=Path(temp).resolve(); target=directory/'candidate'
             manifest=stage(target)
             self.assertEqual(manifest,file_manifest())
             self.assertFalse(any(name.endswith(('config.toml','.db','.pyc','.env')) or name.startswith(('tests/','evidence/')) for name in manifest))
             self.assertIn('LICENSE',manifest); self.assertIn('ROLLBACK.md',manifest)
-            self.assertIn('legacy_plugin.py',manifest)
+            self.assertIn('maivita/legacy/plugin.py',manifest)
+            # Internal notes must stay private even if an operator recreates
+            # the ignored directory next to an otherwise installable package.
+            import importlib
+            packaging=importlib.import_module(stage.__module__)
+            private=target/'docs/development'
+            private.mkdir(parents=True)
+            (private/'ARCHITECTURE.md').write_text('Internal packaging canary',encoding='utf-8')
+            with patch.object(packaging,'ROOT',target):
+                self.assertFalse(any(name.startswith('docs/development/') for name in packaging.entries()))
             import subprocess,sys
             code="import importlib.util,sys; p=sys.argv[1]; s=importlib.util.spec_from_file_location('i1_candidate',p+'/__init__.py',submodule_search_locations=[p]); m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m); from i1_candidate.plugin import create_plugin; assert create_plugin().get_components()"
             result=subprocess.run([sys.executable,'-c',code,str(target)],cwd=directory,capture_output=True,timeout=10)

@@ -8,7 +8,7 @@ package = types.ModuleType("maibot_autonomous_planning_plugin")
 package.__path__ = [str(ROOT)]
 sys.modules.setdefault("maibot_autonomous_planning_plugin", package)
 
-from maibot_autonomous_planning_plugin.planner.generator.response_parser import LLMResponseParser
+from maibot_autonomous_planning_plugin.maivita.legacy.planner.generator.response_parser import LLMResponseParser
 
 
 class ResponseParserTests(unittest.TestCase):

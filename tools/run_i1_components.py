@@ -8,7 +8,7 @@ import sys
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
 from integration_tests.process_job import ProcessJob
-from development.package import runtime_manifest as file_manifest
+from tools.package import runtime_manifest as file_manifest
 
 if __name__=='__main__':
     (root/'evidence/integration-ready').mkdir(parents=True,exist_ok=True)

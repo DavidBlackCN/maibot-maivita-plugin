@@ -60,7 +60,7 @@ async def run():
         results['command']={'passed':True,'unlisted_stream_denied':True,'platform_delivery':'not_tested'}
         from src.common.paths import get_instance_root
         # Real second writer refusal while the Host plugin owns its lease.
-        from maivita_i1_source.storage.safety import WriterLease
+        from maivita_i1_source.maivita.life.storage.safety import WriterLease
         lease=WriterLease(get_instance_root()/'maivita-writer.lock')
         try: lease.acquire()
         except RuntimeError: results['single_writer']={'passed':True}

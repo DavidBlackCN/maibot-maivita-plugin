@@ -12,7 +12,7 @@ import tomllib
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
 from verify_ready import verification_manifest
-from development.package import entries,runtime_manifest,HOST_COMMIT
+from tools.package import entries,runtime_manifest,HOST_COMMIT
 
 
 def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -32,7 +32,13 @@ def main():
             Path(name).name in ('config.toml','model_config.toml') or name.endswith(('.db','.sqlite','.pyc','.log','.pem','.key'))]
     assert not denied,denied
     secrets=[]
-    for instance in ('i1-instance','ready-instance','ready-final-instance','ready-gated-instance'):
+    instances={'i1-instance','ready-instance','ready-final-instance','ready-gated-instance'}
+    # Include newly prepared, explicitly synthetic instances as well. Their UI
+    # tokens are unique even when the same dedicated test provider is used.
+    for marker in (root/'.integration').glob('*/.maivita-i1-test-instance.json'):
+        if json.loads(marker.read_text(encoding='utf-8')).get('production_data') is False:
+            instances.add(marker.parent.name)
+    for instance in sorted(instances):
         directory=root/'.integration'/instance
         path=directory/'config/model_config.toml'
         if path.exists():

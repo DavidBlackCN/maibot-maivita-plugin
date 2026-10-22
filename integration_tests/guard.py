@@ -37,7 +37,7 @@ def install_guard(work, source, repository, *, ipc_port=None, allow_loopback_bin
             if not writing and not any(inside(path,root) for root in read_roots):
                 # MaiVita is imported as source only, never from its config/data.
                 if not ((inside(path,repository) and path.suffix in ('.py','.pyc')) or
-                        (path.parent==repository/'storage/migrations' and path.suffix=='.sql')):
+                        (path.parent==repository/'maivita/life/storage/migrations' and path.suffix=='.sql')):
                     raise PermissionError('I0_READ_OUTSIDE_SOURCE_OR_TEMP: '+str(path))
         elif event in ('os.remove','os.rmdir','os.mkdir','os.chmod','os.utime'):
             path=path_for(args[0])

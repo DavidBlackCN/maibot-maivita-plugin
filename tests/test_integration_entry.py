@@ -13,10 +13,10 @@ import tomli_w
 
 import r0_support
 from maibot_sdk.context import PluginContext, PluginPaths
-from maibot_autonomous_planning_plugin.entrypoint import create_plugin
-from maibot_autonomous_planning_plugin.integration_config import IntegrationConfig
-from maibot_autonomous_planning_plugin.storage.safety import WriterLease
-from maibot_autonomous_planning_plugin.integrations.contracts import IdentityDecision, IdentityRequest, contract_descriptor
+from maibot_autonomous_planning_plugin.maivita.host.entrypoint import create_plugin
+from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
+from maibot_autonomous_planning_plugin.maivita.life.storage.safety import WriterLease
+from maibot_autonomous_planning_plugin.maivita.integrations.contracts import IdentityDecision, IdentityRequest, contract_descriptor
 
 spec=importlib.util.spec_from_file_location('switch_fixture',r0_support.ROOT/'tools/switch_engine.py')
 switch=importlib.util.module_from_spec(spec); spec.loader.exec_module(switch)
@@ -113,7 +113,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_authority_commit_self_cleans_and_retains_lease_recoverability(self):
         plugin=self.plugin()
-        with patch('maibot_autonomous_planning_plugin.activation.atomic_record',side_effect=OSError('disk failure')):
+        with patch('maibot_autonomous_planning_plugin.maivita.host.activation.atomic_record',side_effect=OSError('disk failure')):
             with self.assertRaises(OSError): await plugin.on_load()
         self.assertFalse(plugin.ready)
         with WriterLease(self.work/'writer.lock'): pass

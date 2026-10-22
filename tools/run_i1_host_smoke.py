@@ -18,7 +18,7 @@ import tomlkit
 
 ROOT=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(ROOT))
 from integration_tests.process_job import ProcessJob
-from development.package import runtime_manifest as file_manifest,HOST_COMMIT
+from tools.package import runtime_manifest as file_manifest,HOST_COMMIT
 
 HOST=Path(os.environ.get('MAIVITA_HOST_SOURCE',ROOT.parent/'maibot'))
 INSTANCE=Path(os.environ.get('MAIVITA_TEST_INSTANCE',ROOT/'.integration/ready-instance'))

@@ -8,9 +8,9 @@ import json
 
 from r1_support import AT, clock
 from r0_support import ROOT
-from maibot_autonomous_planning_plugin.domain.clock import to_epoch_ms
-from maibot_autonomous_planning_plugin.storage.life_database import LifeDatabase, connect
-from maibot_autonomous_planning_plugin.storage.schema import Migration, SchemaError, migrate, migrations, validate_schema
+from maibot_autonomous_planning_plugin.maivita.life.domain.clock import to_epoch_ms
+from maibot_autonomous_planning_plugin.maivita.life.storage.life_database import LifeDatabase, connect
+from maibot_autonomous_planning_plugin.maivita.life.storage.schema import Migration, SchemaError, migrate, migrations, validate_schema
 
 
 class MigrationTests(unittest.TestCase):

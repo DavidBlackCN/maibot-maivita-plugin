@@ -4,11 +4,11 @@ import unittest
 
 from test_life_engine import EngineFixture
 from r1_support import AT
-from maibot_autonomous_planning_plugin.domain.models import DomainError,Preference,SleepSegment
-from maibot_autonomous_planning_plugin.events.dispatcher import EventDispatcher
-from maibot_autonomous_planning_plugin.integrations.behavior import BehaviorHandoff
-from maibot_autonomous_planning_plugin.integrations.memory import MemoryAdapter
-from maibot_autonomous_planning_plugin.life_state.subjective import sleep_debt
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import DomainError,Preference,SleepSegment
+from maibot_autonomous_planning_plugin.maivita.life.events.dispatcher import EventDispatcher
+from maibot_autonomous_planning_plugin.maivita.integrations.behavior import BehaviorHandoff
+from maibot_autonomous_planning_plugin.maivita.integrations.memory import MemoryAdapter
+from maibot_autonomous_planning_plugin.maivita.life.life_state.subjective import sleep_debt
 
 
 class ContinuityTests(EngineFixture,unittest.TestCase):
@@ -73,7 +73,7 @@ class ContinuityTests(EngineFixture,unittest.TestCase):
             self.assertEqual(u.summaries.all(),[]); self.assertEqual(u.activities.all()[0],source)
 
     def test_sleep_debt_midnight_split_recompute_and_unknown_gap(self):
-        from maibot_autonomous_planning_plugin.domain.clock import UTC
+        from maibot_autonomous_planning_plugin.maivita.life.domain.clock import UTC
         from datetime import datetime
         start=datetime(2026,10,20,23,tzinfo=UTC); end=start+timedelta(hours=2)
         segment=SleepSegment(segment_id='s',session_id='session',character_id='default',started_at=start,ended_at=end,provenance='fixture')

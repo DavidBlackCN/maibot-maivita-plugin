@@ -12,12 +12,12 @@ from maibot_sdk import API,Command,HookHandler,MaiBotPlugin,Tool
 ROOT=Path(os.environ['MAIVITA_I0_SOURCE'])
 package=types.ModuleType('maivita_i0_core'); package.__path__=[str(ROOT)]
 sys.modules.setdefault(package.__name__,package)
-from maivita_i0_core.compatibility.life_bridge import LegacyLifeBridge
-from maivita_i0_core.domain.clock import ManualClock,UTC
-from maivita_i0_core.integrations.life_api import LifeAPI
-from maivita_i0_core.integrations.safety import OwnedFrequency
-from maivita_i0_core.life_state.runtime import DevelopmentRuntime
-from maivita_i0_core.storage.life_database import LifeDatabase
+from maivita_i0_core.maivita.compatibility.life_bridge import LegacyLifeBridge
+from maivita_i0_core.maivita.life.domain.clock import ManualClock,UTC
+from maivita_i0_core.maivita.integrations.life_api import LifeAPI
+from maivita_i0_core.maivita.integrations.safety import OwnedFrequency
+from maivita_i0_core.maivita.life.life_state.runtime import DevelopmentRuntime
+from maivita_i0_core.maivita.life.storage.life_database import LifeDatabase
 from datetime import datetime
 
 

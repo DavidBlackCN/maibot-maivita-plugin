@@ -10,7 +10,7 @@ class ConfigExampleTests(unittest.TestCase):
     def test_example_is_valid_toml_and_contains_all_sections(self):
         with (ROOT / "tests/fixtures/config.r0.example.toml").open("rb") as file:
             config = tomllib.load(file)
-        from maibot_autonomous_planning_plugin.config_models import MaiVitaConfig
+        from maibot_autonomous_planning_plugin.maivita.legacy.config_models import MaiVitaConfig
         model = MaiVitaConfig.model_validate(config)
         config = {"plugin": config["plugin"], "schedule": model.schedule.model_dump(),
                   "inject": model.inject.model_dump(), "autonomous_planning": model.autonomous_planning.model_dump()}

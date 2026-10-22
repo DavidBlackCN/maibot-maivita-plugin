@@ -13,12 +13,12 @@ import unittest
 from unittest.mock import patch
 
 from r1_support import ROOT, AT, activity, clock, sleeping, state
-from maibot_autonomous_planning_plugin.domain.models import (
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import (
     Commitment, DomainError, LifeEvent, LifeGoal, Plan, Preference, ScheduleItem, ScheduleRevision,
 )
-from maibot_autonomous_planning_plugin.storage.life_database import LifeDatabase
-from maibot_autonomous_planning_plugin.storage.repositories import RepositoryError
-from maibot_autonomous_planning_plugin.storage.schema import SchemaError
+from maibot_autonomous_planning_plugin.maivita.life.storage.life_database import LifeDatabase
+from maibot_autonomous_planning_plugin.maivita.life.storage.repositories import RepositoryError
+from maibot_autonomous_planning_plugin.maivita.life.storage.schema import SchemaError
 
 
 class StorageTests(unittest.TestCase):
@@ -166,8 +166,8 @@ from pathlib import Path
 from dataclasses import replace
 sys.path.insert(0, str(Path(sys.argv[1]) / "tests"))
 from r1_support import AT, clock
-from maibot_autonomous_planning_plugin.domain.models import LifeEvent
-from maibot_autonomous_planning_plugin.storage.life_database import LifeDatabase
+from maibot_autonomous_planning_plugin.maivita.life.domain.models import LifeEvent
+from maibot_autonomous_planning_plugin.maivita.life.storage.life_database import LifeDatabase
 db=LifeDatabase(Path(sys.argv[2]),clock=clock())
 with db.unit_of_work() as u:
     old=u.states.get("default")
@@ -202,7 +202,7 @@ with db.unit_of_work() as u:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys=ON")
             return conn
-        with patch("maibot_autonomous_planning_plugin.storage.life_database.connect", side_effect=failing_connect):
+        with patch("maibot_autonomous_planning_plugin.maivita.life.storage.life_database.connect", side_effect=failing_connect):
             with self.assertRaisesRegex(sqlite3.OperationalError, "disk full"):
                 with self.db.unit_of_work() as uow:
                     uow.events.add(self.event())
