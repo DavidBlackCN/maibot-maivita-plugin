@@ -10,6 +10,50 @@ from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import De
 
 
 class LifeAPITests(EngineFixture,unittest.IsolatedAsyncioTestCase):
+    async def test_source_less_activity_and_plan_are_hidden_from_public_api(self):
+        async def model(*args): self.fail('read must not call model')
+        runtime=DevelopmentRuntime(self.db,model,lock_path=Path(self.temp.name).resolve()/'writer.lock').start()
+        try:
+            command=self.command('start_activity',{'name':'private activity','visibility':'restricted'})
+            # Construct a historical command fixture, bypassing only the new
+            # creation boundary. Production callers cannot deserialize Command.
+            object.__setattr__(command,'payload',{'name':'private activity','visibility':'source_stream'})
+            self.engine.execute(command)
+            now=self.clock.now_utc()
+            command=self.command('apply_plan_patch',{'reason':'test','local_date':'2026-10-21','upserts':[
+                {'item_id':'private-plan','name':'private plan','visibility':'restricted',
+                 'time_mode':'fixed','start_at':now.isoformat(),'end_at':(now+timedelta(hours=1)).isoformat()}]})
+            payload=dict(command.payload)
+            payload['upserts']=[dict(payload['upserts'][0],visibility='source_stream')]
+            object.__setattr__(command,'payload',payload)
+            self.engine.execute(command)
+            api=LifeAPI(runtime)
+            for args in ({}, {'stream_id':'forged','private_details':True}):
+                state=await api.call('get_life_state',args)
+                plan=await api.call('get_plan',args)
+                legacy=await api.call('get_current_activity',args)
+                self.assertIsNone(state['data']['activity'])
+                self.assertEqual(plan['data']['items'],[])
+                self.assertNotIn('private activity',str(legacy))
+                self.assertNotIn('private plan',str(legacy))
+            private=LifeAPI(runtime,scope_resolver=lambda ctx:QueryScope(private_details=True))
+            self.assertEqual((await private.call('get_life_state'))['data']['activity']['name'],'private activity')
+            self.assertEqual(len((await private.call('get_plan'))['data']['items']),1)
+        finally: await runtime.close()
+
+    def test_source_visibility_requires_nonempty_matching_origin(self):
+        from types import SimpleNamespace
+        from maibot_autonomous_planning_plugin.maivita.life.life_state.projections import visible
+        for source in (None, '', ' ', 'source'):
+            record=SimpleNamespace(visibility='source_stream',source_stream_id=source)
+            for target in (None, '', ' ', 'source', 'other'):
+                with self.subTest(source=source,target=target):
+                    self.assertEqual(visible(record,QueryScope(target)),source=='source' and target=='source')
+            self.assertTrue(visible(record,QueryScope(private_details=True)))
+        self.assertFalse(visible(SimpleNamespace(visibility='source_stream'),QueryScope()))
+        self.assertTrue(visible(SimpleNamespace(visibility='public_summary'),QueryScope()))
+        self.assertFalse(visible(SimpleNamespace(visibility='restricted'),QueryScope('source')))
+
     async def test_legacy_tools_propose_plan_goals_and_explicit_preserved_delete(self):
         from maibot_autonomous_planning_plugin.maivita.compatibility.life_tools import LifeToolAdapter
         async def model(*args): self.fail('mapping must not call LLM')

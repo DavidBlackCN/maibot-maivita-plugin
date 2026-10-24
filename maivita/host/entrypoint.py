@@ -198,6 +198,26 @@ class MaiVitaPlugin(MaiBotPlugin):
     async def get_availability(self, **kwargs): return await self.life_query('get_availability')
     @API('get_diagnostics', public=True, version='1')
     async def get_diagnostics(self, **kwargs): return await self.life_query('get_diagnostics')
+    @API('get_public_events', public=True, version='1')
+    async def get_public_events(self, after_version=0, after_index=-1, limit=50, **kwargs):
+        if not self.ready: return self.unavailable('NOT_READY')
+        if self.selected_mode != 'life': return self.unavailable('ENGINE_UNAVAILABLE')
+        if not self.delegate.ready: return self.unavailable('NOT_READY')
+        from ..integrations.social import public_events
+        from ..life.domain.models import DomainError
+        try:
+            data=public_events(self.delegate.runtime.database,after_version,after_index,limit)
+            return {'api_version':1,'ok':True,'data':data,'error':None}
+        except (DomainError,ValueError,TypeError): return self.unavailable('INVALID_ARGUMENT')
+
+    @API('get_public_route_scope', public=True, version='1')
+    async def get_public_route_scope(self, stream_id=None, **kwargs):
+        if not self.ready or self.selected_mode != 'life' or not self.delegate.ready:
+            return self.unavailable('ENGINE_UNAVAILABLE')
+        if type(stream_id) is not str or stream_id not in self.active_config.instance.allowed_streams:
+            return self.unavailable('ROUTE_UNAVAILABLE')
+        return {'api_version':1,'ok':True,'data':{'stream_id':stream_id,'character_id':'default','guarded':True,
+            'config_digest':self.authority['config_sha256']},'error':None}
     @API('request_replan', public=True, version='1')
     async def request_replan(self, **kwargs): return self.unavailable('PERMISSION_DENIED')
     @API('request_wakeup', public=True, version='1')

@@ -11,8 +11,12 @@ class QueryScope:
 
 
 def visible(record, scope):
+    source_stream_id = getattr(record, 'source_stream_id', None)
     return record.visibility == 'public_summary' or scope.private_details or (
-        record.visibility == 'source_stream' and getattr(record,'source_stream_id',None) == scope.stream_id)
+        record.visibility == 'source_stream'
+        and isinstance(source_stream_id, str)
+        and bool(source_stream_id.strip())
+        and source_stream_id == scope.stream_id)
 
 
 class LifeQueries:

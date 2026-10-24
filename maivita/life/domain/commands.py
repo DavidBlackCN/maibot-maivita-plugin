@@ -27,6 +27,15 @@ class Command:
         integer(self.expected_state_version)
         require(self.source in ('internal', 'legacy_observed', 'model', 'authorized'), "unknown command source")
         require(isinstance(self.payload, Mapping), "command payload must be an object")
+        # These records have no authenticated source field in schema 4. Keep
+        # old rows readable, but reject new promises of source-only visibility.
+        records = [self.payload] if self.kind in ('start_activity', 'start_secondary', 'manage_goal') else []
+        if self.kind == 'apply_plan_patch':
+            records = self.payload.get('upserts', ())
+        elif self.kind == 'update_direction':
+            records = self.payload.get('goals', ())
+        for record in records:
+            require(record.get('visibility') != 'source_stream', 'source_stream requires a trusted record source; unsupported for this record')
         object.__setattr__(self, 'payload', freeze_json(self.payload))
         if self.expires_at is not None:
             object.__setattr__(self, 'expires_at', as_utc(self.expires_at))

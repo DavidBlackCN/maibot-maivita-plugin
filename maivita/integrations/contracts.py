@@ -1,5 +1,6 @@
 """Frozen v1 wire shapes. Validation does not authenticate an issuer."""
 from datetime import datetime
+import json
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -9,6 +10,15 @@ VERSION = '1.0.0'
 class Contract(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     contract_version: Literal['1.0.0'] = VERSION
+
+    @classmethod
+    def from_wire(cls, value):
+        """JSON-aware strict parsing; never relax the Python model globally."""
+        if type(value) is dict:
+            value = json.dumps(value, allow_nan=False)
+        if type(value) not in (str, bytes):
+            raise ValueError('JSON object or encoded JSON required')
+        return cls.model_validate_json(value)
 
     @model_validator(mode='after')
     def aware_times(self):
@@ -83,6 +93,9 @@ class SocialAck(Contract):
 
 def contract_descriptor():
     return {'contract_version': VERSION, 'status': 'frozen_for_joint_testing',
+            'host': '1.3.12', 'sdk': '2.15.0',
+            'plugin_version': '0.3.1',
+            'public_event_feed': {'api':'get_public_events','version':'1','mode':'read_only_pull','max_batch':100},
             'owner_auth': {'enabled': False, 'reason': 'H03_NO_TRUSTED_IDENTITY_TRANSPORT'},
             'policy': {'enabled': False, 'reason': 'NO_VERIFIED_EXTERNAL_POLICY_TRANSPORT'},
             'social': {'enabled': False, 'reason': 'NO_VERIFIED_CONSUMER_TRANSPORT'},

@@ -2,6 +2,7 @@
 from pathlib import Path
 import asyncio
 import importlib.metadata
+import os
 import json
 import re
 
@@ -43,6 +44,8 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         cfg=self.config
         if not cfg.plugin.enabled: return
         try:
+            if os.environ.get('MAIBOT_HOST_VERSION') != HOST_VERSION:
+                raise RuntimeError('I1 requires the audited Host '+HOST_VERSION)
             if importlib.metadata.version('maibot-plugin-sdk')!=SDK_VERSION:
                 raise RuntimeError('I1 requires the audited SDK '+SDK_VERSION)
             await assert_no_old_writer(self.ctx)

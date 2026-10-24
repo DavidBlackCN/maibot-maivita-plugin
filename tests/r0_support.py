@@ -1,5 +1,7 @@
 """Load hyphenated distribution and source-execute fixed Host contracts offline."""
 import ast
+import os
+os.environ.setdefault('MAIBOT_HOST_VERSION','1.3.12')  # isolated Host fixture
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path

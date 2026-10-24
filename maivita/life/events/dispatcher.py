@@ -1,13 +1,23 @@
 from datetime import timedelta
+from dataclasses import dataclass
+import asyncio
 
 from ..domain.clock import to_epoch_ms
 from ..domain.models import require
 
 
+@dataclass(frozen=True)
+class DeliveryResult:
+    event_id: str
+    status: str
+
+
 class EventDispatcher:
-    def __init__(self, database, consumers=None, *, fault=None):
+    def __init__(self, database, consumers=None, *, fault=None, timeout_seconds=2):
         self.database,self.consumers = database,dict(consumers or {})
         self.fault = fault or (lambda point:None)
+        require(0 < timeout_seconds <= 5, 'invalid consumer timeout')
+        self.timeout_seconds=timeout_seconds
 
     def subscribe(self, consumer_id, handler, prefix='life.'):
         require(consumer_id and prefix.startswith('life.'), 'invalid subscription')
@@ -58,16 +68,24 @@ class EventDispatcher:
                 u.commit()
             sent+=1
             acknowledged=False
+            terminal=None
             try:
                 # Consumer must durably deduplicate event_id. An RPC returning
                 # unknown outcome is retried with exactly the same event_id.
-                acknowledged=await self.consumers[consumer_id](event) == event.event_id
+                result=await asyncio.wait_for(self.consumers[consumer_id](event),self.timeout_seconds)
+                acknowledged=result == event.event_id
+                if isinstance(result,DeliveryResult) and result.event_id == event.event_id:
+                    acknowledged=result.status in ('accepted','duplicate')
+                    terminal={'expired':'expired','rejected':'failed'}.get(result.status)
                 self.fault('after_delivery_before_ack')
             except Exception:
                 acknowledged=False
+                terminal=None
             with self.database.unit_of_work() as u:
                 if acknowledged:
                     u.connection.execute("UPDATE event_deliveries SET status='acknowledged',acknowledged_at_ms=? WHERE event_id=? AND consumer_id=?",(now_ms,event.event_id,consumer_id))
+                elif terminal:
+                    u.connection.execute('UPDATE event_deliveries SET status=? WHERE event_id=? AND consumer_id=?',(terminal,event.event_id,consumer_id))
                 elif attempt >= 5:
                     u.connection.execute("UPDATE event_deliveries SET status='failed' WHERE event_id=? AND consumer_id=?",(event.event_id,consumer_id))
                 u.commit()

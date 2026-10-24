@@ -64,6 +64,7 @@ class DevelopmentRuntime:
         self.last_check=None
         self.stop_event=asyncio.Event()
         self.worker_task=None
+        self.background_tasks=set()
 
     def start(self):
         self.lease.acquire()
@@ -136,14 +137,28 @@ class DevelopmentRuntime:
         """
         require(self.opened and self.worker_task is None,'runtime loop already running/not started')
         self.worker_task=asyncio.current_task()
-        try:
+        async def background(operation):
             while not self.stop_event.is_set():
-                self.tick()
-                await self.process_triggers()
-                await self.dispatcher.dispatch()
+                await operation()
                 try: await asyncio.wait_for(self.stop_event.wait(),1)
                 except TimeoutError: pass
-        finally: self.worker_task=None
+        try:
+            while not self.stop_event.is_set():
+                if not self.background_tasks:
+                    self.background_tasks={asyncio.create_task(background(self.process_triggers)),
+                                           asyncio.create_task(background(self.dispatcher.dispatch))}
+                for task in self.background_tasks:
+                    if task.done():
+                        await task  # Surface worker failures to the host readiness gate.
+                        raise RuntimeError('life background worker stopped')
+                self.tick()
+                try: await asyncio.wait_for(self.stop_event.wait(),1)
+                except TimeoutError: pass
+        finally:
+            for task in self.background_tasks: task.cancel()
+            await asyncio.gather(*self.background_tasks,return_exceptions=True)
+            self.background_tasks.clear()
+            self.worker_task=None
 
     def switch_modes(self, config):
         state=self.engine.state()
