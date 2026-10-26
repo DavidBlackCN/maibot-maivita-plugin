@@ -58,16 +58,18 @@ def main():
     generic=re.compile(rb'(?:sk-[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{24,}|-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----)')
     suspicious=[name for name,data in content.items() if generic.search(data)]
     assert not leaked and not suspicious,(leaked,suspicious)
-    host=root.parent/'maibot'; lock=json.loads((host/'.maivita-i1-source.json').read_text())
+    host=Path(os.environ.get('MAIVITA_HOST_SOURCE',root.parent/'maibot'))
+    reference_root=Path(os.environ.get('MAIVITA_REFERENCE_ROOT',root.parent))
+    lock=json.loads((host/'.maivita-i1-source.json').read_text())
     assert lock['host_commit']==HOST_COMMIT
     host_changes=[name for name,sha in lock['files'].items() if digest(host/name)!=sha]
     assert not host_changes,host_changes
     preserved=json.loads((root/'tests/fixtures/preserved-files.json').read_text())
     assert all(digest(root/name)==sha for name,sha in preserved.items())
-    old=root.parent/'maibot-autonomous-planning-plugin'
+    old=reference_root/'maibot-autonomous-planning-plugin'
     baseline=json.loads((root/'evidence/baseline.json').read_text())
     old_changed=[item['path'] for item in baseline['files'] if item.get('kind')!='original_design' and digest(old/item['path'])!=item['sha256']]
-    owner=root.parent/'maibot-owner-auth-plugin'
+    owner=reference_root/'maibot-owner-auth-plugin'
     expected=json.loads((root/'evidence/r3-contract-matrix.json').read_text())['owner_auth']
     owner_changed=[name for name,sha in expected['source_files'].items() if digest(owner/name)!=sha]
     assert not old_changed and not owner_changed
