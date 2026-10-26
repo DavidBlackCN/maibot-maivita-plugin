@@ -18,7 +18,7 @@ import tomlkit
 
 ROOT=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(ROOT))
 from integration_tests.process_job import ProcessJob
-from tools.package import runtime_manifest as file_manifest,HOST_COMMIT
+from tools.package import runtime_manifest as file_manifest,HOST_COMMIT,SDK_VERSION
 
 HOST=Path(os.environ.get('MAIVITA_HOST_SOURCE',ROOT.parent/'maibot'))
 INSTANCE=Path(os.environ.get('MAIVITA_TEST_INSTANCE',ROOT/'.integration/ready-instance'))
@@ -30,10 +30,21 @@ def main():
     parser.add_argument('--agreements-confirmed',action='store_true',help='operator has explicitly agreed to Host EULA and privacy for this test')
     parser.add_argument('--exercise-model',action='store_true',help='one configured startup decision using the dedicated real provider')
     args=parser.parse_args()
+    actual_sdk=subprocess.check_output([str(PYTHON),'-c',"import importlib.metadata; print(importlib.metadata.version('maibot-plugin-sdk'))"],text=True).strip()
+    if actual_sdk!=SDK_VERSION: raise ValueError('I1 SDK does not match selected baseline')
     if not args.agreements_confirmed: parser.error('explicit user agreement required before starting Host')
+    source=json.loads((HOST/'.maivita-i1-source.json').read_text(encoding='utf8'))
+    pinned=ROOT/'tests/fixtures'/('i1-'+HOST_COMMIT+'-source-lock.json')
+    if pinned.exists():
+        expected=json.loads(pinned.read_text(encoding='utf8'))
+        if source['files']!=expected['host_files'] or source['archive_sha256']!=expected['host_archive_sha256']:
+            raise ValueError('Host marker differs from reviewed source lock')
+    if source['host_commit']!=HOST_COMMIT or any(hashlib.sha256((HOST/name).read_bytes()).hexdigest()!=sha for name,sha in source['files'].items()):
+        raise ValueError('complete Host source does not match selected baseline')
     (ROOT/'evidence/integration-ready').mkdir(parents=True,exist_ok=True)
     marker=json.loads((INSTANCE/'.maivita-i1-test-instance.json').read_text(encoding='utf-8'))
     if marker.get('production_data') is not False: raise ValueError('test-instance marker missing')
+    if marker.get('host_commit')!=HOST_COMMIT: raise ValueError('instance belongs to a different Host baseline')
     config=tomllib.loads((INSTANCE/'config/bot_config.toml').read_text(encoding='utf-8'))
     if config['telemetry']['enable'] is not False or config['maim_message']['enabled'] is not False or config['webui']['host']!=['127.0.0.1']:
         raise ValueError('I1 requires telemetry/platform server disabled and loopback-only WebUI')
@@ -54,7 +65,9 @@ def main():
     # checksum environment mechanism; never write counterfeit confirmation files.
     for filename,key in [('EULA.md','EULA_AGREE'),('PRIVACY.md','PRIVACY_AGREE')]:
         env[key]=hashlib.md5((HOST/filename).read_text(encoding='utf-8').encode()).hexdigest()
-    report={'host_commit':HOST_COMMIT,'sdk':'2.15.0','candidate_files':file_manifest(),
+    report={'host_commit':HOST_COMMIT,'sdk':actual_sdk,'candidate_files':file_manifest(),
+        'host_source_files_verified':len(source['files']),
+        'python':subprocess.check_output([str(PYTHON),'--version'],text=True).strip(),
         'complete_host_started':False,'real_model_requests':0,'passed_cases':[],
         'agreements':'explicit user approval; Host checksum mechanism','telemetry':False,
         'production_data':False,'passed':False,'first_install_gate':False,'scope':'complete original Host CLI, no module replacement'}
@@ -63,13 +76,13 @@ def main():
     opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),urllib.request.ProxyHandler({}))
     def request(path,payload=None):
         data=json.dumps(payload).encode() if payload is not None else None
-        with opener.open(urllib.request.Request(base+path,data=data,headers={'Content-Type':'application/json'}),timeout=5) as response:
+        with opener.open(urllib.request.Request(base+path,data=data,headers={'Content-Type':'application/json'}),timeout=20) as response:
             return json.load(response)
     process=None
     try:
         with ProcessJob() as job,log.open('wb') as stream:
             process=subprocess.Popen([str(PYTHON),str(ROOT/'tools/i1_full_host_entry.py')],cwd=INSTANCE,env=env,
-                stdin=subprocess.PIPE,stdout=stream,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                stdin=subprocess.PIPE,stdout=stream,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=='nt' else 0,start_new_session=os.name!='nt')
             job.assign(process); process.stdin.write(b'1'); process.stdin.flush()
             deadline=time.monotonic()+80
             while time.monotonic()<deadline and process.poll() is None:
@@ -146,7 +159,7 @@ def main():
                 # Runtime endpoints are queried only after successful cookie auth.
                 report['webui_ready']=True
             if process.poll() is None:
-                process.send_signal(signal.CTRL_BREAK_EVENT)
+                process.send_signal(signal.CTRL_BREAK_EVENT if os.name=='nt' else signal.SIGINT)
                 try: process.wait(timeout=55)
                 except subprocess.TimeoutExpired: report['shutdown_forced']=True
             report['host_exit_code']=process.poll()

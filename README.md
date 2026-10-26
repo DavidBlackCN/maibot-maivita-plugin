@@ -1,10 +1,12 @@
+> 2026-10-26 兼容性修订：运行时仅接受 `Host 1.3.12 / SDK 2.15.0` 与 `Host 1.3.15 / SDK 2.16.0` 两个明确配对；Manifest 的上下限不表示支持中间版本或混搭。部署时使用 Bot 自己的虚拟环境，不要用系统 Python，也不要单独降级 SDK。新版验收证据与旧版分开记录；真实 QQ、生产部署以及 H01/H02/H03 均未因此获得验收或授权。
+
 # maibot-maivita-plugin
 
 MaiVita 是 MaiBot 的生活状态引擎，维护角色共享的当前活动、计划、睡眠和历史事件，为 planner、replyer 与其他插件提供一致的公开生活上下文。
 
 - 当前版本：`0.3.1`
-- Host：`1.3.12`，固定提交 `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`
-- Plugin SDK：`2.15.0`
+- 新目标：Host `1.3.15`（`062d45cf8bd4272ac57d7ec03fcf405e5a458211`）/ SDK `2.16.0`；I1 工具使用 `MAIVITA_HOST_BASELINE=1.3.15`。
+- 保留原基线：Host `1.3.12`（`5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`）/ SDK `2.15.0`；I0 固定夹具继续验证此组合。
 - 配置版本：`3`；SQLite Schema：`4`；跨插件契约：`1.0.0`
 - 项目地址：[DavidBlackCN/maibot-maivita-plugin](https://github.com/DavidBlackCN/maibot-maivita-plugin)
 

@@ -1,14 +1,16 @@
-"""Windows process-tree containment for the disposable Host/Runner pair."""
+"""Process-tree containment for the disposable Host/Runner pair."""
 import ctypes
 from ctypes import wintypes
 import os
+import signal
 
 
 class ProcessJob:
     """Fail closed if a kill-on-close job cannot be established."""
     def __init__(self):
         if os.name!='nt':
-            raise RuntimeError('I0 process containment currently requires Windows')
+            self.groups=set()
+            return
         class BasicLimits(ctypes.Structure):
             _fields_=[('process_time',ctypes.c_int64),('job_time',ctypes.c_int64),
                 ('flags',wintypes.DWORD),('min_working',ctypes.c_size_t),('max_working',ctypes.c_size_t),
@@ -32,10 +34,21 @@ class ProcessJob:
             error=ctypes.get_last_error(); self.close(); raise ctypes.WinError(error)
 
     def assign(self,process):
+        if os.name!='nt':
+            if os.getpgid(process.pid)!=process.pid or os.getsid(process.pid)!=process.pid:
+                raise RuntimeError('isolated process must use start_new_session=True')
+            self.groups.add(process.pid)
+            return
         if not self.api.AssignProcessToJobObject(self.handle,wintypes.HANDLE(int(process._handle))):
             raise ctypes.WinError(ctypes.get_last_error())
 
     def close(self):
+        if os.name!='nt':
+            for group in self.groups:
+                try: os.killpg(group,signal.SIGKILL)
+                except ProcessLookupError: pass
+            self.groups.clear()
+            return
         if self.handle:
             self.api.CloseHandle(self.handle); self.handle=None
 

@@ -65,6 +65,16 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         descriptor=await first.get_integration_contract(owner=True)
         self.assertFalse(descriptor['owner_auth']['enabled'])
 
+    async def test_unsupported_host_refuses_both_engines_before_storage(self):
+        for mode in ('life','legacy'):
+            with self.subTest(mode=mode), patch.dict('os.environ',{'MAIBOT_HOST_VERSION':'1.3.14'}):
+                plugin=self.plugin({**self.config,'engine':{'mode':mode}})
+                with self.assertRaisesRegex(RuntimeError,'unsupported Host/SDK pair'):
+                    await plugin.on_load()
+                self.assertFalse(plugin.ready)
+                self.assertFalse((self.work/'data').exists())
+                self.assertEqual(self.calls,[])
+
     async def test_sdk_default_discovery_before_config_does_not_freeze_disabled_delegate(self):
         plugin=create_plugin(); plugin.get_components()  # Real Host discovers metadata first.
         plugin._set_context(self.ctx); plugin.set_plugin_config(self.config); plugin.get_components()

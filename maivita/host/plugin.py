@@ -1,8 +1,7 @@
 """Installable I1 lifecycle adapter. Only the new engine may run here."""
 from pathlib import Path
 import asyncio
-import importlib.metadata
-import os
+from ..runtime_versions import runtime_pair, runtime_supported
 import json
 import re
 
@@ -18,8 +17,6 @@ from .config import DevelopmentConfig
 from .model_port import SDKModelPort
 
 PLUGIN_ID='davidblackcn.maibot-maivita-plugin'
-HOST_VERSION='1.3.12'
-SDK_VERSION='2.15.0'
 BEGIN='[MaiVita I1 state]'
 END='[/MaiVita I1 state]'
 
@@ -44,10 +41,8 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         cfg=self.config
         if not cfg.plugin.enabled: return
         try:
-            if os.environ.get('MAIBOT_HOST_VERSION') != HOST_VERSION:
-                raise RuntimeError('I1 requires the audited Host '+HOST_VERSION)
-            if importlib.metadata.version('maibot-plugin-sdk')!=SDK_VERSION:
-                raise RuntimeError('I1 requires the audited SDK '+SDK_VERSION)
+            if not runtime_supported():
+                raise RuntimeError('I1 unsupported Host/SDK pair: '+repr(runtime_pair()))
             await assert_no_old_writer(self.ctx)
             data=resolve_data_dir(self.ctx)
             # Refuse legacy co-location before opening any database. No import
@@ -128,7 +123,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         if not self.ready: return self.error(self.failure_code or 'NOT_READY')
         result=await self.api.call(method,trusted_context=None)
         if method=='get_diagnostics' and result['ok']:
-            result['data'].update({'entry':'i1-development','host_contract':'1.3.12/2.15.0',
+            result['data'].update({'entry':'i1-development','host_contract':'/'.join(str(v) for v in runtime_pair()),
                 'frequency':'disabled_unsupported','owner_auth':'disabled_no_contract',
                 'privileged_writes':'denied_no_trusted_user_context','trusted_receipts':'no_silence_exception',
                 'model':self.model_port.last,'startup_decision':self.startup_result,'first_install_gate':'not_accepted'})

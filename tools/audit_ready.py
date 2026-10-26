@@ -81,7 +81,8 @@ def main():
             assert target.resolve().is_relative_to(destination)
             target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(index_content[name])
         public_cache=destination/'.integration/cache'; public_cache.mkdir(parents=True)
-        archive=root/'.integration/cache'/(HOST_COMMIT+'.tar.gz')
+        from integration_tests.source import COMMIT as I0_COMMIT
+        archive=root/'.integration/cache'/(I0_COMMIT+'.tar.gz')
         shutil.copyfile(archive,public_cache/archive.name)
         commands=[['-m','pytest','tests','-q','-p','no:cacheprovider'],
                   ['tools/setup_i0_host.py','--offline'],

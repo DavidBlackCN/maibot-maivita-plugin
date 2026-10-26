@@ -2,7 +2,7 @@
 
 状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 4 和配置 3 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
 
-修复候选仅支持 Host 1.3.12 / SDK 2.15.0。source_stream 投影要求非空匹配来源；活动、计划条目、目标的新命令不再接受 source_stream，因为 schema 4 无可信来源字段。已有行仍可加载并被公开读取过滤；没有批量改公开或数据库迁移。
+修复构建仅支持 Host 1.3.12 / SDK 2.15.0 与 Host 1.3.15 / SDK 2.16.0 两组配对；接口 host/sdk 返回实际运行版本，混搭及中间版本拒绝加载。source_stream 投影要求非空匹配来源；活动、计划条目、目标的新命令不再接受 source_stream，因为 schema 4 无可信来源字段。已有行仍可加载并被公开读取过滤；没有批量改公开或数据库迁移。
 
 get_public_events@1 是无副作用的公开拉取接口，参数 after_version / after_index 为游标，limit 为 1..100。返回事件数组、扫描游标和 as_of；即使遇到过滤或过期事件也推进扫描游标。事件摘要由固定白名单产生，绝不透传内部 payload。消费者应将接收记录与游标放在自己的同一事务中。它不创建订阅、不确认 Vita 的内部 outbox、不授权事件参数中的生产者；协调层从固定全名 API 读取以绑定来源。
 

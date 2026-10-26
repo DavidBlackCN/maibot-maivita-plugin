@@ -24,7 +24,7 @@ if __name__=='__main__':
     with ProcessJob() as job,log.open('wb') as stream:
         interpreter=Path(os.environ.get('MAIVITA_HOST_PYTHON',root/'.integration/i1-host-env/Scripts/python.exe'))
         p=subprocess.Popen([str(interpreter),'-m','integration_tests.i1_components'],
-            cwd=instance,env=env,stdin=subprocess.PIPE,stdout=stream,stderr=subprocess.STDOUT)
+            cwd=instance,env=env,stdin=subprocess.PIPE,stdout=stream,stderr=subprocess.STDOUT,start_new_session=os.name!='nt')
         try:
             job.assign(p); p.communicate(input=b'1',timeout=100)
         finally:

@@ -13,22 +13,17 @@
   },
   "host_application": {
     "min_version": "1.3.12",
-    "max_version": "1.3.12"
+    "max_version": "1.3.15"
   },
   "sdk": {
     "min_version": "2.15.0",
-    "max_version": "2.15.0"
+    "max_version": "2.16.0"
   },
   "dependencies": [
     {
       "type": "python_package",
       "name": "pillow",
       "version_spec": ">=9.0.0"
-    },
-    {
-      "type": "python_package",
-      "name": "pytz",
-      "version_spec": ">=2024.1"
     },
     {
       "type": "python_package",

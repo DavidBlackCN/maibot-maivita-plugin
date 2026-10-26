@@ -5,7 +5,7 @@ import json
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-HOST_COMMIT='5c7637e6913c84d1c3d5e742fa9e95a7e70d3501'
+from .acceptance_baseline import HOST_COMMIT, SDK_VERSION
 PACKAGES=('maivita',)
 READMES=('INSTALL.md','LIMITATIONS.md','ACCEPTANCE.md','ROLLBACK.md')
 
@@ -63,7 +63,7 @@ def build_zip(destination,acceptance):
     # Absence, failure, stale source or synthetic-only evidence never produces
     # an installable distribution. Staging is only for isolated testing.
     required={'startup','model','api','tool','command','hook','reload','shutdown','single_writer','restore','permission_denial'}
-    if (acceptance.get('host_commit')!=HOST_COMMIT or acceptance.get('sdk')!='2.15.0' or
+    if (acceptance.get('host_commit')!=HOST_COMMIT or acceptance.get('sdk')!=SDK_VERSION or
         acceptance.get('complete_host_started') is not True or acceptance.get('real_model_requests',0)<1 or
         acceptance.get('passed') is not True or set(acceptance.get('passed_cases',[]))!=required or
         acceptance.get('integration_ready') is not True or

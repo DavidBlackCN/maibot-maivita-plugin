@@ -51,3 +51,4 @@ images/
 !/tools/build_ready.py
 !/tools/rehearse_ready.py
 !/tools/audit_ready.py
+!/tools/acceptance_baseline.py

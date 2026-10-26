@@ -1,4 +1,5 @@
 """Frozen v1 wire shapes. Validation does not authenticate an issuer."""
+from ..runtime_versions import runtime_descriptor
 from datetime import datetime
 import json
 from typing import Literal
@@ -93,7 +94,7 @@ class SocialAck(Contract):
 
 def contract_descriptor():
     return {'contract_version': VERSION, 'status': 'frozen_for_joint_testing',
-            'host': '1.3.12', 'sdk': '2.15.0',
+            **runtime_descriptor(),
             'plugin_version': '0.3.1',
             'public_event_feed': {'api':'get_public_events','version':'1','mode':'read_only_pull','max_batch':100},
             'owner_auth': {'enabled': False, 'reason': 'H03_NO_TRUSTED_IDENTITY_TRANSPORT'},

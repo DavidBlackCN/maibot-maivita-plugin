@@ -10,7 +10,7 @@ import zipfile
 import subprocess
 
 root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
-from tools.package import runtime_manifest,file_manifest,entries,build_zip,HOST_COMMIT
+from tools.package import runtime_manifest,file_manifest,entries,build_zip,HOST_COMMIT,SDK_VERSION
 from verify_ready import verification_manifest
 
 
@@ -29,9 +29,9 @@ def evaluate():
         offline.get('runtime_files')==runtime and offline.get('verification_files')==verification and
         audit.get('verification_files')==verification)
     ready=(fingerprint and offline.get('passed') is True and audit.get('passed') is True and legacy.get('passed') is True
-        and restore.get('native_legacy_and_life') is True and smoke.get('host_commit')==HOST_COMMIT and smoke.get('sdk')=='2.15.0'
+        and restore.get('native_legacy_and_life') is True and smoke.get('host_commit')==HOST_COMMIT and smoke.get('sdk')==SDK_VERSION
         and smoke.get('real_model_requests',0)>=1 and len(checks)==11 and all(checks.values()))
-    result={'integration_ready':ready,'passed':ready,'host_commit':HOST_COMMIT,'sdk':'2.15.0',
+    result={'integration_ready':ready,'passed':ready,'host_commit':HOST_COMMIT,'sdk':SDK_VERSION,
         'complete_host_started':smoke.get('complete_host_started') is True,'real_model_requests':smoke.get('real_model_requests',0),
         'checks':checks,'passed_cases':sorted(key for key,value in checks.items() if value),
         'runtime_files':runtime,'source_fingerprints_match':fingerprint,
@@ -42,7 +42,7 @@ def evaluate():
         'real_ecosystem':'not_run_deferred_to_joint_testing','production_switch':False,'independent_feature_development':'frozen'}
     (directory/'acceptance.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     public={'status':'integration_ready' if ready else 'not_ready','plugin_version':'0.3.1',
-        'host_commit':HOST_COMMIT,'sdk':'2.15.0','config_version':'3','schema_version':4,'contract_version':'1.0.0',
+        'host_commit':HOST_COMMIT,'sdk':SDK_VERSION,'config_version':'3','schema_version':4,'contract_version':'1.0.0',
         'checks':checks,'source_fingerprints_match':fingerprint,
         'runtime_manifest_sha256':hashlib.sha256(json.dumps(runtime,sort_keys=True).encode()).hexdigest(),
         'static_unit_runner':result['static_unit_runner'],'public_source_and_export_audit':result['public_source_and_export_audit'],

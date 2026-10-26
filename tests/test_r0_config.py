@@ -19,6 +19,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ConfigTests(unittest.TestCase):
+    def test_timezone_validation_does_not_require_optional_pytz(self):
+        code="import sys; sys.modules['pytz']=None; from maivita.legacy.config_models import MaiVitaConfig; assert MaiVitaConfig(character={'timezone':'Asia/Shanghai'}).character.timezone=='Asia/Shanghai'"
+        result=subprocess.run([sys.executable,'-c',code],cwd=ROOT,capture_output=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stderr.decode('utf8',errors='replace'))
+        with self.assertRaisesRegex(ValueError,'unknown character timezone'):
+            MaiVitaConfig(character={'timezone':'Invalid/NoSuchZone'})
+
     def test_T01_full_v51_projection_preserves_all_fields_and_reports_permissions(self):
         old = LegacyConfig().model_dump()
         old["schedule"].update(no_sleep_mode=True, admin_users=[], timezone="Asia/Tokyo",

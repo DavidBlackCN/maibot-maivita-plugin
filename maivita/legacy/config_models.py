@@ -1,7 +1,7 @@
 """MaiVita config schema 1; R0 projects it to the legacy engine."""
 from copy import deepcopy
 from typing import Literal
-from pytz import timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import create_model, model_validator
 from maibot_sdk import Field, PluginConfigBase
 from ..compatibility.legacy_config import (
@@ -101,7 +101,10 @@ class MaiVitaConfig(StrictSection):
 
     @model_validator(mode="after")
     def validate_legacy_projection(self):
-        timezone(self.character.timezone)
+        try:
+            ZoneInfo(self.character.timezone)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError('unknown character timezone') from exc
         self.schedule
         self.autonomous_planning
         if self.sleep.mode == "legacy_fixed":
