@@ -1,6 +1,6 @@
-# MaiVita 0.3.0. Explicit isolated-instance activation only.
+# MaiVita: ready on first install; Host/adapter controls incoming sessions.
 [plugin]
-enabled = false
+enabled = true
 config_version = "3"
 
 [engine]
@@ -8,7 +8,9 @@ mode = "life"
 
 [instance]
 acknowledgement = ""
+# Optional absolute override; empty uses the granted data directory.
 writer_lock = ""
+# Empty follows all Host/adapter sessions; optional explicit stream IDs narrow it.
 allowed_streams = []
 timezone = "Asia/Shanghai"
 frequency_enabled = false

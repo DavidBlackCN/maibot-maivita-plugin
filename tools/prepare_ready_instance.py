@@ -42,9 +42,6 @@ def main():
     target=args.instance/'plugins/maibot-maivita-plugin'; stage(target)
     cfg=tomlkit.parse((target/'config.example.toml').read_text(encoding='utf-8'))
     cfg['plugin']['enabled']=True
-    cfg['instance']['acknowledgement']='isolated-test-instance'
-    cfg['instance']['writer_lock']=str(args.instance/'maivita-writer.lock')
-    cfg['instance']['allowed_streams']=['maivita-i1-synthetic-test-stream']
     # The automated full-Host acceptance instance permits one real decision
     # attempt per 24h, including uncertain outcomes. Reloads cannot spend more.
     cfg['model']['daily_budget']=1

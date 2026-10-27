@@ -1,4 +1,4 @@
-"""Allowlisted, deterministic staging; distributable ZIP requires I1 acceptance."""
+"""Allowlisted deterministic packages with distinct default-install and I1 gates."""
 from pathlib import Path
 import hashlib
 import json
@@ -25,6 +25,8 @@ def entries():
     if layout.exists(): files['docs/source-layout-map.json']=layout.read_bytes()
     public_proof=ROOT/'docs/integration-ready.json'
     if public_proof.exists(): files['docs/integration-ready.json']=public_proof.read_bytes()
+    default_proof=ROOT/'docs/default-install.json'
+    if default_proof.exists(): files['docs/default-install.json']=default_proof.read_bytes()
     files['LICENSE']=(ROOT/'LICENSE').read_bytes()
     files['SOURCES.md']=(ROOT/'docs/SOURCES.md').read_bytes()
     for name in ('plugin.py','README.md','logo.jpg'):
@@ -69,6 +71,23 @@ def build_zip(destination,acceptance):
         acceptance.get('integration_ready') is not True or
         acceptance.get('runtime_files')!=runtime_manifest()):
         raise ValueError('I1 first-install acceptance incomplete or source changed; no ZIP generated')
+    return write_zip(destination)
+
+
+def build_default_zip(destination, acceptance):
+    """Default-install release is separate from the paid-model I1 gate."""
+    from .verify_ready import verification_manifest
+    required={'unit','native_joint','default_activation','null_scope','status_commands','full_host_reload'}
+    if (acceptance.get('passed') is not True or acceptance.get('kind')!='default_install' or
+        acceptance.get('host_commit')!=HOST_COMMIT or acceptance.get('sdk')!=SDK_VERSION or
+        set(acceptance.get('passed_cases',[]))!=required or
+        acceptance.get('runtime_files')!=runtime_manifest() or
+        acceptance.get('verification_files')!=verification_manifest()):
+        raise ValueError('default-install acceptance incomplete or source changed; no ZIP generated')
+    return write_zip(destination)
+
+
+def write_zip(destination):
     destination=Path(destination)
     if not destination.is_absolute(): raise ValueError('absolute artifact path required')
     destination.parent.mkdir(parents=True,exist_ok=True)

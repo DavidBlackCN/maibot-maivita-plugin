@@ -1,3 +1,5 @@
+> 2026-10-27 默认安装修订：新增默认加载、自动锁/实例标识及无 scope 路由验证。此前完整 I1 模型通过记录仅属于此前源码；本轮未追加真实模型调用或真实 QQ 验收。当前构建以随包证据和最新 CI 为准。
+
 # I1 Integration-Ready 自动门禁
 
 当前版本为 0.3.1，机器验收状态见 [integration-ready.json](integration-ready.json)。2026-10-27 对当前源码重新完成 Linux / Python 3.12.15、Host 1.3.15（`062d45cf8bd4272ac57d7ec03fcf405e5a458211`）/ SDK 2.16.0 的完整 I1：完整 Host CLI/WebUI、一次真实模型合法候选提交、API/Tool/Command/Hook、权限拒绝、重载、单写者、legacy/life 回切与校验恢复。数据库确认专用模型实际成功调用一次，没有连接 QQ，也未读取生产聊天。

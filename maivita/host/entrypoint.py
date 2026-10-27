@@ -4,6 +4,7 @@ import asyncio
 
 from maibot_sdk import API, MaiBotPlugin
 from .activation import EngineAuthority
+from .config import stream_allowed
 from .integration_config import IntegrationConfig
 from ..life.storage.safety import resolve_data_dir
 from ..runtime_versions import runtime_pair, runtime_supported
@@ -84,8 +85,8 @@ class MaiVitaPlugin(MaiBotPlugin):
                         return {'action': 'continue'}
                     message = kwargs.get('message')
                     stream = message.get('session_id') if isinstance(message, dict) else getattr(message, 'session_id', None)
-                    return ({'action': 'abort', 'reason': 'maivita_not_ready'} if not stream or
-                            stream in self.config.instance.allowed_streams else {'action': 'continue'})
+                    return ({'action': 'abort', 'reason': 'maivita_not_ready'} if self.config.plugin.enabled and (not stream or
+                            stream_allowed(stream, self.config.instance.allowed_streams)) else {'action': 'continue'})
                 if types[name] == 'COMMAND':
                     return True, 'MaiVita not ready; reload required', 2
                 if self.component_names[name].endswith('get_current_activity'):
@@ -123,17 +124,19 @@ class MaiVitaPlugin(MaiBotPlugin):
             if (data / 'goals.db').exists() or (data / 'maivita.db').exists():
                 raise ValueError('unscoped database requires explicit offline migration')
             authority = EngineAuthority(data)
-            authority.check(self.config)
+            resolved = self.config.resolved(data)
+            authority.check(resolved)
             delegate = self._select()
             if self.selected_mode != self.config.engine.mode:
                 raise RuntimeError('engine configuration changed after registration; reload required')
+            delegate.set_plugin_config(resolved.selected_config().model_dump())
             delegate._set_context(EngineContext(self.ctx, self.selected_mode))
             await delegate.on_load()
             lease = getattr(delegate, 'deployment_lease', getattr(delegate, '_writer_lease', None))
             if not bool(getattr(delegate, 'ready', getattr(delegate, '_loaded', False))) or lease is None or lease.file is None:
                 raise RuntimeError('selected delegate did not become ready and acquire its writer lease')
             # Recheck and persist only after the delegate owns the common lock.
-            self.authority = authority.activate(self.config)
+            self.authority = authority.activate(resolved)
             self.active_config = self.config.model_copy(deep=True)
             self.ready = True
             self.failure_code = None
@@ -217,7 +220,7 @@ class MaiVitaPlugin(MaiBotPlugin):
     async def get_public_route_scope(self, stream_id=None, **kwargs):
         if not self.ready or self.selected_mode != 'life' or not self.delegate.ready:
             return self.unavailable('ENGINE_UNAVAILABLE')
-        if type(stream_id) is not str or stream_id not in self.active_config.instance.allowed_streams:
+        if not stream_allowed(stream_id, self.active_config.instance.allowed_streams):
             return self.unavailable('ROUTE_UNAVAILABLE')
         return {'api_version':1,'ok':True,'data':{'stream_id':stream_id,'character_id':'default','guarded':True,
             'config_digest':self.authority['config_sha256']},'error':None}

@@ -141,10 +141,10 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DevelopmentConfigTests(unittest.TestCase):
-    def test_default_disabled_and_no_unsupported_feature_can_be_enabled(self):
-        self.assertFalse(DevelopmentConfig().plugin.enabled)
+    def test_default_enabled_and_no_unsupported_feature_can_be_enabled(self):
+        self.assertTrue(DevelopmentConfig().plugin.enabled)
         for section,value in [('instance',{'frequency_enabled':True}),('instance',{'owner_auth_enabled':True}),
-                              ('plugin',{'enabled':True}),('plugin',{'config_version':'1'})]:
+                              ('instance',{'writer_lock':'relative.lock'}),('plugin',{'config_version':'1'})]:
             with self.subTest(value=value),self.assertRaises(ValueError): DevelopmentConfig.model_validate({section:value})
 
     def test_package_is_allowlisted_self_contained_and_not_released_without_acceptance(self):
@@ -171,3 +171,12 @@ class DevelopmentConfigTests(unittest.TestCase):
             self.assertEqual(result.returncode,0,result.stderr.decode('utf-8',errors='replace'))
             with self.assertRaisesRegex(ValueError,'incomplete'): build_zip(directory/'release.zip',{'passed':True})
             self.assertFalse((directory/'release.zip').exists())
+
+    def test_default_install_package_does_not_accept_missing_or_stale_evidence(self):
+        from maibot_autonomous_planning_plugin.tools.package import build_default_zip
+        with tempfile.TemporaryDirectory() as temp:
+            target=Path(temp).resolve()/'default.zip'
+            for evidence in ({}, {'passed':True,'kind':'default_install','runtime_files':{}}):
+                with self.assertRaisesRegex(ValueError,'incomplete'):
+                    build_default_zip(target,evidence)
+                self.assertFalse(target.exists())

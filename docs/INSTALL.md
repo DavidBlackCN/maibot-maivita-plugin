@@ -3,11 +3,13 @@
 仅用于独立空实例和后续超级 MaiBot 核心插件联合测试，不接管生产实例。版本 0.3.1、配置 3、数据库 Schema 4、契约 1.0.0。运行时只接受两组精确配对：Host 1.3.15 / `062d45cf8bd4272ac57d7ec03fcf405e5a458211`、SDK 2.16.0；或保留的 Host 1.3.12 / `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`、SDK 2.15.0。禁止交叉配对或为了启动旧包单独降级 SDK。Linux 使用 Bot 自己的 `.venv/bin/python`，不要使用可能仍为 Python 2 的系统 `python`。
 
 1. 停止旧完整规划插件，安装本包的唯一 MaiVita ID。保留旧代码和数据库，不同版本不得同时运行。隔离环境须有 Manifest 声明的 pillow、tzdata（时区校验使用标准库 zoneinfo，不再强依赖 pytz）；若 uv 创建的环境没有 pip，先用 uv pip 在该环境安装这些依赖，不能假设 Host 自动安装必定成功。
-2. 从 config.example.toml 创建新配置，默认 disabled。填写 instance.acknowledgement=`isolated-test-instance`、全实例共用的绝对 writer_lock、明确 allowed_streams；禁止通配符。
+2. 首次安装由 Host 生成默认配置，默认启用 life。无需填写 acknowledgement、writer_lock 或 allowed_streams；空会话列表跟随 Host/适配器接入范围。已在 Snowluma 限制测试群时可直接使用。非空列表仍是精确白名单，禁止通配符。
 3. 默认 engine.mode=`life`。模型通过 Host 专用配置的 utils 任务路由；model.generate_on_start 默认 false，设 true 后每次加载最多请求一次，预算与超时生效。后续显著事件仍由已有协调器按预算调度，不定时轮询模型。
 4. 配置版本 1/2 不自动升级。旧版 1 字段可放入 legacy 部分，但必须重新检查管理员和隔离目录；engine.mode=legacy 需要明确管理员，旧开放管理员语义拒绝。
 5. 数据根由真实 SDK paths.data_dir 注入；life/maivita.db 与 legacy/goals.db 分目录，根 engine-authority.json 指定唯一权威。根下发现未分目录旧库时拒绝启动，不能手工改名搬入绕过审查。
-6. 启动前按 Host 自身流程同意 EULA/隐私条款，隔离实例关闭遥测、真实平台接入、MCP 与 render。先验 API、Tool、Hook、单写者及重载，再进入联合测试。
+6. 启动后发送 `/maivita status`。默认不在启动时调用模型；如需启动规划，可在已有 Host 模型配置就绪后设置 model.generate_on_start=true。睡眠和 Hush 硬静音仍可阻止状态消息，无发送豁免。
+
+升级保留现有 config.toml 和数据。原 writer_lock 可以保留；清空时若已有 engine-authority.json，会沿用其中原锁路径。acknowledgement 兼容旧值但不再作为启用门禁。普通升级不要改 engine.mode 或移动数据库。
 
 跨引擎切换先禁用/停止 Host，保存当前配置副本。在相同环境安装 tools/requirements.txt 后执行：
 

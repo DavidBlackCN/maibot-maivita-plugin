@@ -13,7 +13,7 @@ class Strict(PluginConfigBase):
 
 
 class PluginSettings(Strict):
-    enabled: bool=False
+    enabled: bool=True
     config_version: Literal['2']='2'
 
 
@@ -25,6 +25,11 @@ class InstanceSettings(Strict):
     frequency_enabled: Literal[False]=False
     owner_auth_enabled: Literal[False]=False
     privileged_writes_enabled: Literal[False]=False
+
+
+def stream_allowed(stream, allowed):
+    # Empty list follows all sessions admitted by Host/adapter. Never a privilege.
+    return isinstance(stream, str) and bool(stream.strip()) and (not allowed or stream in allowed)
 
 
 class ModelSettings(Strict):
@@ -47,11 +52,9 @@ class DevelopmentConfig(Strict):
         from pathlib import Path
         ZoneInfo(self.instance.timezone)
         if self.plugin.enabled:
-            if self.instance.acknowledgement!='isolated-test-instance':
-                raise ValueError('I1 requires an explicit isolated-test-instance acknowledgement')
-            if not self.instance.writer_lock or not Path(self.instance.writer_lock).is_absolute():
-                raise ValueError('I1 requires an absolute instance-wide writer_lock')
-            if not self.instance.allowed_streams or any(not s.strip() or '*' in s for s in self.instance.allowed_streams):
-                raise ValueError('I1 requires explicit test stream IDs; no wildcards')
+            if self.instance.writer_lock and not Path(self.instance.writer_lock).is_absolute():
+                raise ValueError('instance.writer_lock must be absolute when specified')
+            if any(not s.strip() or s != s.strip() or '*' in s for s in self.instance.allowed_streams):
+                raise ValueError('allowed_streams entries must be explicit stream IDs; no wildcards')
         if not self.model.task_name.strip(): raise ValueError('explicit model task_name required')
         return self

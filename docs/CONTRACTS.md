@@ -27,3 +27,6 @@ SocialEvent / SocialAck 通过 from_wire 的 JSON-aware 严格解析处理 ISO �
 公开查询 get_life_state/get_plan/get_availability/get_diagnostics/get_current_activity 只返回 public_summary；旧完整当前活动 alias 读同一被选引擎。特权 request_replan/request_wakeup 与旧变更 Tool 在两个模式均明确拒绝。engine/contract 状态 API 不触发模型。legacy 模式保留新查询的静态绑定以满足原生 WebUI 校验，调用返回 ENGINE_UNAVAILABLE；只运行旧引擎，不伪造新生活状态。
 
 当前没有绑定任何外部 API 路由、授权令牌或回调注册入口。联合阶段先协商版本、声明可信来源与最小能力，再实现单独适配器并复验；本项目不改 Host、Owner Auth、策略或社交插件来制造接口。错误包括 PERMISSION_DENIED、POLICY_UNAVAILABLE、NOT_READY、RELOAD_REQUIRED、STALE_STATE、IDEMPOTENCY_CONFLICT，默认不允许自动权限回退。
+
+
+2026-10-27 默认安装修订：Vita 的空 allowed_streams 表示所有 Host 接入会话，非空仍精确限制；Identity 的空 route_scope 仅匹配消息 scope=None。自动实例标识、自动锁和默认启用均不建立可信调用者身份，不开放 H01/H02/H03 或跨插件特权。

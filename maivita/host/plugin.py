@@ -13,7 +13,7 @@ from ..integrations.safety import assert_no_old_writer
 from ..life.life_state.runtime import DevelopmentRuntime,LifeRuntimeConfig
 from ..life.storage.life_database import LifeDatabase
 from ..life.storage.safety import WriterLease,resolve_data_dir
-from .config import DevelopmentConfig
+from .config import DevelopmentConfig,stream_allowed
 from .model_port import SDKModelPort
 
 PLUGIN_ID='davidblackcn.maibot-maivita-plugin'
@@ -48,7 +48,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             # Refuse legacy co-location before opening any database. No import
             # or migration of old data is part of this entry.
             if (data/'goals.db').exists(): raise RuntimeError('I1 refuses a directory containing goals.db')
-            self.deployment_lease=WriterLease(Path(cfg.instance.writer_lock))
+            self.deployment_lease=WriterLease(Path(cfg.instance.writer_lock) if cfg.instance.writer_lock else data/'deployment-writer.lock')
             self.deployment_lease.acquire()
             data.mkdir(parents=True,exist_ok=True)
             db_path=data/'maivita.db'
@@ -166,7 +166,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
     async def command(self,text='',message=None,stream_id='',**kwargs):
         # Read-only commands have no Owner exemption and use the normal send
         # capability. Sleeping commands never receive a send permit.
-        if not self.ready or stream_id not in self.active_config.instance.allowed_streams:
+        if not self.ready or not stream_allowed(stream_id,self.active_config.instance.allowed_streams):
             return True,'MaiVita not ready or test stream not allowed',2
         raw=text or (message if isinstance(message,str) else '')
         action=raw.strip().split(maxsplit=1)[1] if len(raw.strip().split(maxsplit=1))==2 else 'status'
@@ -179,7 +179,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         return True,'MaiVita public result sent through normal permissions',2
 
     def inject(self,kwargs):
-        if not self.ready or kwargs.get('session_id') not in self.active_config.instance.allowed_streams:
+        if not self.ready or not stream_allowed(kwargs.get('session_id'),self.active_config.instance.allowed_streams):
             return {'action':'continue'}
         original=kwargs.get('extra_prompt','')
         if not isinstance(original,str): return {'action':'continue'}
@@ -201,11 +201,11 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         stream=message.get('session_id') if isinstance(message,dict) else getattr(message,'session_id',None)
         if not self.ready:
             return ({'action':'abort','reason':'maivita_runtime_failed'} if self.failure_code and
-                (not stream or stream in self.guarded_streams) else {'action':'continue'})
+                (not stream or stream_allowed(stream,self.guarded_streams)) else {'action':'continue'})
         # Host message serialization carries session_id. Unknown identity while
         # asleep cannot establish a trusted exception.
         phase=self.runtime.engine.state().sleep_phase
-        if phase in ('sleeping','temporarily_awake') and (not stream or stream in self.active_config.instance.allowed_streams):
+        if phase in ('sleeping','temporarily_awake') and (not stream or stream_allowed(stream,self.active_config.instance.allowed_streams)):
             return {'action':'abort','reason':'maivita_sleeping_no_receipt_exception'}
         return {'action':'continue'}
 

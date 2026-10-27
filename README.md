@@ -37,9 +37,9 @@ MaiVita 是 MaiBot 的生活状态引擎，维护角色共享的当前活动、�
 
 ## 安装
 
-1. 使用新的隔离 Host 实例，检查上述固定 Host/SDK。官方 Host 锁文件可能仍为 SDK 2.12.0，需在独立环境明确安装 2.15.0，不修改 Host 源码或锁文件。
+1. 使用上述支持的 Host/SDK 配对。Host 1.3.15 使用 SDK 2.16.0，不要单独降级 SDK。
 2. 将仓库或已通过门禁的包放入插件目录，同一实例只保留一个 MaiVita ID；停止旧完整规划插件。
-3. 从 [config.example.toml](config.example.toml) 新建配置。默认禁用，显式填写实例确认、绝对共享写入锁与会话白名单后再启用。
+3. 首次安装由 Host 生成默认配置，默认启用 life；也可复制 [config.example.toml](config.example.toml)。不需要确认口令、锁路径或会话 ID。Snowluma 已限制测试群时，直接发送 `/maivita status`。
 
 ```toml
 [plugin]
@@ -50,9 +50,8 @@ config_version = "3"
 mode = "life"
 
 [instance]
-acknowledgement = "isolated-test-instance"
-writer_lock = "D:/MaiBot/instance-locks/maivita.lock"
-allowed_streams = ["your-dedicated-stream-id"]
+writer_lock = ""
+allowed_streams = []
 timezone = "Asia/Shanghai"
 frequency_enabled = false
 owner_auth_enabled = false
@@ -63,7 +62,7 @@ privileged_writes_enabled = false
 
 ## 命令与 Tool
 
-life 模式支持 `/maivita`、`/plan`、`/规划` 的以下只读查询，限明确白名单内会话。命令走正常发送权限，睡眠时不会唤醒或绕过静默。
+life 模式支持 `/maivita`、`/plan`、`/规划` 的以下只读查询，默认作用于 Host/适配器接入的会话；非空 allowed_streams 可进一步限制。命令走正常发送权限，睡眠时不会唤醒或绕过静默。
 
 | 子命令 | 说明 |
 |---|---|
@@ -79,8 +78,8 @@ life 模式支持 `/maivita`、`/plan`、`/规划` 的以下只读查询，限�
 | 配置 | 说明 |
 |---|---|
 | `engine.mode` | `life` 或 `legacy`，不能在线直接切换 |
-| `instance.writer_lock` | 同一部署共用绝对路径，启用后绑定权威记录 |
-| `instance.allowed_streams` | 显式会话白名单，禁止通配符 |
+| `instance.writer_lock` | 默认自动使用数据目录锁；已有权威记录沿用原锁，非空值为绝对路径覆盖 |
+| `instance.allowed_streams` | 空列表跟随 Host/适配器接入范围；非空为精确白名单，禁止通配符 |
 | `model.task_name` / `model_name` | Host 路由任务与可选模型名 |
 | `model.generate_on_start` | 每次加载请求一次决策，默认 false |
 | `model.daily_budget` | 协调器 24 小时请求预算，默认 8 |

@@ -25,7 +25,7 @@ def prepare(config_path, data_dir, target, output):
         raise ValueError('explicit absolute config, granted data directory and new output required')
     if output.exists(): raise ValueError('configuration output must not exist')
     cfg = IntegrationConfig.model_validate(tomllib.loads(config_path.read_text(encoding='utf-8')))
-    if cfg.instance.acknowledgement != 'isolated-test-instance': raise ValueError('isolated instance acknowledgement required')
+    cfg = cfg.resolved(data_dir)
     if target == cfg.engine.mode: raise ValueError('source and target engine must differ')
     source_mode = cfg.engine.mode
     cfg.engine.mode = target

@@ -71,10 +71,10 @@ def main():
                 for name,data in actual.items():
                     path=destination/name; assert path.resolve().is_relative_to(destination)
                     path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(data)
-                code="import importlib.util,sys,pathlib; p=pathlib.Path(sys.argv[1]);s=importlib.util.spec_from_file_location('ready_pkg',p/'__init__.py',submodule_search_locations=[str(p)]);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);from ready_pkg.plugin import create_plugin;q=create_plugin();assert q.get_components();assert q.config.plugin.config_version=='3' and not q.config.plugin.enabled;assert m.__version__=='0.3.1'"
+                code="import importlib.util,sys,pathlib; p=pathlib.Path(sys.argv[1]);s=importlib.util.spec_from_file_location('ready_pkg',p/'__init__.py',submodule_search_locations=[str(p)]);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);from ready_pkg.plugin import create_plugin;q=create_plugin();assert q.get_components();assert q.config.plugin.config_version=='3' and q.config.plugin.enabled;assert m.__version__=='0.3.1'"
                 subprocess.run([sys.executable,'-I','-c',code,str(destination)],cwd=destination,check=True,timeout=20)
         verification={'passed':True,'artifact':args.output.name,'sha256':checksum,'files':len(actual),
-            'bytes':args.output.stat().st_size,'exact_source_match':True,'fresh_process_import':True,'default_disabled':True,
+            'bytes':args.output.stat().st_size,'exact_source_match':True,'fresh_process_import':True,'default_enabled':True,
             'runtime_data_or_credentials':False}
         (root/'evidence/integration-ready/package.json').write_text(json.dumps(verification,indent=2),encoding='utf-8')
         print(json.dumps(verification,indent=2))

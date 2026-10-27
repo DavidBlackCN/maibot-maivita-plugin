@@ -65,6 +65,30 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         descriptor=await first.get_integration_contract(owner=True)
         self.assertFalse(descriptor['owner_auth']['enabled'])
 
+    async def test_default_install_lock_scope_sleep_and_reload(self):
+        plugin=self.plugin({'plugin':{'config_version':'3'}})
+        await plugin.on_load()
+        self.assertTrue(plugin.ready)
+        self.assertEqual(plugin.config.instance.writer_lock,'')
+        self.assertEqual(plugin.authority['writer_lock'],str((self.work/'data/writer.lock').resolve()))
+        self.assertTrue((await plugin.get_public_route_scope(stream_id='host-admitted-session'))['ok'])
+        self.assertFalse((await plugin.get_public_route_scope(stream_id=''))['ok'])
+        self.assertEqual(plugin.delegate.inject({'session_id':'host-admitted-session'})['action'],'modify')
+        from types import SimpleNamespace
+        with patch.object(plugin.delegate.runtime.engine,'state',return_value=SimpleNamespace(sleep_phase='sleeping')):
+            self.assertEqual((await plugin.delegate.silence_hook(message={'session_id':'another-session'}))['action'],'abort')
+        second=self.plugin({'plugin':{'config_version':'3'}})
+        with self.assertRaisesRegex(RuntimeError,'another life writer'): await second.on_load()
+        await plugin.on_config_update('self',plugin.config.model_dump(),2)
+        self.assertTrue(plugin.ready)
+        await plugin.on_unload(); await second.on_load()
+        self.assertTrue(second.ready)
+
+    async def test_explicit_stream_filter_still_excludes_other_sessions(self):
+        plugin=self.plugin(); await plugin.on_load()
+        self.assertFalse((await plugin.get_public_route_scope(stream_id='outside'))['ok'])
+        self.assertEqual(plugin.delegate.inject({'session_id':'outside'})['action'],'continue')
+
     async def test_unsupported_host_refuses_both_engines_before_storage(self):
         for mode in ('life','legacy'):
             with self.subTest(mode=mode), patch.dict('os.environ',{'MAIBOT_HOST_VERSION':'1.3.14'}):
