@@ -105,6 +105,21 @@ async def run(work):
         await supervisor.start()
         assert {VITA,HUSH,IDENTITY,COORD}<=set(supervisor._registered_plugins),supervisor._registered_plugins
         cases.append('four_real_plugins_loaded_on_pinned_host_sdk')
+        # The actual Runner endpoint used by WebUI must return a renderable
+        # schema, not just accept config_model defaults during activation.
+        for plugin_id in (VITA, IDENTITY, HUSH, COORD):
+            inspected=await supervisor.inspect_plugin_config(plugin_id)
+            assert not inspected.config_error,(plugin_id,inspected.config_error)
+            sections=inspected.config_schema.get('sections')
+            assert sections,plugin_id
+            for section in sections.values():
+                for field in section['fields'].values():
+                    if field['ui_type']=='select': assert '' not in (field.get('choices') or []),(plugin_id,field)
+        broken=await supervisor.inspect_plugin_config(IDENTITY,{'plugin':{'enabled':True}},use_provided_config=True)
+        assert 'config_version' in broken.config_error
+        repaired=await supervisor.inspect_plugin_config(IDENTITY,{'plugin':{'enabled':True,'config_version':'3'}},use_provided_config=True)
+        assert not repaired.config_error and repaired.config_schema['sections']
+        cases.append('WebUI_native_config_schema_and_missing_version_recovery')
         if automatic:
             from src.chat.message_receive.message import SessionMessage
             from src.common.data_models.mai_message_data_model import MessageInfo,UserInfo,GroupInfo

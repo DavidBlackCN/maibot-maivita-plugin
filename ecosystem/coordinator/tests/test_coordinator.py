@@ -51,7 +51,7 @@ class HostDouble:
         plugin,method=name.rsplit('.',1)
         if method=='get_integration_contract': return wrap({'contract_version':'1.0.0','host':HOST,'sdk':SDK,'plugin_version':'0.4.1','features':['public_persona_v1','public_events_v1']},True)
         if method=='get_contract':
-            return wrap({'plugin_id':plugin,'plugin_version':'0.3.0' if plugin==HUSH else '3.1.1',
+            return wrap({'plugin_id':plugin,'plugin_version':'0.3.1' if plugin==HUSH else '3.1.1',
                 'contract_version':'1.1.0','api_major':'1','features':['public_social_context_v1'],'host':HOST,'sdk':SDK,'ready':True})
         if method=='get_public_persona':return wrap({'text':'shared persona','digest':self.persona_digest})
         if method=='get_public_social_context':return wrap({'stream_id':args['stream_id'],'revision':self.social_revision,'style':'neutral',

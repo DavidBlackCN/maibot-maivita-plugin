@@ -19,4 +19,13 @@ def build_schema(**metadata):
     draft_route=create_model('RouteDraft',__base__=PluginConfigBase,**fields)
     draft_settings=create_model('SettingsDraft',__base__=Settings,
         routes=(list[draft_route],Field(default_factory=list,max_length=4)))
-    return generate_plugin_config_schema(draft_settings,**metadata)
+    schema=generate_plugin_config_schema(draft_settings,**metadata)
+    for section in schema['sections'].values():
+        for field in section['fields'].values():
+            choices=field.get('choices')
+            if choices and '' in choices:
+                field.update(type='string',ui_type='text',choices=None,hidden=True,disabled=True)
+            elif choices==[False]:
+                field.update(type='boolean',ui_type='switch',choices=None,disabled=True)
+            if field['name']=='config_version': field['disabled']=True
+    return schema

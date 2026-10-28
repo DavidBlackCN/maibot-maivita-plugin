@@ -24,6 +24,11 @@ class EngineContext:
 class MaiVitaPlugin(MaiBotPlugin):
     config_model = IntegrationConfig
 
+    @classmethod
+    def build_config_schema(cls, **metadata):
+        from .schema import build_schema
+        return build_schema(**metadata)
+
     def __init__(self):
         super().__init__()
         self.delegate = None

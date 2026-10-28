@@ -1,6 +1,6 @@
-# MaiCoordinate 0.3.0
+# MaiCoordinate 0.3.1
 
-复用现有协调层，本轮组合为 MaiVita 0.5.0、MaiHush 0.2.2、MaiIdentity 3.2.0。支持精确 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0。默认启用 shadow，只读事实和记录影子决策，不主动生成或发送。可维护源码及联合 CI 收录于 MaiVita 仓库 ecosystem/coordinator；工作区同名目录为交付工作副本。
+复用现有协调层，本轮组合为 MaiVita 0.5.1、MaiHush 0.2.2、MaiIdentity 3.2.1。支持精确 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0。默认启用 shadow，只读事实和记录影子决策，不主动生成或发送。可维护源码及联合 CI 收录于 MaiVita 仓库 ecosystem/coordinator；工作区同名目录为交付工作副本。
 
 安装后由 Host 生成配置。在适配器已允许的测试群发一条消息，协调层会把 Host 接收路由与 Hush 公开绑定逐项核对后记住该群，最多四群；无需填写 instance_id、scope 或内部 session ID。空 scope 精确匹配 None。新发现群不会补发绑定之前的旧醒来事件。使用 `/maicoordinate status` 查看状态。
 
@@ -47,3 +47,10 @@ WebUI 路由编辑器可以展示空白草稿，但空白草稿无法通过实�
 本版包含协调层回归与 20 项原版 Host 联合场景；联合脚本也支持 `--bundle <候选包目录>` 从校验过的 ZIP 安装验证。完整工作区回归与证据索引见根目录 COORDINATION_DELIVERY.md。
 
 此源码候选没有真实 QQ、真实模型语义、长期运行或生产验收。保留数据目录和工作流记录即可停止/回滚插件；回滚不得将 unknown 清成 pending。
+
+
+### 2026-10-28 WebUI 配置兼容修复
+
+修复空字符串枚举导致的 Select.Item 崩溃，以及必填账户条目无法生成编辑 Schema。历史确认字段不再显示为空选项；固定关闭的特权字段只读显示。运行时模型和权限校验不变。高级嵌套角色/旧引擎表请使用原始 TOML 编辑，避免 Host 表单把对象转成字符串。
+
+若 Identity 页面提示缺少 plugin.config_version，在现有 [plugin] 内补入 config_version = "3" 后保存并重载，保留原有其他配置。Vita 使用 "3"，Coordinator 使用 "1"。这些是配置格式版本，不是插件发布版本；不能填写 3.2.1 或 0.5.1。不要删除数据或只保留 enabled。当前源码真实模型 I1 和 QQ 验收仍待进行，不沿用旧版本通过记录。
