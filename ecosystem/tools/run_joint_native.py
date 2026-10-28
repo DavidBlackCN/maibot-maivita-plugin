@@ -97,9 +97,13 @@ def main():
         'real_model_requests':0,'real_platform_sends':0,'source_unchanged':True}
     report['installed_bundle']=str(args.bundle) if args.bundle else None
     report['host_extension']=lock.get('extension')
+    console=output.decode('utf8',errors='replace')
+    report['hook_action_contract_passed']='未知的 Hook action' not in console
+    report['graceful_shutdown_passed']=not any(s in console for s in ('Runner shutdown 请求失败','Runner 优雅退出超时','尝试 kill'))
     assert verification=={name:digest(ROOT/'tools'/name) for name in verification}
     report['verification_files']=verification
     (work/'run.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+    assert report['hook_action_contract_passed'],'unsupported Hook action returned'
     print((work/'result.json').read_text() if process.returncode==0 else output.decode('utf8',errors='replace')[-6500:])
     raise SystemExit(process.returncode)
 

@@ -73,7 +73,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plugin.authority['writer_lock'],str((self.work/'data/writer.lock').resolve()))
         self.assertTrue((await plugin.get_public_route_scope(stream_id='host-admitted-session'))['ok'])
         self.assertFalse((await plugin.get_public_route_scope(stream_id=''))['ok'])
-        self.assertEqual(plugin.delegate.inject({'session_id':'host-admitted-session'})['action'],'modify')
+        self.assertEqual(plugin.delegate.inject({'session_id':'host-admitted-session'})['action'],'continue')
         from types import SimpleNamespace
         with patch.object(plugin.delegate.runtime.engine,'state',return_value=SimpleNamespace(sleep_phase='sleeping')):
             self.assertEqual((await plugin.delegate.silence_hook(message={'session_id':'another-session'}))['action'],'abort')

@@ -15,7 +15,7 @@ class ManifestTests(unittest.TestCase):
         self.assertNotIn("frequency.set_adjust", capabilities)
         self.assertIn("frequency.get_adjust", capabilities)
         self.assertIn("frequency.get_current_talk_value", capabilities)
-        self.assertEqual(manifest["version"], "0.5.1")
+        self.assertEqual(manifest["version"], "0.5.2")
 
 
 if __name__ == "__main__":

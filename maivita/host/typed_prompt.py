@@ -18,4 +18,4 @@ def inject(owner,kwargs,facts,namespace):
         'logical_turn_id':None,'timestamp':datetime.now(timezone.utc).isoformat()},
         'parts':[{'type':'text','text':text}]}
     owner._planner_context_item=item
-    return {'action':'modify','modified_kwargs':{**kwargs,'items':remaining+[item]}}
+    return {'action':'continue','modified_kwargs':{**kwargs,'items':remaining+[item]}}

@@ -6,6 +6,7 @@ import re
 from datetime import timedelta
 from ..life.domain.commands import Command
 from .config import stream_allowed
+from .routes import command_route
 
 API='davidblackcn.maibot-maiidentity-plugin.get_vita_policy'
 ACTIONS={'wake':'wake','醒来':'wake','replan':'enqueue_replan','重新规划':'enqueue_replan'}
@@ -57,10 +58,10 @@ async def execute(plugin,command):
     if not plugin.ready or runtime is None or cfg is None: return plugin.error('NOT_READY')
     state=runtime.engine.state()
     try:
-        bot=await asyncio.wait_for(plugin.ctx.config.get('bot.qq_account',''),2)
+        route=await command_route(plugin.ctx,command)
         if not plugin.ready or plugin.runtime is not runtime or plugin.active_config is not cfg:
             return plugin.error('NOT_READY')
-        query,key=local_request(plugin,command,str(bot))
+        query,key=local_request(plugin,command,route['account_id'])
         response=await asyncio.wait_for(plugin.ctx.call_host_method('cap.call',payload={
             'capability':'api.call','args':{'api_name':API,'version':'1','args':query}}),3)
         decision=response.get('result') if type(response) is dict and response.get('success') is True else None

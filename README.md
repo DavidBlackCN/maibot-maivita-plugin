@@ -1,4 +1,4 @@
-# MaiVita 0.5.1
+# MaiVita 0.5.2
 
 MaiBot 的持久生活引擎：活动、计划、目标、睡眠、历史与公开上下文。本版支持官方 Host 命令管理与有限中文管理，使用现有 MaiIdentity 权限规则；无需私有 Host 补丁。
 
@@ -23,4 +23,4 @@ MaiBot 的持久生活引擎：活动、计划、目标、睡眠、历史与公�
 
 修复空字符串枚举导致的 Select.Item 崩溃，以及必填账户条目无法生成编辑 Schema。历史确认字段不再显示为空选项；固定关闭的特权字段只读显示。运行时模型和权限校验不变。高级嵌套角色/旧引擎表请使用原始 TOML 编辑，避免 Host 表单把对象转成字符串。
 
-若 Identity 页面提示缺少 plugin.config_version，在现有 [plugin] 内补入 config_version = "3" 后保存并重载，保留原有其他配置。Vita 使用 "3"，Coordinator 使用 "1"。这些是配置格式版本，不是插件发布版本；不能填写 3.2.1 或 0.5.1。不要删除数据或只保留 enabled。当前源码真实模型 I1 和 QQ 验收仍待进行，不沿用旧版本通过记录。
+若 Identity 页面提示缺少 plugin.config_version，在现有 [plugin] 内补入 config_version = "3" 后保存并重载，保留原有其他配置。Vita 使用 "3"，Coordinator 使用 "1"。这些是配置格式版本，不是插件发布版本；不能填写 3.2.2 或 0.5.2。不要删除数据或只保留 enabled。当前源码真实模型 I1 和 QQ 验收仍待进行，不沿用旧版本通过记录。

@@ -204,7 +204,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         original=re.sub(re.escape(BEGIN)+r'.*?'+re.escape(END),'',original,flags=re.S).rstrip()
         state=self.runtime.queries.get_life_state()
         block=BEGIN+'\n'+json.dumps(state,ensure_ascii=False)+'\n'+END
-        return {'action':'modify','modified_kwargs':{**kwargs,'extra_prompt':original+'\n'+block}}
+        return {'action':'continue','modified_kwargs':{**kwargs,'extra_prompt':original+'\n'+block}}
 
     @HookHandler('maisaka.replyer.before_request',name='maivita_life_replyer')
     async def replyer_hook(self,**kwargs): return self.inject(kwargs)

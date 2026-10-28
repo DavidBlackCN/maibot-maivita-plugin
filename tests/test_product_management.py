@@ -3,7 +3,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from test_life_engine import EngineFixture
-from test_host_management import command
+from test_host_management import command,routes
 from maibot_autonomous_planning_plugin.maivita.host.life_commands import parse
 from maibot_autonomous_planning_plugin.maivita.host.management_requests import Requests,dispatch
 from maibot_autonomous_planning_plugin.maivita.host.typed_prompt import inject
@@ -14,7 +14,8 @@ class ProductManagement(EngineFixture,unittest.IsolatedAsyncioTestCase):
         super().setUp();self.seq=0
         self.p=SimpleNamespace(ready=True,management=None,runtime=SimpleNamespace(engine=self.engine),
             active_config=SimpleNamespace(instance=SimpleNamespace(timezone='Asia/Shanghai',allowed_streams=['s'])),
-            ctx=SimpleNamespace(config=SimpleNamespace(get=AsyncMock(return_value='99999')),
+            ctx=SimpleNamespace(config=SimpleNamespace(get=AsyncMock(return_value='')),
+                chat=SimpleNamespace(get_all_streams=AsyncMock(side_effect=lambda **kw:routes())),
                 call_host_method=AsyncMock(return_value={'success':True,'result':{'policy_version':1,'allowed':True}})))
     def tearDown(self):
         if self.p.management:self.p.management.close()
@@ -99,8 +100,20 @@ class PublicContextTests(unittest.IsolatedAsyncioTestCase):
     def test_typed_items_preserve_history_tools_and_exact_owned_replacement(self):
         owner=SimpleNamespace();item={'item_type':'FunctionCallItem','call_id':'original','private':'unchanged'}
         kwargs={'items':[item],'item_schema_version':1,'tool_definitions':[{'opaque':'keep'}]}
-        first=inject(owner,kwargs,{'public':'fact'},'Vita')['modified_kwargs']
+        result=inject(owner,kwargs,{'public':'fact'},'Vita')
+        self.assertEqual(result['action'],'continue')
+        first=result['modified_kwargs']
         second=inject(owner,first,{'public':'new'},'Vita')['modified_kwargs']
         self.assertEqual(len(second['items']),2);self.assertIs(second['items'][0],item)
         self.assertEqual(second['tool_definitions'],kwargs['tool_definitions']);self.assertEqual(len(kwargs['items']),1)
         self.assertEqual(inject(owner,{**kwargs,'item_schema_version':2},{},'Vita'),{'action':'continue'})
+
+    def test_cancelled_plan_is_labelled_and_cannot_hide_active_items(self):
+        from maibot_autonomous_planning_plugin.maivita.host.presentation import public_text
+        items=[{'name':'old','item_id':str(i),'status':'superseded'} for i in range(22)]
+        items.append({'name':'reading','item_id':'active','status':'planned'})
+        text=public_text('plan',{'ok':True,'data':{'items':items}},'Asia/Shanghai')
+        self.assertIn('reading [active] 待执行',text)
+        self.assertIn('已取消/替换',text)
+        self.assertIn('仅显示前 20 条',text)
+        self.assertEqual(items[0]['item_id'],'0')

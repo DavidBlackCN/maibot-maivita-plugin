@@ -12,13 +12,18 @@ def command(user='10001'):
         'message':{'platform':'qq','account_id':'99999','scope':None,'session_id':'s','message_id':'m1',
             'processed_plain_text':'/maivita wake','message_info':{'user_info':{'user_id':user},'group_info':{'group_id':'20001'}}}}
 
+def routes():
+    return [{'session_id':'s','stream_id':'s','platform':'qq','account_id':'99999',
+             'scope':None,'is_group_session':True,'group_id':'20001'}]
+
 class ManagementTests(unittest.IsolatedAsyncioTestCase):
     def plugin(self,response=None):
         engine=SimpleNamespace(state=lambda:SimpleNamespace(state_version=1,config_revision=1),
             execute=Mock(return_value={'event_id':'e1'}),clock=SimpleNamespace(now_utc=lambda:datetime.now(timezone.utc)))
         return SimpleNamespace(ready=True,runtime=SimpleNamespace(engine=engine),
             active_config=SimpleNamespace(instance=SimpleNamespace(allowed_streams=['s'])),
-            ctx=SimpleNamespace(config=SimpleNamespace(get=AsyncMock(return_value='99999')),
+            ctx=SimpleNamespace(config=SimpleNamespace(get=AsyncMock(return_value='')),
+                chat=SimpleNamespace(get_all_streams=AsyncMock(side_effect=lambda **kw:routes())),
                 call_host_method=AsyncMock(return_value=response or {'success':True,'result':{'policy_version':1,'allowed':True}})),
             error=lambda code:{'ok':False,'error':{'code':code}})
 
@@ -33,6 +38,31 @@ class ManagementTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first.kind,'wake');self.assertTrue(first.idempotency_key.startswith('local-command:'))
         await execute(p,c)
         self.assertEqual(first.idempotency_key,p.runtime.engine.execute.call_args.args[0].idempotency_key)
+        p.ctx.config.get.assert_not_awaited()
+
+    async def test_adapter_route_overrides_empty_or_stale_fallback(self):
+        for fallback in ('','88888'):
+            p=self.plugin();p.ctx.config.get.return_value=fallback
+            self.assertTrue((await execute(p,command()))['ok'])
+            p.ctx.config.get.assert_not_awaited()
+        for rows in ([],routes()+routes(),[dict(routes()[0],account_id='88888')],
+                     [dict(routes()[0],group_id='20002')]):
+            p=self.plugin();p.ctx.chat.get_all_streams.side_effect=None
+            p.ctx.chat.get_all_streams.return_value=rows
+            self.assertFalse((await execute(p,command()))['ok'])
+            p.runtime.engine.execute.assert_not_called()
+
+    async def test_reload_or_cancellation_during_route_lookup_never_writes(self):
+        p=self.plugin()
+        async def changed(**kw):
+            p.active_config=deepcopy(p.active_config)
+            return routes()
+        p.ctx.chat.get_all_streams.side_effect=changed
+        self.assertFalse((await execute(p,command()))['ok'])
+        p.runtime.engine.execute.assert_not_called()
+        p=self.plugin();p.ctx.chat.get_all_streams.side_effect=asyncio.CancelledError
+        with self.assertRaises(asyncio.CancelledError):await execute(p,command())
+        p.runtime.engine.execute.assert_not_called()
 
     async def test_malformed_envelopes_never_query_or_mutate(self):
         variants=[]

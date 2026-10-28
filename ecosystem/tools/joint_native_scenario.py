@@ -22,7 +22,8 @@ async def run(work):
     scope=None if automatic else 'synthetic-test-scope'
     from src.config.config import config_manager
     config_manager.initialize(); cfg=config_manager.get_global_config()
-    cfg.bot.qq_account='123456789'; cfg.bot.platform='qq'; cfg.telemetry.enable=False; cfg.maim_message.enabled=False
+    # SnowLuma supplies account_id per route; the official fallback may be empty.
+    cfg.bot.qq_account=''; cfg.bot.platform=''; cfg.telemetry.enable=False; cfg.maim_message.enabled=False
     from src.common.database.database import initialize_database,engine
     initialize_database()
     from src.chat.message_receive.chat_manager import chat_manager
@@ -75,9 +76,11 @@ async def run(work):
     from src.platform_io.types import DriverDescriptor,DriverKind,DeliveryStatus,DeliveryReceipt,RouteBinding
     class CountedDriver(PlatformIODriver):
         def __init__(self):
-            super().__init__(DriverDescriptor('joint-counted',DriverKind.LOCAL,'qq','123456789',scope)); self.calls=[]
+            super().__init__(DriverDescriptor('joint-counted',DriverKind.LOCAL,'qq','123456789',scope)); self.calls=[];self.texts=[]
         async def send_message(self,message,route_key,metadata=None):
             self.calls.append(message.session_id)
+            from src.common.data_models.message_component_data_model import TextComponent
+            self.texts.append(''.join(c.text for c in message.raw_message.components if isinstance(c,TextComponent)))
             return DeliveryReceipt(message.message_id,route_key,DeliveryStatus.SENT,driver_id=self.driver_id,driver_kind=DriverKind.LOCAL,external_message_id='test-'+message.message_id)
     port=get_platform_io_manager(); driver=CountedDriver(); await port.add_driver(driver)
     port.send_route_table.bind(RouteBinding(driver.descriptor.route_key,driver.driver_id,DriverKind.LOCAL,priority=1000))
@@ -218,6 +221,9 @@ async def run(work):
             query={'account_id':'10001','bot_account_id':'123456789','route_scope':scope,'stream_id':stream,'action':'wake'}
             policy=await call(IDENTITY,'get_vita_policy',query)
             assert policy=={'policy_version':1,'allowed':True},policy
+            cfg.bot.qq_account='888888888'
+            assert (await call(IDENTITY,'get_vita_policy',query))['allowed']
+            cfg.bot.qq_account=''
             assert not (await call(VITA,'request_wakeup',{'policy':policy,**query}))['ok']
             cases.append('official_api_registry_cannot_invoke_Command_and_read_policy_cannot_execute')
             for user in ('10002','10003'): await command('/maiidentity register',user)
@@ -262,6 +268,7 @@ async def run(work):
             assert (await call(VITA,'get_life_state'))['state_version']==before
             assert len(driver.calls)==1
             cases.append('official_policy_admin_removal_reload_denies_management')
+            cases.append('adapter_reported_identity_with_empty_global_fallback')
             # Product features through the actual official Command and Hook
             # registries. Inspect only this synthetic instance's owned data.
             configs['maibot-maiIdentity-plugin']['management']['vita_admin_accounts']=['10001']
@@ -328,6 +335,15 @@ async def run(work):
             await command('/maihush 安静5分钟')
             assert (await call(HUSH,'get_public_constraints',{'stream_id':stream}))['data']['hard']=='HARD_SILENT'
             cases.append('native_finite_Chinese_hush_aliases_preserve_local_admin_boundary')
+            # Early author/service denials must produce normal-send receipts.
+            # No permission, Hush bypass or synthetic owner evidence is added.
+            before=len(driver.calls)
+            await command('/maiidentity relations','10004')
+            assert len(driver.calls)==before
+            await command('/maihush 恢复聊天')
+            await command('/maiidentity relations','10004')
+            assert len(driver.calls)==before+1 and 'MaiIdentity 未执行' in driver.texts[-1],driver.texts[-3:]
+            cases.append('native_identity_denial_receipt_visible_when_allowed_and_blocked_by_hard_silence')
 
     finally:
         await supervisor.stop(); engine.dispose()

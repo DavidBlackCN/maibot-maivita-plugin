@@ -4,6 +4,7 @@ import json,secrets,sqlite3
 from ..life.domain.commands import Command
 from .life_commands import parse,describe
 from .management import local_request,API
+from .routes import command_route
 import asyncio
 
 
@@ -65,9 +66,9 @@ async def dispatch(plugin,command):
     if not plugin.ready:return 'MaiVita 未就绪'
     try:
         operation=parse(command['text'],runtime.engine,cfg.instance.timezone)
-        bot=await asyncio.wait_for(plugin.ctx.config.get('bot.qq_account',''),2)
+        route=await command_route(plugin.ctx,command)
         if not plugin.ready or plugin.runtime is not runtime or plugin.active_config is not cfg:raise ValueError('配置已改变，请重新操作')
-        query,origin=local_request(plugin,command,str(bot),management_action=operation.get('kind','inspect'))
+        query,origin=local_request(plugin,command,route['account_id'],management_action=operation.get('kind','inspect'))
         actor=json.dumps([query[k] for k in ('account_id','bot_account_id','route_scope','stream_id')])
         if plugin.management is None:plugin.management=Requests(runtime.engine.database.path.with_name('management.sqlite3'))
         store=plugin.management;now=runtime.engine.clock.now_utc()

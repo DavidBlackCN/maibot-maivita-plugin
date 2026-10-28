@@ -22,7 +22,13 @@ def public_text(view,result,timezone):
         return '\n'.join(lines)
     if view=='plan':
         lines=['MaiVita 当前计划']
-        lines.extend('• '+clean(item.get('name','未命名活动'))+' ['+clean(item.get('item_id',''))+'] '+clean(item.get('start_at') or '未排时') for item in data.get('items',[])[:20])
+        statuses={'planned':'待执行','started':'进行中','done':'已完成',
+            'superseded':'已取消/替换','cancelled':'已取消'}
+        items=data.get('items',[])
+        rows=sorted(items,key=lambda item:item.get('status') in ('superseded','cancelled','done'))
+        lines.extend('• '+clean(item.get('name','未命名活动'))+' ['+clean(item.get('item_id',''))+'] '
+            +statuses.get(item.get('status'),clean(item.get('status') or '状态未知'))+' '+clean(item.get('start_at') or '未排时') for item in rows[:20])
+        if len(items)>20:lines.append('仅显示前 20 条，优先显示未结束条目；完整记录可在 WebUI 查看。')
         if len(lines)==1: lines.append('暂无计划。可在插件设置中开启每日生活规划。')
         return '\n'.join(lines)
     if view=='goals':
