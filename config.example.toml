@@ -24,6 +24,8 @@ timeout_seconds = 25
 max_tokens = 2048
 daily_budget = 8
 generate_on_start = false
+# One durable local-day decision trigger, sharing the existing budget.
+daily_planning_enabled = false
 life_context = ""
 
 # For the legacy profile, fill [legacy] using the former version-1 example.

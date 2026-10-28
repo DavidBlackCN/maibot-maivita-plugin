@@ -39,6 +39,7 @@ class ModelSettings(Strict):
     max_tokens: int=Field(default=2048,ge=128,le=8192)
     daily_budget: int=Field(default=8,ge=1,le=100)
     generate_on_start: bool=False
+    daily_planning_enabled: bool=False
     life_context: str=Field(default='',max_length=4000)
 
 

@@ -62,7 +62,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
                     'plan':self.runtime.queries.get_plan(),'goals':self.runtime.queries.get_goals()}
             self.model_port=SDKModelPort(self.ctx,cfg.model,context=context)
             self.runtime=DevelopmentRuntime(db,self.model_port,config=LifeRuntimeConfig(timezone=cfg.instance.timezone,
-                daily_budget=cfg.model.daily_budget),lock_path=data/'runtime-writer.lock')
+                daily_budget=cfg.model.daily_budget,daily_planning_enabled=cfg.model.daily_planning_enabled),lock_path=data/'runtime-writer.lock')
             self.runtime.start()
             self.api=LifeAPI(self.runtime)  # no trusted end-user contract: privileged writes denied
             self.worker=asyncio.create_task(self.runtime.run(),name='maivita-i1-worker')
@@ -70,7 +70,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             if self.worker.done(): await self.worker
             self.worker.add_done_callback(self._worker_stopped)
             self.ready=True; self.failure_code=None
-            if cfg.model.generate_on_start:
+            if cfg.model.generate_on_start and not cfg.model.daily_planning_enabled:
                 self.startup=asyncio.create_task(self.runtime.request_replan('i1-configured-startup'),name='maivita-i1-startup')
                 self.startup.add_done_callback(self._startup_stopped)
         except BaseException:
@@ -171,10 +171,15 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         raw=text or (message if isinstance(message,str) else '')
         action=raw.strip().split(maxsplit=1)[1] if len(raw.strip().split(maxsplit=1))==2 else 'status'
         method={'status':'get_life_state','plan':'get_plan','availability':'get_availability','diagnostics':'get_diagnostics'}.get(action)
-        result=await self.read(method) if method else self.error('PERMISSION_DENIED')
+        from .management import ACTIONS,FIELD,execute
+        if action in ACTIONS:
+            result=await execute(self,action,stream_id,kwargs.get(FIELD))
+        else:
+            result=await self.read(method) if method else self.error('PERMISSION_DENIED')
         if self.runtime.engine.state().sleep_phase in ('sleeping','temporarily_awake'):
             return True,'MaiVita sleeping; no trusted management receipt exception',2
-        if await self.ctx.send.text(json.dumps(result,ensure_ascii=False),stream_id) is not True:
+        from .presentation import public_text
+        if await self.ctx.send.text(public_text(action,result,self.active_config.instance.timezone),stream_id) is not True:
             return True,'MaiVita normal send rejected or unavailable; no bypass attempted',2
         return True,'MaiVita public result sent through normal permissions',2
 

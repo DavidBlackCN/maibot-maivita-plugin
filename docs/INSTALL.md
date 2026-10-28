@@ -1,6 +1,8 @@
+> 当前联动版本 0.4.0（2026-10-28）：默认安装与可选可信命令以[本版说明](JOINT_RELEASE.md)为准。下文原有通用特权 API 限制仍适用；可选有限命令需要独立 Host 扩展。
+
 # MaiVita Integration-Ready 候选安装
 
-仅用于独立空实例和后续超级 MaiBot 核心插件联合测试，不接管生产实例。版本 0.3.1、配置 3、数据库 Schema 4、契约 1.0.0。运行时只接受两组精确配对：Host 1.3.15 / `062d45cf8bd4272ac57d7ec03fcf405e5a458211`、SDK 2.16.0；或保留的 Host 1.3.12 / `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`、SDK 2.15.0。禁止交叉配对或为了启动旧包单独降级 SDK。Linux 使用 Bot 自己的 `.venv/bin/python`，不要使用可能仍为 Python 2 的系统 `python`。
+仅用于独立空实例和后续超级 MaiBot 核心插件联合测试，不接管生产实例。版本 0.4.0、配置 3、数据库 Schema 4、契约 1.0.0。运行时只接受两组精确配对：Host 1.3.15 / `062d45cf8bd4272ac57d7ec03fcf405e5a458211`、SDK 2.16.0；或保留的 Host 1.3.12 / `5c7637e6913c84d1c3d5e742fa9e95a7e70d3501`、SDK 2.15.0。禁止交叉配对或为了启动旧包单独降级 SDK。Linux 使用 Bot 自己的 `.venv/bin/python`，不要使用可能仍为 Python 2 的系统 `python`。
 
 1. 停止旧完整规划插件，安装本包的唯一 MaiVita ID。保留旧代码和数据库，不同版本不得同时运行。隔离环境须有 Manifest 声明的 pillow、tzdata（时区校验使用标准库 zoneinfo，不再强依赖 pytz）；若 uv 创建的环境没有 pip，先用 uv pip 在该环境安装这些依赖，不能假设 Host 自动安装必定成功。
 2. 首次安装由 Host 生成默认配置，默认启用 life。无需填写 acknowledgement、writer_lock 或 allowed_streams；空会话列表跟随 Host/适配器接入范围。已在 Snowluma 限制测试群时可直接使用。非空列表仍是精确白名单，禁止通配符。

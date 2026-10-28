@@ -27,6 +27,7 @@ class LifeRuntimeConfig:
     fallback_check_minutes: int = 45
     habits_enabled: bool = False
     cleanup_enabled: bool = False
+    daily_planning_enabled: bool = False
 
     def __post_init__(self):
         from zoneinfo import ZoneInfo
@@ -96,6 +97,17 @@ class DevelopmentRuntime:
         # require an explicit significant trigger through request_replan.
         require(self.opened, 'runtime not started')
         result=self.recovery.tick()
+        if self.config.daily_planning_enabled and self.config.planning_mode=='autonomous':
+            # One durable local-day trigger; coordinator owns budget and claims.
+            now=self.engine.clock.now_utc()
+            day=self.engine.clock.to_local(now,self.config.timezone).date().isoformat()
+            key='daily-planning:'+day
+            if getattr(self,'last_daily_trigger',None)!=key:
+                with self.database.unit_of_work() as u:
+                    u.connection.execute('INSERT OR IGNORE INTO decision_triggers VALUES(?,?,?,?,0)',
+                        (key,'default','enqueue_replan',int(now.timestamp()*1000)))
+                    u.commit()
+                self.last_daily_trigger=key
         mono=self.engine.clock.monotonic()
         if self.last_check is None or mono-self.last_check>=self.config.fallback_check_minutes*60:
             self.last_check=mono

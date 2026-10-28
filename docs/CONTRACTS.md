@@ -1,3 +1,5 @@
+> 当前联动版本 0.4.0（2026-10-28）：默认安装与可选可信命令以[本版说明](JOINT_RELEASE.md)为准。下文原有通用特权 API 限制仍适用；可选有限命令需要独立 Host 扩展。
+
 # MaiVita 跨插件接口契约 1.0.0
 
 状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 4 和配置 3 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
