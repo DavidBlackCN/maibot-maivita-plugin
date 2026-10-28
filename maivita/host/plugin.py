@@ -168,15 +168,18 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         # capability. Sleeping commands never receive a send permit.
         if not self.ready or not stream_allowed(stream_id,self.active_config.instance.allowed_streams):
             return True,'MaiVita not ready or test stream not allowed',2
+        runtime=self.runtime
         raw=text or (message if isinstance(message,str) else '')
         action=raw.strip().split(maxsplit=1)[1] if len(raw.strip().split(maxsplit=1))==2 else 'status'
         method={'status':'get_life_state','plan':'get_plan','availability':'get_availability','diagnostics':'get_diagnostics'}.get(action)
-        from .management import ACTIONS,FIELD,execute
+        from .management import ACTIONS,execute
         if action in ACTIONS:
-            result=await execute(self,action,stream_id,kwargs.get(FIELD))
+            result=await execute(self,{**kwargs,'text':text,'stream_id':stream_id,'message':message})
         else:
             result=await self.read(method) if method else self.error('PERMISSION_DENIED')
-        if self.runtime.engine.state().sleep_phase in ('sleeping','temporarily_awake'):
+        if not self.ready or self.runtime is not runtime:
+            return True,'MaiVita reloaded during command; no receipt sent',2
+        if runtime.engine.state().sleep_phase in ('sleeping','temporarily_awake'):
             return True,'MaiVita sleeping; no trusted management receipt exception',2
         from .presentation import public_text
         if await self.ctx.send.text(public_text(action,result,self.active_config.instance.timezone),stream_id) is not True:

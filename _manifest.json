@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "name": "MaiVita",
-  "description": "Life planning, sleep and public state; optional Host-verified finite management commands.",
+  "description": "Life planning, sleep and public state; official Host command entry; finite management commands.",
   "author": {
     "name": "DavidBlackCN",
     "url": "https://github.com/DavidBlackCN"

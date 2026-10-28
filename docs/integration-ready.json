@@ -1,6 +1,6 @@
 {
   "status": "not_ready",
-  "plugin_version": "0.4.0",
+  "plugin_version": "0.4.1",
   "host_commit": "062d45cf8bd4272ac57d7ec03fcf405e5a458211",
   "sdk": "2.16.0",
   "config_version": "3",
@@ -19,7 +19,7 @@
     "restore": false
   },
   "source_fingerprints_match": false,
-  "runtime_manifest_sha256": "f34321430ca7f8a9b80206e27b2224621ae9bd859362d12691c9eceb81b46c5e",
+  "runtime_manifest_sha256": "7c08f10d0dc26b6b7ad08ff8eb5814e67d75467d645dd092584f30aca5ca05dc",
   "static_unit_runner": true,
   "public_source_and_export_audit": false,
   "native_engine_roundtrip": false,
