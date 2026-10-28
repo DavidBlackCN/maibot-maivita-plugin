@@ -1,0 +1,73 @@
+name: Super MaiMai joint contracts
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  official-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MAIBOT_HOST_VERSION: '1.3.15'
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: workspace/maibot-maivita-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - name: Read immutable peer revisions
+        id: peers
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          lock=json.loads(Path('workspace/maibot-maivita-plugin/ecosystem/peers.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              for key,value in lock.items():
+                  assert len(value)==40 and all(c in '0123456789abcdef' for c in value)
+                  f.write(key+'='+value+'\n')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: DavidBlackCN/maibot-maiidentity-plugin
+          ref: ${{ steps.peers.outputs.identity }}
+          path: workspace/maibot-maiIdentity-plugin
+      - uses: actions/checkout@v4
+        with:
+          repository: DavidBlackCN/maibot-maihush-plugin
+          ref: ${{ steps.peers.outputs.hush }}
+          path: workspace/maibot-maihush-plugin
+      - uses: actions/checkout@v4
+        with:
+          repository: Mai-with-u/MaiBot
+          ref: 062d45cf8bd4272ac57d7ec03fcf405e5a458211
+          path: host
+      - name: Install pinned official SDK and Host dependencies
+        run: |
+          python -m pip install -r host/requirements.txt
+          python -m pip install maibot-plugin-sdk==2.16.0 pytest pytest-asyncio tomli-w
+      - name: Stage the existing coordinator and maintained joint harness
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          base=Path('workspace/maibot-maivita-plugin/ecosystem')
+          shutil.copytree(base/'coordinator','workspace/maibot-maicoordinate-plugin')
+          shutil.copytree(base/'tools','workspace/tools')
+          PY
+      - name: Coordinator regression suite
+        working-directory: workspace/maibot-maicoordinate-plugin
+        run: python -m pytest tests -q -p no:cacheprovider --junitxml ../coordinate.xml
+      - name: Real native joint runtime with synthetic model and driver
+        run: python workspace/tools/run_joint_native.py --output workspace/joint-evidence --host-source host --source-lock workspace/maibot-maihush-plugin/tests/fixtures/source-lock-1.3.15.json --auto-routes --trusted-management
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: super-maimai-joint-${{ github.sha }}
+          path: |
+            workspace/coordinate.xml
+            workspace/joint-evidence/result.json
+            workspace/joint-evidence/run.json
+            workspace/joint-evidence/console.log

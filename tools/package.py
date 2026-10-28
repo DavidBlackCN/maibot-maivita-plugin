@@ -17,7 +17,7 @@ def entries():
             if path.is_file() and path.suffix in ('.py','.sql'):
                 files[path.relative_to(ROOT).as_posix()]=path.read_bytes()
     for name in READMES: files[name]=(ROOT/'docs'/name).read_bytes()
-    for name in ('INSTALL.md','LIMITATIONS.md','ACCEPTANCE.md','ROLLBACK.md','CONTRACTS.md','SOURCES.md','CHANGELOG.md','SOURCE_LAYOUT.md','JOINT_RELEASE.md'):
+    for name in ('INSTALL.md','LIMITATIONS.md','ACCEPTANCE.md','ROLLBACK.md','CONTRACTS.md','SOURCES.md','CHANGELOG.md','SOURCE_LAYOUT.md','JOINT_RELEASE.md','PRODUCT_GUIDE.md'):
         files['docs/'+name]=(ROOT/'docs'/name).read_bytes()
     schema=ROOT/'docs/contracts-v1.schema.json'
     if schema.exists(): files['docs/contracts-v1.schema.json']=schema.read_bytes()

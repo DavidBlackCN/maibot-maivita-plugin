@@ -213,11 +213,11 @@ class LifeStateEngine:
             require(state.active_sleep_session_id is None, 'already sleeping')
             return replace(state, sleep_phase='winding_down'), 'life.sleep.intent'
         if kind == 'start_sleep':
-            require(command.source in ('model','legacy_observed'), 'normal autonomous sleep requires a validated model decision')
+            require(command.source in ('model','authorized','legacy_observed'), 'sleep requires a validated model decision or local authorization')
             require(state.active_sleep_session_id is None, 'sleep session already open')
             duration = p['duration_minutes']
             require(type(duration) in (int,float) and 0 < duration < 100000, 'invalid sleep duration')
-            autonomous = command.source == 'model'
+            autonomous = command.source in ('model','authorized')
             if autonomous:
                 require(5 <= duration <= 1080, 'sleep duration outside engineering limits')
                 require(state.last_wake_at is None or now - state.last_wake_at >= timedelta(minutes=5), 'new-session cooldown')

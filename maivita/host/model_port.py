@@ -47,10 +47,12 @@ class SDKModelPort:
     async def __call__(self,state,triggers):
         started=time.monotonic()
         context=self.context()
+        from .persona import read_persona
+        persona=await read_persona(self.ctx,self.settings.life_context)
         prompt=json.dumps({'contract':CONTRACT,'as_of':iso_instant(context['now']),
             'basis':{'state_version':state.state_version,'plan_version':state.plan_version,'config_revision':state.config_revision},
             'context':{k:v for k,v in context.items() if k!='now'},
-            'character_context':self.settings.life_context,'trigger_ids':list(triggers)[:100]},ensure_ascii=False)
+            'character_context':persona['text'],'trigger_ids':list(triggers)[:100]},ensure_ascii=False)
         if len(prompt)>40000: raise DomainError('model context exceeds I1 limit')
         try:
             response=await asyncio.wait_for(self.ctx.llm.generate(prompt,task_name=self.settings.task_name,

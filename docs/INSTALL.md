@@ -1,3 +1,5 @@
+> 阶段参考文档：本文保留早期实现边界。当前 0.5.0 使用方式与开放能力以 [PRODUCT_GUIDE](PRODUCT_GUIDE.md) 为准；未实现的通用特权仍不开放。
+
 > 当前版本 0.4.1：官方 Host 命令入口及只读策略，无需私有补丁。使用与边界见[本版说明](JOINT_RELEASE.md)，下文通用特权 API 限制仍适用。
 
 # MaiVita Integration-Ready 候选安装

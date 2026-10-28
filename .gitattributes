@@ -7,3 +7,5 @@ tests/fixtures/provenance/legacy_plugin.r0.py -text
 maivita/life/storage/migrations/001_initial.sql -text
 LICENSE -text
 tests/fixtures/host_contracts/** -text
+ecosystem/coordinator/** -text
+ecosystem/tools/** -text

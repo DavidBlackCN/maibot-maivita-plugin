@@ -1,0 +1,21 @@
+{
+  "LICENSE": "d53cc6b16bfcb4ef97d354a917c01c1b37467840858565f8a8a94ae9bad12ae8",
+  "README.md": "ce7e9c5539cb460ff6396ac49d667a74b5a34ee2cea084f7829fa316f4081692",
+  "_locales/zh-CN.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "_manifest.json": "b34e63311f12d64f536b43b2b0626b9f6044d5d43d187325211417a65b56e550",
+  "config.example.toml": "49b670f30981e1a973ee997c18253d0fab0dfadaea3aebad3433184e3ce66740",
+  "maicoordinate/__init__.py": "542b66470f21c20c6c2977f9645d63236332f306a08099005099c8b0b409ddbe",
+  "maicoordinate/config.py": "26a815e8e632fc99c0f26df38dc67764e37ff196de4dd87f6e6cfb16537a6fe5",
+  "maicoordinate/contracts.py": "ca01f30f846c9f953c133c21116f028d464f8e8e8297b2de4d53c6f40f900b72",
+  "maicoordinate/expression.py": "7bf69ed71a76f1f695bb69fbf7731ef3f07928664c97d5b939a9941c74f90f36",
+  "maicoordinate/plugin.py": "38dc29ca433e0e26df47969efe139422553e541a2432a5b2ce2389ecaad3fa81",
+  "maicoordinate/ports.py": "1bec52225dc9201857ee17ede33e1528cca14857c10ec764f5685f421a2f0b40",
+  "maicoordinate/schema.py": "cdaa0f5525180b42b4e928e96b14e30724c04f8a286e8d7b8ed4ae967e4a1ba3",
+  "maicoordinate/service.py": "3de66851aa071a4c64f8a9064b7bdf74080438c3dd4844a642f920c613cafc2c",
+  "maicoordinate/store.py": "739e5a649b7234f14aa8ad65c68f19d15a61e2e2e26383664fc1ee446d45d91a",
+  "plugin.py": "579b4ef8a4414c9bfddce28e4fc283fc518d7bdf0406a0f26fb87983023be040",
+  "tests/test_auto_routes.py": "ba1d33a9e74009ad97b5132dbbc125b48f3d9290d86a0b0be1d856a14feb1d68",
+  "tests/test_coordinator.py": "4693bc3d3c36dad03c053bde9e57ae6ca3ae0ae697a90f05e3fce7d0da14858d",
+  "tests/test_product_expression.py": "1a34fb6fd0ca2a88401f70dcdd3a71ba3a58d99920bd6c43cc09ff84bcb27fe7",
+  "tests/test_resilience.py": "8d5533c8ef1820137618598c3acf18d93dead90c045a0fdbdba1612e65d4d712"
+}

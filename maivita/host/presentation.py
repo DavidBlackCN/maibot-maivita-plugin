@@ -10,10 +10,10 @@ def public_text(view,result,timezone):
     data=result['data']
     if view in ('wake','醒来','replan','重新规划'):
         return 'MaiVita：'+('已唤醒；仍遵守群静音。' if view in ('wake','醒来') else '已提交重新规划；睡眠、预算和冷却约束仍生效。')
-    if view=='status':
+    if view in ('status','activity'):
         lines=['MaiVita：'+PHASES.get(data.get('sleep_phase'),'状态待确认')]
         activity=data.get('activity')
-        lines.append('当前活动：'+(clean(activity['name']) if activity else '暂无'))
+        lines.append('当前活动：'+(clean(activity['name'])+' ['+clean(activity.get('activity_id',''))+']' if activity else '暂无'))
         lines.append('计划：'+('尚未生成' if data.get('plan_version',0)==0 else '已生成，可用 /maivita plan 查看'))
         if data.get('next_deadline_at'):
             deadline=datetime.fromisoformat(data['next_deadline_at']).astimezone(ZoneInfo(timezone))
@@ -22,9 +22,12 @@ def public_text(view,result,timezone):
         return '\n'.join(lines)
     if view=='plan':
         lines=['MaiVita 当前计划']
-        lines.extend('• '+clean(item.get('name','未命名活动')) for item in data.get('items',[])[:20])
+        lines.extend('• '+clean(item.get('name','未命名活动'))+' ['+clean(item.get('item_id',''))+'] '+clean(item.get('start_at') or '未排时') for item in data.get('items',[])[:20])
         if len(lines)==1: lines.append('暂无计划。可在插件设置中开启每日生活规划。')
         return '\n'.join(lines)
+    if view=='goals':
+        rows=data.get('goals',[]) if isinstance(data,dict) else data
+        return 'MaiVita 公开目标\n'+('\n'.join(clean(g['title'])+' ['+clean(g['goal_id'])+'] '+clean(g['status']) for g in rows[:20]) or '暂无')
     if view=='availability':
         return 'MaiVita：'+PHASES.get(data.get('sleep_phase'),'状态待确认')+'；'+('可以参与聊天，仍遵守静音约束。' if data.get('can_reply_recommendation') is True else '当前不宜打扰。')
     return json.dumps(result,ensure_ascii=False)

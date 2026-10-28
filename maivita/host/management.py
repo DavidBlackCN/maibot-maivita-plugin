@@ -11,7 +11,7 @@ API='davidblackcn.maibot-maiidentity-plugin.get_vita_policy'
 ACTIONS={'wake':'wake','醒来':'wake','replan':'enqueue_replan','重新规划':'enqueue_replan'}
 
 
-def local_request(plugin, command, bot_account):
+def local_request(plugin, command, bot_account, *, management_action=None):
     # This function is called ONLY by @Command, never by API/Tool dispatch.
     raw=command.get('message')
     if type(raw) is not dict or type(bot_account) is not str or not re.fullmatch(r'[1-9][0-9]{0,19}',bot_account):
@@ -29,7 +29,7 @@ def local_request(plugin, command, bot_account):
     if type(text) is not str or len(text)>256 or text!=raw.get('processed_plain_text'):
         raise ValueError('UNTRUSTED_CONTEXT')
     words=text.strip().split()
-    if len(words)!=2 or words[0]!='/maivita' or words[1] not in ACTIONS:
+    if management_action is None and (len(words)!=2 or words[0]!='/maivita' or words[1] not in ACTIONS):
         raise ValueError('UNSUPPORTED_COMMAND')
     stream=command.get('stream_id')
     scope=raw.get('scope')
@@ -43,7 +43,7 @@ def local_request(plugin, command, bot_account):
             or any(raw.get(flag,False) is not False for flag in ('is_bot','is_system','is_mai_message','is_notify'))):
         raise ValueError('UNTRUSTED_CONTEXT')
     query={'account_id':account,'bot_account_id':bot_account,'route_scope':scope,
-        'stream_id':stream,'action':ACTIONS[words[1]]}
+        'stream_id':stream,'action':management_action if management_action is not None else ACTIONS[words[1]]}
     # Same original message cannot be replayed as another action. The engine
     # checks payload conflicts and persists idempotency across reloads.
     key='local-command:'+hashlib.sha256(json.dumps(

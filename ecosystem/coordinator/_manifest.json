@@ -1,0 +1,40 @@
+{
+  "manifest_version": 2,
+  "id": "davidblackcn.maibot-maicoordinate-plugin",
+  "version": "0.3.0",
+  "name": "MaiCoordinate",
+  "description": "Read-only aggregation, shadow decisions and opt-in bounded public-event expression.",
+  "author": {
+    "name": "DavidBlackCN",
+    "url": "https://github.com/DavidBlackCN"
+  },
+  "urls": {
+    "repository": "https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator",
+    "homepage": "https://github.com/DavidBlackCN"
+  },
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": [
+      "zh-CN"
+    ],
+    "locales_path": "_locales"
+  },
+  "license": "MIT",
+  "host_application": {
+    "min_version": "1.3.12",
+    "max_version": "1.3.15"
+  },
+  "sdk": {
+    "min_version": "2.15.0",
+    "max_version": "2.16.0"
+  },
+  "dependencies": [],
+  "capabilities": [
+    "api.list",
+    "api.call",
+    "llm.get_available_models",
+    "llm.generate",
+    "send.text"
+  ],
+  "plugin_type": "extension"
+}

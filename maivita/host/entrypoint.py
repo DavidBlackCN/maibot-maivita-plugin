@@ -216,6 +216,15 @@ class MaiVitaPlugin(MaiBotPlugin):
             return {'api_version':1,'ok':True,'data':data,'error':None}
         except (DomainError,ValueError,TypeError): return self.unavailable('INVALID_ARGUMENT')
 
+    @API('get_public_persona', public=True, version='1')
+    async def get_public_persona(self, **kwargs):
+        if not self.ready or self.selected_mode!='life' or not self.delegate.ready:return self.unavailable('NOT_READY')
+        delegate=self.delegate;cfg=delegate.active_config
+        from .persona import read_persona
+        data=await read_persona(delegate.ctx,cfg.model.life_context)
+        if not self.ready or self.delegate is not delegate or delegate.active_config is not cfg:return self.unavailable('NOT_READY')
+        return {'api_version':1,'ok':True,'data':data,'error':None}
+
     @API('get_public_route_scope', public=True, version='1')
     async def get_public_route_scope(self, stream_id=None, **kwargs):
         if not self.ready or self.selected_mode != 'life' or not self.delegate.ready:

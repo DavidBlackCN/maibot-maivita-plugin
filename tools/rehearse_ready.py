@@ -52,7 +52,10 @@ def main():
     env['MAIVITA_EXPECT_ENGINE']='life'
     subprocess.run([sys.executable,str(root/'tools/run_i1_components.py')],cwd=root,env=env,check=True)
     # Both native Host processes are stopped before reading/restoring snapshots.
-    with WriterLease(instance/'maivita-writer.lock'):
+    lock_path=Path(json.loads((data/'engine-authority.json').read_text())['writer_lock'])
+    if not lock_path.resolve().is_relative_to(instance.resolve()):
+        raise ValueError('restore rehearsal lock must belong to the isolated instance')
+    with WriterLease(lock_path):
         restored=[]
         with tempfile.TemporaryDirectory(prefix='maivita-ready-restore-',dir=root/'.integration') as temporary:
             target_root=Path(temporary).resolve()

@@ -27,7 +27,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
     def __init__(self):
         super().__init__()
         self.runtime=None; self.worker=None; self.startup=None; self.deployment_lease=None
-        self.api=None; self.model_port=None; self.active_config=None
+        self.api=None; self.model_port=None; self.active_config=None; self.management=None
         self.ready=False; self.failure_code=None
         self.startup_result={'status':'not_requested'}; self.guarded_streams=()
 
@@ -99,6 +99,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             if self.worker is not None:
                 self.worker.cancel(); await asyncio.gather(self.worker,return_exceptions=True)
         finally:
+            if self.management is not None: self.management.close(); self.management=None
             if self.deployment_lease is not None: self.deployment_lease.release()
             self.runtime=None; self.worker=None; self.startup=None; self.api=None
             self.model_port=None; self.deployment_lease=None; self.active_config=None
@@ -123,10 +124,10 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         if not self.ready: return self.error(self.failure_code or 'NOT_READY')
         result=await self.api.call(method,trusted_context=None)
         if method=='get_diagnostics' and result['ok']:
-            result['data'].update({'entry':'i1-development','host_contract':'/'.join(str(v) for v in runtime_pair()),
+            result['data'].update({'entry':'life','host_contract':'/'.join(str(v) for v in runtime_pair()),
                 'frequency':'disabled_unsupported','owner_auth':'disabled_no_contract',
                 'privileged_writes':'denied_no_trusted_user_context','trusted_receipts':'no_silence_exception',
-                'model':self.model_port.last,'startup_decision':self.startup_result,'first_install_gate':'not_accepted'})
+                'model':self.model_port.last,'startup_decision':self.startup_result,'local_management':'official_command_with_confirmation','first_install_gate':'see_source_bound_delivery_evidence'})
         return result
 
     @API('get_life_state',public=True,version='1')
@@ -162,7 +163,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
     async def old_goal_tool(self,action='list',**kwargs):
         return await self.read('get_goals') if action=='list' else self.error('PERMISSION_DENIED')
 
-    @Command('maivita',pattern=r'^/(?:maivita|plan|规划)(?:\s|$)')
+    @Command('maivita',pattern=r'^(?:/(?:maivita|plan|规划)|麦麦管理)(?:\s|$)')
     async def command(self,text='',message=None,stream_id='',**kwargs):
         # Read-only commands have no Owner exemption and use the normal send
         # capability. Sleeping commands never receive a send permit.
@@ -171,18 +172,26 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         runtime=self.runtime
         raw=text or (message if isinstance(message,str) else '')
         action=raw.strip().split(maxsplit=1)[1] if len(raw.strip().split(maxsplit=1))==2 else 'status'
-        method={'status':'get_life_state','plan':'get_plan','availability':'get_availability','diagnostics':'get_diagnostics'}.get(action)
+        method={'status':'get_life_state','plan':'get_plan','availability':'get_availability','diagnostics':'get_diagnostics','goals':'get_goals','activity':'get_life_state'}.get(action)
         from .management import ACTIONS,execute
-        if action in ACTIONS:
+        rendered=None
+        if action=='help':
+            from .life_commands import HELP
+            rendered=HELP;result={'ok':True,'data':{}}
+        elif action in ACTIONS and raw.strip().startswith('/maivita '):
             result=await execute(self,{**kwargs,'text':text,'stream_id':stream_id,'message':message})
+        elif method:
+            result=await self.read(method)
         else:
-            result=await self.read(method) if method else self.error('PERMISSION_DENIED')
+            from .management_requests import dispatch
+            rendered=await dispatch(self,{**kwargs,'text':text,'stream_id':stream_id,'message':message})
+            result={'ok':True,'data':{}}
         if not self.ready or self.runtime is not runtime:
             return True,'MaiVita reloaded during command; no receipt sent',2
         if runtime.engine.state().sleep_phase in ('sleeping','temporarily_awake'):
             return True,'MaiVita sleeping; no trusted management receipt exception',2
         from .presentation import public_text
-        if await self.ctx.send.text(public_text(action,result,self.active_config.instance.timezone),stream_id) is not True:
+        if await self.ctx.send.text(rendered if rendered is not None else public_text(action,result,self.active_config.instance.timezone),stream_id) is not True:
             return True,'MaiVita normal send rejected or unavailable; no bypass attempted',2
         return True,'MaiVita public result sent through normal permissions',2
 
@@ -201,9 +210,10 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
     async def replyer_hook(self,**kwargs): return self.inject(kwargs)
     @HookHandler('maisaka.planner.before_request',name='maivita_life_planner')
     async def planner_hook(self,**kwargs):
-        # Use only the verified extra_prompt shape. Unknown planner versions
-        # are left alone rather than rewriting typed messages/items.
-        return self.inject(kwargs) if 'extra_prompt' in kwargs else {'action':'continue'}
+        if 'extra_prompt' in kwargs:return self.inject(kwargs)
+        if not self.ready or not stream_allowed(kwargs.get('session_id'),self.active_config.instance.allowed_streams):return {'action':'continue'}
+        from .typed_prompt import inject
+        return inject(self,kwargs,self.runtime.queries.get_life_state(),'MaiVita')
     @HookHandler('send_service.before_send',name='maivita_sleep_silence',order='early',error_policy='abort')
     async def silence_hook(self,message=None,**kwargs):
         stream=message.get('session_id') if isinstance(message,dict) else getattr(message,'session_id',None)

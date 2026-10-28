@@ -35,7 +35,7 @@ class LifeQueries:
             deadline=(session.interrupt_until or session.expected_wake_at) if session else from_epoch_ms(checkpoint[0]) if checkpoint else None
             return {'character_id':character_id, 'state_version':state.state_version,
                 'plan_version':state.plan_version, 'sleep_phase':state.sleep_phase,
-                'activity': ({'name':actual.name, 'category':actual.category,
+                'activity': ({'activity_id':actual.activity_id,'name':actual.name, 'category':actual.category,
                               'started_at':iso_instant(actual.started_at)} if actual and not unknown and visible(actual,scope) else None),
                 'activity_continuity_unknown':unknown,
                 'energy':state.energy, 'fatigue':state.fatigue, 'stress':state.stress,

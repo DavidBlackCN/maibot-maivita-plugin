@@ -61,7 +61,10 @@ async def run():
         from src.common.paths import get_instance_root
         # Real second writer refusal while the Host plugin owns its lease.
         from maivita_i1_source.maivita.life.storage.safety import WriterLease
-        lease=WriterLease(get_instance_root()/'maivita-writer.lock')
+        authority_path=get_instance_root()/'data/plugins/davidblackcn.maibot-maivita-plugin/engine-authority.json'
+        lock_path=Path(json.loads(authority_path.read_text())['writer_lock'])
+        assert lock_path.resolve().is_relative_to(get_instance_root().resolve())
+        lease=WriterLease(lock_path)
         try: lease.acquire()
         except RuntimeError: results['single_writer']={'passed':True}
         else:

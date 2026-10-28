@@ -1,0 +1,16 @@
+mode = "shadow"
+acknowledgement = ""
+routes = []
+model_task = "utils"
+character_context = ""
+poll_seconds = 5
+cooldown_seconds = 3600
+queue_capacity = 256
+max_records = 10000
+payload_retention_days = 7
+privileged_writes = false
+
+[plugin]
+enabled = true
+config_version = "1"
+
