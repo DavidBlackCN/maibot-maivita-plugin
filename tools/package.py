@@ -7,7 +7,7 @@ import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 from .acceptance_baseline import HOST_COMMIT, SDK_VERSION
 PACKAGES=('maivita',)
-READMES=('INSTALL.md','LIMITATIONS.md','ACCEPTANCE.md','ROLLBACK.md')
+READMES=('README.md','UPDATE_NOTES.md')
 
 
 def entries():
@@ -16,8 +16,8 @@ def entries():
         for path in (ROOT/directory).rglob('*'):
             if path.is_file() and path.suffix in ('.py','.sql'):
                 files[path.relative_to(ROOT).as_posix()]=path.read_bytes()
-    for name in READMES: files[name]=(ROOT/'docs'/name).read_bytes()
-    for name in ('INSTALL.md','LIMITATIONS.md','ACCEPTANCE.md','ROLLBACK.md','CONTRACTS.md','SOURCES.md','CHANGELOG.md','SOURCE_LAYOUT.md','JOINT_RELEASE.md','PRODUCT_GUIDE.md'):
+    for name in READMES: files[name]=(ROOT/name).read_bytes()
+    for name in ('LIMITATIONS.md','ROLLBACK.md','CONTRACTS.md','SOURCES.md','SOURCE_LAYOUT.md','DIAGNOSTICS.md'):
         files['docs/'+name]=(ROOT/'docs'/name).read_bytes()
     schema=ROOT/'docs/contracts-v1.schema.json'
     if schema.exists(): files['docs/contracts-v1.schema.json']=schema.read_bytes()

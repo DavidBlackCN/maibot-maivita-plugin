@@ -1,18 +1,72 @@
-# 0.5.0
+# 更新说明
 
-新增官方命令入口的生活管理预览/确认与持久恢复、有限中文语法、共享 Host 人设、Planner schema 1 公开上下文、现有协调层的活动/计划表达与公开关系风格、版本化联合 CI、离线备份恢复工具。保留旧数据 schema 和静音独立约束；无 Host 补丁。真实平台与当前源码真实模型验收单独记录。
+## v0.6.2
 
-# 更新日志
+### 文档
+- README 重写为面向使用者（功能/安装/命令/配置/限制）
+- 新增 UPDATE_NOTES.md
+- config.example.toml 全字段中文注释
+- 删除重复文档：ACCEPTANCE/CHANGELOG/INSTALL/JOINT_RELEASE/PRODUCT_GUIDE
 
-## 0.3.1 — 2026-10-22
+## v0.6.1
+
+### 变更
+- 生活管理员名单唯一来自 MaiIdentity 的 management.vita_admin_accounts。
+- 移除 instance.owner_auth_enabled / privileged_writes_enabled；旧键无论真假均忽略，其他未知键仍报错。
+
+### 兼容性
+- 支持 Host 1.3.12 / SDK 2.15.0、Host 1.3.15 / SDK 2.16.0；配置版本 3，生活数据库 schema 4。
+- 文档将 MaiCoordinate 定位为 opt-in 可选扩展；默认 shadow 行为未改变。
+
+## v0.6.0
+
+### 变更
+- 退役 legacy 规划引擎；入口只运行 life，保留旧 API 投影、旧库离线导入及来源 fixture。
+
+## v0.5.4
+
+### 变更
+- 默认启用每日规划，使用 Host planner 任务；增加模型路由选择、作息偏好与扩展状态展示。
+
+## v0.5.3
+
+### 变更
+- 管理入口拒绝原因使用不含账号及正文的结构化日志。
+
+## v0.5.2
+
+### 变更
+- 按适配器实际会话核对管理路由，兼容备用 Bot QQ 为空或过时。
+- 修正 Hook 上下文呈现方式，计划列表展示取消和替换状态。
+
+## v0.5.1
+
+### 变更
+- 修复 WebUI 空枚举和配置 Schema 展示，历史兼容字段不再显示为空选项。
+
+## v0.5.0
+
+### 变更
+- 新增生活管理预览、确认及持久化结果，支持有限中文语法。
+- 读取 Host 共享人设，为 Planner 提供公开上下文；提供公开事件供可选协调层消费。
+- 增加联合验证与停机备份恢复工具。
+
+## v0.4.x
+
+### 变更
+- 默认 life 安装不再要求手填部署确认串、写锁或会话 ID。
+- 提供持久每日规划和官方 Host 有限管理命令，不依赖私有 Host 补丁。
+- 兼容 Host 1.3.15 / SDK 2.16.0，同时保留原精确配对。
+
+## v0.3.1 — 2026-10-22
 
 - 将平铺运行模块收拢到 maivita/host、life、legacy、shared、compatibility、integrations，更新导入、CLI、CI 和打包白名单。
 - 同步修正插件/图片资源根和旧模型配置定位；旧调度器派生缓存使用授权数据目录，未加载时拒绝构造。
 - 保留原始 R0 入口的逐字节来源 fixture 和 SQL 001 哈希，配置、数据库与跨插件契约版本不变。
-- 搬迁版本重新进行自动化验收，范围见 [ACCEPTANCE](ACCEPTANCE.md)；未新增生活模拟功能。
+- 搬迁版本重新进行自动化验收，范围见 历史验收记录；未新增生活模拟功能。
 - 移除公开仓库和安装包中的内部架构、设计、工作计划、提示词及过程报告，保留必要使用说明。
 
-## 0.3.0 — 2026-10-21
+## v0.3.0 — 2026-10-21
 
 - 正式入口按配置 3 选择唯一 life/legacy delegate，新 Runtime 接入真实 SDK 生命周期、ModelPort、API/Tool/Command/Hook。
 - 新增绑定配置、revision 和共享锁的离线切换票据，分离新旧数据目录并保留一致快照与回切路径；失败自清理，无自动旧引擎 fallback。
@@ -21,7 +75,7 @@
 - 公开可移植测试源码、固定公开 Host fixture、CI、开发文档与操作说明，继续排除敏感配置和运行数据。
 - 单插件时间门禁调整为自动化 Integration-Ready；长期观察和真实生态联调统一移交超级 MaiBot 联合测试，独立功能开发冻结。实际门禁见验收报告。
 
-## 0.1.0 — 2026-10-21
+## v0.1.0 — 2026-10-21
 
 ### 新增
 
@@ -43,4 +97,4 @@
 - Owner Auth 身份授权、自主睡眠和混合规划尚未接入当前入口。
 - 不自动迁移旧运行库，不直接接管已有生产实例。
 
-上游 5.1.0 及更早版本记录见 [自主规划插件 CHANGELOG](https://github.com/DavidBlackCN/maibot-autonomous-planning-plugin/blob/6c936467cfde6339c9eea91bbf761e3cf0a21fdc/CHANGELOG.md)。来源及继承关系见 [SOURCES](SOURCES.md)。
+上游 5.1.0 及更早版本记录见 [自主规划插件 CHANGELOG](https://github.com/DavidBlackCN/maibot-autonomous-planning-plugin/blob/6c936467cfde6339c9eea91bbf761e3cf0a21fdc/CHANGELOG.md)。来源及继承关系见 [SOURCES](docs/SOURCES.md)。

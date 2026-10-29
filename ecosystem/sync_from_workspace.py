@@ -9,7 +9,7 @@ import argparse,hashlib,json,shutil,subprocess
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True);a=p.parse_args()
     root=a.workspace.resolve();target=root/'maibot-maivita-plugin/ecosystem';target.mkdir(exist_ok=True)
-    source=root/'maibot-maicoordinate-plugin';names={'plugin.py','_manifest.json','README.md','LICENSE','config.example.toml'}
+    source=root/'maibot-maicoordinate-plugin';names={'plugin.py','_manifest.json','README.md','UPDATE_NOTES.md','LICENSE','config.example.toml'}
     for directory in ('maicoordinate','tests','_locales'):
         names.update(f.relative_to(source).as_posix() for f in (source/directory).rglob('*') if f.is_file() and f.suffix in ('.py','.json') and '__pycache__' not in f.parts)
     hashes={}

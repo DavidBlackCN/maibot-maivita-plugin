@@ -1,6 +1,6 @@
 # 源码目录与职责
 
-从 0.3.1 起，运行实现统一放在 `maivita/`。此次整理结构和资源路径，不增加生活模拟功能，配置 3、SQLite Schema 4 和契约 1.0.0 不变。
+从 0.3.1 起，运行实现统一放在 `maivita/`。当前配置版本 3、SQLite Schema 4 和契约 1.0.0。
 
 ```text
 maibot-maivita-plugin/
@@ -21,7 +21,7 @@ maibot-maivita-plugin/
 ├── tools/                    # 验证、打包与离线数据迁移
 ├── tests/                    # 单元回归与公开 fixtures
 ├── integration_tests/        # 原始 Runner 与完整 Host 验证
-├── docs/                     # 安装、接口、限制、验收与回滚说明
+├── docs/                     # 接口、诊断、限制、来源与回滚参考
 └── .github/                  # 无密钥 CI
 ```
 
@@ -47,7 +47,7 @@ life 调用链为 `plugin.py → maivita/host/entrypoint.py → maivita/host/plu
 | `tests/`、`integration_tests/`、`.github/` | 验证材料，不进入插件安装包 |
 | `tools/` | 独立 CLI；安装包仅含明确白名单中的离线数据迁移工具 |
 
-H01 可信发送回执不可用，H02 归属频率撤销、H03 可信身份未具备，相应功能保持关闭或拒绝。详见[契约](CONTRACTS.md)与[限制](LIMITATIONS.md)。本轮没有依据“未直接调用”删除代码，保留条件导入、包导出、离线入口和来源材料。
+H01 可信发送回执不可用，H02 归属频率撤销、H03 可信身份未具备，相应功能保持关闭或拒绝。详见[契约](CONTRACTS.md)与[限制](LIMITATIONS.md)。保留条件导入、包导出、离线入口和来源材料。
 
 ## 本地目录
 
@@ -60,6 +60,6 @@ H01 可信发送回执不可用，H02 归属频率撤销、H03 可信身份未�
 | `__pycache__/`、`.pytest_cache/` | 自动生成缓存；排除 Git |
 | `.git/` | 仓库元数据 |
 
-本轮不迁移已有实例或数据。旧入口原字节存于 `tests/fixtures/provenance/legacy_plugin.r0.py` 并继续校验哈希，仅作来源存档，不由运行入口导入。
+不自动迁移已有实例或数据。旧入口原字节存于 `tests/fixtures/provenance/legacy_plugin.r0.py` 并继续校验哈希，仅作来源存档，不由运行入口导入。
 
-当前验证范围见[验收说明](ACCEPTANCE.md)，操作回退见[回滚说明](ROLLBACK.md)。内部设计、任务计划、提示词及过程报告不随仓库或安装包分发。
+当前验证范围见README 中的使用与限制说明，操作回退见[回滚说明](ROLLBACK.md)。内部设计、任务计划、提示词及过程报告不随仓库或安装包分发。

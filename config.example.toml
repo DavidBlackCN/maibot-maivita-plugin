@@ -1,36 +1,49 @@
-# MaiVita: ready on first install; Host/adapter controls incoming sessions.
+# 插件开关与配置格式。以下字段均可省略并使用所示默认值；条件必填项另有说明。
 [plugin]
+# 是否启用插件；布尔值，默认 true，可选。
 enabled = true
+# 配置格式版本，固定为 "3"（不是发布版本）；默认 "3"，可选，请勿改写。
 config_version = "3"
 
+# 会话范围、时区与部署选项。
 [instance]
+# 历史兼容确认串；可选，默认空；仅允许空或 isolated-test-instance，不是启用门禁。
 acknowledgement = ""
-# Optional absolute override; empty uses the granted data directory.
+# 可选绝对锁路径；默认空，沿用权威记录或授权数据目录，无需手填。
 writer_lock = ""
-# Empty follows all Host/adapter sessions; optional explicit stream IDs narrow it.
+# 可选会话 ID 数组；默认空表示所有 Host 接入会话；非空须填精确 ID，不支持通配符。
 allowed_streams = []
+# IANA 时区字符串；可选，默认 Asia/Shanghai，影响日程及每日规划。
 timezone = "Asia/Shanghai"
+# 调频开关；可选，仅允许 false，默认 false，当前不支持归属化调频。
 frequency_enabled = false
 
+# 模型路由配置：选择使用哪个 Host 任务或具体模型，以及超时、预算等。
 [model]
-# 模型路由模式：task = 跟随 MaiBot 任务类别（推荐，开箱即用）
-#               model = 指定 model_config.toml 中的具体模型
+# 路由模式 task/model；可选，默认 task，跟随 Host 任务类别。
 mode = "task"
-# mode=task 时使用：planner（推荐）/ replyer / utils
+# Host 已有任务类别，非空字符串；可选，默认 planner；model 模式也须保留非空值。
 task = "planner"
-# mode=model 时填写 model_config.toml 里某个模型的 name
+# 具体模型 name 或 model_identifier；默认空，task 模式可不填，mode=model 时必填。
 model = ""
+# 单次模型调用超时秒数；整数 1–300，可选，默认 90。
 timeout_seconds = 90
+# 单次最大输出 token 数；整数 128–16384，可选，默认 8192。
 max_tokens = 8192
-# 每日模型调用预算（每次调用尝试计一次，非法内容重试也计入）
+# 滚动 24 小时调用尝试预算（失败及重试也计入）；整数 1–200，可选，默认 16。
 daily_budget = 16
+# 每次加载是否请求一次规划；布尔值，可选，默认 false，开启会消耗模型预算。
 generate_on_start = false
+# 是否每日自动规划；布尔值，可选，默认 true，会产生模型调用费用。
 daily_planning_enabled = true
-# HH:MM，角色时区；错过后当天补触发一次
+# 角色时区的触发时刻，HH:MM（00:00–23:59）；可选，默认 08:00，晚启动当天补触发。
 daily_planning_time = "08:00"
+# 补充生活背景，最多 4000 字符；可选，默认空，Host 人设仍会读取。
 life_context = ""
 
+# 作息偏好，仅供模型参考，不强制改变睡眠状态。
 [routine]
-# 作息偏好，仅作为模型参考，不强制
+# 偏好入睡时刻，HH:MM（00:00–23:59）；可选，默认 01:00。
 preferred_sleep_time = "01:00"
+# 偏好起床时刻，HH:MM（00:00–23:59）；可选，默认 08:00。
 preferred_wake_time = "08:00"

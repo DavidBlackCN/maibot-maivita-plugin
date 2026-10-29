@@ -1,16 +1,30 @@
+# 可选扩展：只有显式切换 controlled 才会生成或发送消息。
+# 运行模式 shadow/controlled；可选，默认 shadow，不调用模型或发消息；controlled 为显式开启，会产生费用。
 mode = "shadow"
+# 历史兼容确认串；可选，默认空；仅允许空或 isolated-test-instance，不是启用门禁。
 acknowledgement = ""
+# 可选精确路由数组，最多 4 项；默认空，自动发现并核对 Hush 已管理群；显式字段见 README。
 routes = []
+# Host 已有任务名，最长 128 字符；默认 utils，shadow 可省略，controlled 时须为非空且已配置任务。
 model_task = "utils"
+# 补充表达风格，最多 2000 字符；可选，默认空，仍读取 Host 人设。
 character_context = ""
+# 公开 API 轮询间隔秒数；整数 1–60，可选，默认 5，不代表模型调用频率。
 poll_seconds = 5
+# 每路由表达冷却秒数；整数 60–86400，可选，默认 3600，失败调用也保留冷却。
 cooldown_seconds = 3600
+# 待处理事件队列容量；整数 1–1024，可选，默认 256，不小于显式路由数。
 queue_capacity = 256
+# 全部账本记录上限；整数 256–100000，可选，默认 10000，且不小于 queue_capacity。
 max_records = 10000
+# 终态事件正文保留天数；整数 1–90，可选，默认 7，清正文仍保留去重及结果。
 payload_retention_days = 7
+# 通用特权写入开关；可选，仅允许 false，默认 false。
 privileged_writes = false
 
+# 插件开关与配置格式；前面的运行选项必须位于此段之前的根级。
 [plugin]
+# 是否加载本插件；布尔值，可选，默认 true；默认加载仍为 shadow 观察模式。
 enabled = true
+# 配置格式版本；可选，固定 "1"，默认 "1"，不是插件发布版本。
 config_version = "1"
-

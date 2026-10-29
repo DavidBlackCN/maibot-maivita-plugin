@@ -1,7 +1,3 @@
-> 阶段参考文档：本文保留早期实现边界。当前 0.5.0 使用方式与开放能力以 [PRODUCT_GUIDE](PRODUCT_GUIDE.md) 为准；未实现的通用特权仍不开放。
-
-> 当前版本 0.4.1：官方 Host 命令入口及只读策略，无需私有补丁。使用与边界见[本版说明](JOINT_RELEASE.md)，下文通用特权 API 限制仍适用。
-
 # MaiVita 跨插件接口契约 1.0.0
 
 状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 4 和配置 3 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
@@ -30,7 +26,7 @@ SocialEvent / SocialAck 通过 from_wire 的 JSON-aware 严格解析处理 ISO �
 
 公开查询 get_life_state/get_plan/get_availability/get_diagnostics/get_current_activity 只返回 public_summary；旧完整当前活动 alias 读取同一 life 引擎。特权 request_replan/request_wakeup 与旧变更 Tool 均明确拒绝。engine/contract 状态 API 不触发模型。查询的静态绑定满足原生 WebUI 校验；get_engine_status 的 engine 固定为 life，ready 表示实际加载状态。
 
-当前没有绑定任何外部 API 路由、授权令牌或回调注册入口。联合阶段先协商版本、声明可信来源与最小能力，再实现单独适配器并复验；本项目不改 Host、Owner Auth、策略或社交插件来制造接口。错误包括 PERMISSION_DENIED、POLICY_UNAVAILABLE、NOT_READY、RELOAD_REQUIRED、STALE_STATE、IDEMPOTENCY_CONFLICT，默认不允许自动权限回退。
+官方有限管理命令读取 MaiIdentity 的 get_vita_policy@1，状态展示读取 MaiHush 的 get_public_constraints@1；这些查询不依赖 MaiCoordinate。通用特权传输不绑定授权令牌或回调注册入口，不通过公开查询获得执行权限。错误包括 PERMISSION_DENIED、POLICY_UNAVAILABLE、NOT_READY、RELOAD_REQUIRED、STALE_STATE、IDEMPOTENCY_CONFLICT，默认不允许自动权限回退。
 
 
 2026-10-27 默认安装修订：Vita 的空 allowed_streams 表示所有 Host 接入会话，非空仍精确限制；Identity 的空 route_scope 仅匹配消息 scope=None。自动实例标识、自动锁和默认启用均不建立可信调用者身份，不开放 H01/H02/H03 或跨插件特权。
