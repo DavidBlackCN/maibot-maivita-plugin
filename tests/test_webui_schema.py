@@ -13,7 +13,7 @@ def test_host_webui_schema_has_no_empty_select_and_roundtrips_defaults():
     fields = [f for s in schema['sections'].values() for f in s['fields'].values()]
     assert all('' not in (f.get('choices') or []) for f in fields if f['ui_type'] == 'select')
     assert schema['sections']['instance']['fields']['acknowledgement']['hidden']
-    assert schema['sections']['instance']['fields']['privileged_writes_enabled']['ui_type'] == 'switch'
+    assert not {'owner_auth_enabled', 'privileged_writes_enabled'} & schema['sections']['instance']['fields'].keys()
     assert schema['sections']['plugin']['fields']['config_version']['disabled']
     config = {name: {k: v['default'] for k, v in s['fields'].items()} for name, s in schema['sections'].items()}
     assert IntegrationConfig.model_validate(json.loads(json.dumps(config))) == IntegrationConfig()
@@ -21,10 +21,26 @@ def test_host_webui_schema_has_no_empty_select_and_roundtrips_defaults():
 
 @pytest.mark.parametrize('patch', [
     {'instance': {'acknowledgement': 'invented'}},
-    {'instance': {'privileged_writes_enabled': True}},
-    {'instance': {'owner_auth_enabled': True}},
+    {'instance': {'unknown_key': 1}},
 ])
 def test_webui_presentation_does_not_relax_runtime(patch):
     MaiVitaPlugin.build_config_schema()
     with pytest.raises(ValueError):
         IntegrationConfig.model_validate(patch)
+
+
+@pytest.mark.parametrize('owner', [False, True])
+@pytest.mark.parametrize('writes', [False, True])
+def test_retired_permission_flags_are_discarded(owner, writes):
+    from maibot_autonomous_planning_plugin.maivita.host.config import InstanceSettings
+    source = {'owner_auth_enabled': owner, 'privileged_writes_enabled': writes}
+    original = source.copy()
+    MaiVitaPlugin.build_config_schema()
+    assert InstanceSettings.model_validate(source) == InstanceSettings()
+    assert IntegrationConfig.model_validate({'instance': source}) == IntegrationConfig()
+    assert source == original
+    for key in source:
+        assert key not in InstanceSettings.model_fields
+        assert key not in InstanceSettings.model_validate(source).model_dump()
+    with pytest.raises(ValueError, match='extra_forbidden'):
+        InstanceSettings.model_validate({**source, 'unknown_key': 1})

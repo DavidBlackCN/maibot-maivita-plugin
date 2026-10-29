@@ -1,4 +1,4 @@
-# MaiVita 0.6.0
+# MaiVita 0.6.1
 
 MaiBot 的持久生活引擎：活动、计划、目标、睡眠、历史与公开上下文。本版支持官方 Host 命令管理与有限中文管理，使用现有 MaiIdentity 权限规则；无需私有 Host 补丁。
 
@@ -24,3 +24,27 @@ MaiBot 的持久生活引擎：活动、计划、目标、睡眠、历史与公�
 修复空字符串枚举导致的 Select.Item 崩溃，以及必填账户条目无法生成编辑 Schema。历史确认字段不再显示为空选项；固定关闭的特权字段只读显示。运行时模型和权限校验不变。高级嵌套角色表请使用原始 TOML 编辑，避免 Host 表单把对象转成字符串。
 
 若 Identity 页面提示缺少 plugin.config_version，在现有 [plugin] 内补入 config_version = "3" 后保存并重载，保留原有其他配置。Vita 使用 "3"，Coordinator 使用 "1"。这些是配置格式版本，不是插件发布版本；不能填写 3.2.2 或 0.5.2。不要删除数据或只保留 enabled。当前源码真实模型 I1 和 QQ 验收仍待进行，不沿用旧版本通过记录。
+
+
+## 管理员权限的唯一来源
+
+Vita 自身**没有**管理员配置。所有生活管理操作都由 MaiIdentity 的
+`[management] vita_admin_accounts` 决定：
+
+```toml
+# MaiIdentity 的 config.toml
+[management]
+vita_admin_accounts = ["你的真实QQ号"]
+```
+
+- 默认空名单 = 没有任何人拥有管理权（fail-closed）。
+- 修改后需要重载 MaiIdentity。
+- 群主称号、群昵称、关系称谓、模型生成的内容**都不构成**管理员身份。
+
+**MaiHush 是独立的一套**：静音控制使用自己的 `[[routes]]` 配置里的
+`owner_accounts` / `admin_accounts`。这是有意的独立信任根——即使
+MaiIdentity 不可用，静音控制仍然有效。两套名单互不影响。
+
+Vita 已从配置定义、示例和 WebUI 移除 `[instance]` 的 `owner_auth_enabled` 和
+`privileged_writes_enabled`。旧配置中的这两个键无论值为 `true` 还是 `false`
+都会被忽略，不授予权限；其他未知键仍然报错。

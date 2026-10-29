@@ -1,4 +1,5 @@
 """Explicit opt-in test-instance configuration, never an R0 config upgrade."""
+from collections.abc import Mapping
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
@@ -25,8 +26,15 @@ class InstanceSettings(Strict):
     allowed_streams: list[str]=Field(default_factory=list)
     timezone: str='Asia/Shanghai'
     frequency_enabled: Literal[False]=False
-    owner_auth_enabled: Literal[False]=False
-    privileged_writes_enabled: Literal[False]=False
+
+    @model_validator(mode='before')
+    @classmethod
+    def discard_retired_permission_flags(cls, data):
+        if isinstance(data, Mapping):
+            # Ignore historical no-op flags without mutating the caller's input.
+            return {key: value for key, value in data.items()
+                    if key not in ('owner_auth_enabled', 'privileged_writes_enabled')}
+        return data
 
 
 def stream_allowed(stream, allowed):

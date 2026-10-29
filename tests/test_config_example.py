@@ -16,6 +16,7 @@ class ConfigExampleTests(unittest.TestCase):
         model = IntegrationConfig.model_validate(config)
         self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine'})
         self.assertEqual(config['plugin']['config_version'], '3')
+        self.assertEqual(model.model_dump(), config)
         self.assertIsInstance(model.selected_config(), DevelopmentConfig)
         self.assertEqual(model.selected_config().routine, model.routine)
 

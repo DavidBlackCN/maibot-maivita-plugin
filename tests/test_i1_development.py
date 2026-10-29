@@ -144,7 +144,7 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
 class DevelopmentConfigTests(unittest.TestCase):
     def test_default_enabled_and_no_unsupported_feature_can_be_enabled(self):
         self.assertTrue(DevelopmentConfig().plugin.enabled)
-        for section,value in [('instance',{'frequency_enabled':True}),('instance',{'owner_auth_enabled':True}),
+        for section,value in [('instance',{'frequency_enabled':True}),
                               ('instance',{'writer_lock':'relative.lock'}),('plugin',{'config_version':'1'})]:
             with self.subTest(value=value),self.assertRaises(ValueError): DevelopmentConfig.model_validate({section:value})
 

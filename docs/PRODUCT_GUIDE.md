@@ -1,21 +1,12 @@
 # 超级麦麦插件成品候选使用说明
 
-本轮组合：MaiVita 0.6.0、MaiIdentity 3.2.2、MaiHush 0.2.2、现有 MaiCoordinate 0.3.1。使用官方 Host，不需要私有补丁，也没有新增插件。支持的精确配对为 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0；中间版本、混搭和未来版本不自动放行。
+本轮组合：MaiVita 0.6.1、MaiIdentity 3.2.2、MaiHush 0.2.2、现有 MaiCoordinate 0.3.1。使用官方 Host，不需要私有补丁，也没有新增插件。支持的精确配对为 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0；中间版本、混搭和未来版本不自动放行。
 
 ## 安装与最少设置
 
 停止 Bot，备份各插件的 `config.toml` 和 `data/plugins`，分别替换代码目录；每个插件 ID 只能安装一份。使用 Bot 自己的 `.venv/bin/python`。首次安装让 Host 生成默认配置，不要填写测试确认串、锁路径、实例 ID 或内部会话 ID。Vita 与 Identity 使用实际接入的消息；Hush 保留你已有的受管理群 routes 配置，Coordinator 只会发现并核对这些 Hush 已管理群，不会自动接管其他群。
 
 Vita 的有效配置段为 `[plugin]`、`[instance]`、`[model]`、`[routine]`，以 `config.example.toml` 为准；多余配置段会被拒绝。升级时保留这四段的现有设置、数据目录及 writer_lock。
-
-普通状态、身份登记、关系确认和静音管理可直接使用。涉及管理员操作，只需在 Identity 本地配置允许管理生活的真实 QQ 号：
-
-```toml
-[management]
-vita_admin_accounts = ["你的QQ号"]
-```
-
-修改后重载 Identity。默认空名单不给任何人管理权；群主称号、关系、昵称、模型生成的内容都不替代此配置。Hush 继续使用自身 routes 的 owner_accounts/admin_accounts，不从 Identity 推导静音管理员。
 
 生活自动规划默认已启用（Vita 的 `[model] daily_planning_enabled = true`），默认以 `mode = "task"`、`task = "planner"` 使用 MaiBot 已配置的 planner 任务，无需单独配置模型。需要指定模型时，将 `mode = "model"` 并把 `model` 填为 `model_config.toml` 中具体模型的 name 或 model_identifier。`daily_budget` 默认 16，限制滚动 24 小时内的模型调用尝试次数；一次规划或一次即时决策算一次，失败或结果不确定也消耗预算。主动表达需要把 Coordinator 的 `mode = "controlled"`，其 `model_task` 指向 Host 已配置的任务（默认 utils）。Vita 默认规划会产生模型调用费用，Coordinator 主动表达默认关闭；所有密钥只放在 Host 模型配置中。先确认已有任务可用，再重载相应插件。
 
@@ -91,3 +82,27 @@ H01 静音回执例外、H02 频率所有权覆盖、通用 H03 跨插件特权�
 修复空字符串枚举导致的 Select.Item 崩溃，以及必填账户条目无法生成编辑 Schema。历史确认字段不再显示为空选项；固定关闭的特权字段只读显示。运行时模型和权限校验不变。高级嵌套角色表请使用原始 TOML 编辑，避免 Host 表单把对象转成字符串。
 
 若 Identity 页面提示缺少 plugin.config_version，在现有 [plugin] 内补入 config_version = "3" 后保存并重载，保留原有其他配置。Vita 使用 "3"，Coordinator 使用 "1"。这些是配置格式版本，不是插件发布版本；不能填写 3.2.2 或 0.5.2。不要删除数据或只保留 enabled。当前源码真实模型 I1 和 QQ 验收仍待进行，不沿用旧版本通过记录。
+
+
+## 管理员权限的唯一来源
+
+Vita 自身**没有**管理员配置。所有生活管理操作都由 MaiIdentity 的
+`[management] vita_admin_accounts` 决定：
+
+```toml
+# MaiIdentity 的 config.toml
+[management]
+vita_admin_accounts = ["你的真实QQ号"]
+```
+
+- 默认空名单 = 没有任何人拥有管理权（fail-closed）。
+- 修改后需要重载 MaiIdentity。
+- 群主称号、群昵称、关系称谓、模型生成的内容**都不构成**管理员身份。
+
+**MaiHush 是独立的一套**：静音控制使用自己的 `[[routes]]` 配置里的
+`owner_accounts` / `admin_accounts`。这是有意的独立信任根——即使
+MaiIdentity 不可用，静音控制仍然有效。两套名单互不影响。
+
+Vita 已从配置定义、示例和 WebUI 移除 `[instance]` 的 `owner_auth_enabled` 和
+`privileged_writes_enabled`。旧配置中的这两个键无论值为 `true` 还是 `false`
+都会被忽略，不授予权限；其他未知键仍然报错。

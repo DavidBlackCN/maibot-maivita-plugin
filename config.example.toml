@@ -11,8 +11,6 @@ writer_lock = ""
 allowed_streams = []
 timezone = "Asia/Shanghai"
 frequency_enabled = false
-owner_auth_enabled = false
-privileged_writes_enabled = false
 
 [model]
 # 模型路由模式：task = 跟随 MaiBot 任务类别（推荐，开箱即用）
