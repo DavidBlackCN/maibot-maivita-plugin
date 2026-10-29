@@ -6,6 +6,7 @@ from collections import Counter
 
 from ..life.domain.clock import from_epoch_ms, local_day_bounds, to_epoch_ms, to_local
 from ..life.life_state.projections import QueryScope, visible
+from ..life.life_state.subjective import body_value_warning
 from ..life.planning.hybrid import decision_task_kind
 from ..life.planning.availability import LABELS, derive_availability
 from .presentation import clean
@@ -44,6 +45,8 @@ def snapshot(runtime, timezone, stream_id):
     latest=runs[0] if runs else None
     degraded=bool(latest and (latest['diagnostic'] or '').startswith('degraded:'))
     return {'phase':state.sleep_phase,
+            'body_warnings':[(field,getattr(state,field)) for field in ('energy','fatigue','stress')
+                             if body_value_warning(field,getattr(state,field))],
             'availability':availability.state,'availability_reason':availability.reason,
             'availability_enabled':runtime.config.availability.enabled,
             'wake':to_local(state.last_wake_at,timezone).strftime('%m-%d %H:%M') if state.last_wake_at else '未知',
@@ -98,6 +101,10 @@ def render_status(data, hush=None):
         behavior='忙闲守卫已开启' if data['availability_enabled'] else '忙闲守卫已关闭'
         if state=='slow': behavior+='；半忙等同空闲，不延迟回复'
         lines.insert(1,f'状态：{state}（{LABELS[state]}）| 原因：{data["availability_reason"]} | {behavior}')
+    if data.get('body_warnings'):
+        labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}
+        values='、'.join(f'{labels[field]} {value:.2f}' for field,value in data['body_warnings'])
+        lines.append('⚠ 身体数值异常：'+values+'（请检查活动历史或测试数据）')
     return '\n'.join(lines)
 
 

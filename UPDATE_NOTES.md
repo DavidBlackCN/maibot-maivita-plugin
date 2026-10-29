@@ -1,5 +1,20 @@
 # 更新说明
 
+## v0.8.2
+
+### 修复
+- **新安装用户的身体数值从未初始化**：energy/fatigue/stress 默认 None，
+  而 advance 对 None 保持 None，导致「身体驱动日程」与「忙闲三态」实际不生效。
+  新增 `[routine] initialize_body_state`（默认 true），首次启动初始化为 50，
+  已有值不重置；关闭后保持未知。
+
+### 调整
+- 身体变化速率：睡眠 +8/-5/-3、工作学习 -3/+2/+0.8、其他 -1/+1/-1.0
+  （原睡眠仅 -1/h 压力恢复过慢，工作 +1/h 增长过快）
+- 数值异常观测：>95（stress/fatigue）或 <5（energy）时记 WARNING，
+  `/maivita status` 显示异常提示；单次变化 >50 也告警。不自动修正。
+- RULE_VERSION estimates-v2 -> estimates-v3
+
 ## v0.8.1
 
 ### 新增

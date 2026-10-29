@@ -1,11 +1,25 @@
 """Versioned bounded estimates; sleep debt is recomputed, never accumulated."""
 from dataclasses import replace
 from datetime import timedelta
+import logging
+import math
 
 from ..domain.clock import local_day_bounds, to_local
 from ..domain.models import number, require
 
-RULE_VERSION = 'estimates-v2'
+RULE_VERSION = 'estimates-v3'
+logger = logging.getLogger(__name__)
+
+
+def body_value_warning(field, value):
+    """Observation only: extreme estimates are not proof of corrupted data."""
+    if value is None:
+        return None
+    if not math.isfinite(value) or not 0 <= value <= 100:
+        return 'out_of_range'
+    if (field in ('stress', 'fatigue') and value > 95) or (field == 'energy' and value < 5):
+        return 'extreme_value'
+    return None
 
 
 def sleep_debt(segments, *, now, timezone, observed_since, need_minutes=480, observed_intervals=None):
@@ -37,6 +51,16 @@ def sleep_debt(segments, *, now, timezone, observed_since, need_minutes=480, obs
 
 def advance(u, state, now, payload):
     require(now >= state.last_advanced_at, 'advance clock regressed')
+    for field in ('energy', 'fatigue', 'stress'):
+        current = getattr(state, field)
+        reason = body_value_warning(field, current)
+        if reason:
+            logger.warning('body_state anomaly character_id=%s field=%s current=%s reason=%s',
+                           state.character_id, field, current, reason)
+        # Preserve the domain's rejection of invalid inputs, never clamp them
+        # into apparently valid history. Legitimate extremes still evolve.
+        if current is not None:
+            number(current, 0, 100)
     # Large unknown gaps are not physiological observations. Bound the rate
     # integration and preserve uncertainty instead of fabricating full days.
     start=max(state.last_advanced_at,now-timedelta(hours=1))
@@ -53,13 +77,16 @@ def advance(u, state, now, payload):
         hours=max(0,hours)
         sleeping=(actual.sleep_session_id,actual.started_at) in sleeping_starts
         demanding=actual.category in ('study','work','travel')
-        rates=(6,-4,-1) if sleeping else (-3 if demanding else -1,2 if demanding else 1,1 if demanding else -0.5)
+        rates=(8,-5,-3) if sleeping else (-3 if demanding else -1,2 if demanding else 1,0.8 if demanding else -1.0)
         if actual.energy_rate != 0 or payload.get('segment_energy_rates'):
             rates=(actual.energy_rate*60, rates[1], rates[2])
         for index,rate in enumerate(rates): delta[index]+=hours*rate
     values = {}
     for field, change in zip(('energy','fatigue','stress'), delta):
         current = getattr(state, field)
+        if not math.isfinite(change) or abs(change) > 50:
+            logger.warning('body_state anomaly character_id=%s field=%s current=%s delta=%s reason=abnormal_delta',
+                           state.character_id, field, current, change)
         values[field] = None if current is None else max(0, min(100, current + change))
     # Initialization is explicit and labelled a low-confidence estimate.
     if payload.get('initialize_neutral'):

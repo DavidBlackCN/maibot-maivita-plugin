@@ -11,6 +11,7 @@ from ..compatibility.life_bridge import LegacyLifeBridge
 from ..integrations.life_api import LifeAPI
 from ..integrations.safety import assert_no_old_writer
 from ..life.life_state.runtime import DevelopmentRuntime,LifeRuntimeConfig
+from ..life.domain.commands import Command as LifeCommand
 from ..life.storage.life_database import LifeDatabase
 from ..life.storage.safety import WriterLease,resolve_data_dir
 from .config import DevelopmentConfig,stream_allowed
@@ -65,9 +66,17 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             self.runtime=DevelopmentRuntime(db,self.model_port,config=LifeRuntimeConfig(timezone=cfg.instance.timezone,
                 model_timeout_seconds=cfg.model.timeout_seconds,daily_planning_time=cfg.model.daily_planning_time,
                 daily_budget=cfg.model.daily_budget,daily_planning_enabled=cfg.model.daily_planning_enabled,
+                initialize_body_state=cfg.routine.initialize_body_state,
                 scheduler=cfg.scheduler.runtime_config(),availability=cfg.availability.runtime_config()),
                 lock_path=data/'runtime-writer.lock')
             self.runtime.start()
+            state=self.runtime.engine.state()
+            if self.runtime.config.initialize_body_state and state.energy is None:
+                self.runtime.engine.execute(LifeCommand(kind='advance',
+                    idempotency_key='initialize-body-state:'+str(state.state_version),
+                    expected_state_version=state.state_version,
+                    payload={'initialize_neutral':True,'timezone':self.runtime.config.timezone,
+                             'segment_energy_rates':self.runtime.config.scheduler.enabled}))
             self.api=LifeAPI(self.runtime)  # no trusted end-user contract: privileged writes denied
             self.worker=asyncio.create_task(self.runtime.run(),name='maivita-i1-worker')
             await asyncio.sleep(0)

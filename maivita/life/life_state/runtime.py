@@ -33,12 +33,14 @@ class LifeRuntimeConfig:
     cleanup_enabled: bool = False
     daily_planning_enabled: bool = False
     daily_planning_time: str = '08:00'
+    initialize_body_state: bool = True
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     availability: AvailabilityConfig = field(default_factory=AvailabilityConfig)
 
     def __post_init__(self):
         from zoneinfo import ZoneInfo
         ZoneInfo(self.timezone)
+        require(type(self.initialize_body_state) is bool, 'invalid initialize body state flag')
         import re
         require(isinstance(self.daily_planning_time,str) and
                 re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',self.daily_planning_time) is not None,

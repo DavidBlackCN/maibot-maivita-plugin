@@ -161,5 +161,5 @@ LifeStateEngine(db,fault=fault).execute(Command(idempotency_key='crash',kind='st
         self.clock.advance(timedelta(hours=24))
         self.apply('advance')
         state=self.engine.state()
-        self.assertEqual((state.energy,state.fatigue,state.stress),(49,51,49.5))
+        self.assertEqual((state.energy,state.fatigue,state.stress),(49,51,49))
         self.assertEqual(state.confidence,'low')

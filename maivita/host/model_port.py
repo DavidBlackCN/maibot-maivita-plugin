@@ -167,7 +167,7 @@ class SDKModelPort:
         if task_kind not in ('planning','present','segment'): raise DomainError('unknown model task')
         started=time.monotonic()
         # Weekly patterns are configuration-only until the next planning stage.
-        context={**self.context(),'routine':self.routine.model_dump(exclude={'weekly_pattern'})}
+        context={**self.context(),'routine':self.routine.model_dump(exclude={'weekly_pattern','initialize_body_state'})}
         contract=SEGMENT_CONTRACT if task_kind=='segment' else PLANNING_CONTRACT if task_kind=='planning' else PRESENT_CONTRACT
         if task_kind=='planning':
             from ..life.domain.clock import to_local

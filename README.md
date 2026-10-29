@@ -2,7 +2,7 @@
 
 为 MaiBot 提供持久的生活状态、活动、计划、目标与睡眠，让日常回复感知角色正在做什么。
 
-- 当前版本：`0.8.1`
+- 当前版本：`0.8.2`
 - MaiBot 版本范围：`1.3.12–1.3.15`
 - Plugin SDK 版本范围：`2.15.0–2.16.0`
 - 项目地址：[MaiVita](https://github.com/DavidBlackCN/maibot-maivita-plugin)

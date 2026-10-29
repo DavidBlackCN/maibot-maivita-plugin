@@ -74,6 +74,7 @@ class WeeklyPattern(Strict):
 
 
 class RoutineSettings(Strict):
+    initialize_body_state: bool=Field(default=True,strict=True)
     preferred_sleep_time: ClockTime='01:00'
     preferred_wake_time: ClockTime='08:00'
     weekly_pattern: WeeklyPattern=Field(default_factory=WeeklyPattern)
