@@ -59,11 +59,13 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
                 return {'now':db.clock.now_utc(),'state':self.runtime.queries.get_life_state(),
                     'character_timezone':cfg.instance.timezone,
                     'local_time':db.clock.to_local(db.clock.now_utc(),cfg.instance.timezone).isoformat(),
-                    'plan':self.runtime.queries.get_plan(),'goals':self.runtime.queries.get_goals()}
+                    'plan':self.runtime.queries.get_plan(),'goals':self.runtime.queries.get_goals(),
+                    'segment':self.runtime.segments.context() if cfg.scheduler.enabled else None}
             self.model_port=SDKModelPort(self.ctx,cfg.model,context=context,routine=cfg.routine)
             self.runtime=DevelopmentRuntime(db,self.model_port,config=LifeRuntimeConfig(timezone=cfg.instance.timezone,
                 model_timeout_seconds=cfg.model.timeout_seconds,daily_planning_time=cfg.model.daily_planning_time,
-                daily_budget=cfg.model.daily_budget,daily_planning_enabled=cfg.model.daily_planning_enabled),lock_path=data/'runtime-writer.lock')
+                daily_budget=cfg.model.daily_budget,daily_planning_enabled=cfg.model.daily_planning_enabled,
+                scheduler=cfg.scheduler.runtime_config()),lock_path=data/'runtime-writer.lock')
             self.runtime.start()
             self.api=LifeAPI(self.runtime)  # no trusted end-user contract: privileged writes denied
             self.worker=asyncio.create_task(self.runtime.run(),name='maivita-i1-worker')

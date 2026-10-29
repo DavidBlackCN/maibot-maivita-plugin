@@ -6,6 +6,7 @@ from ..domain.clock import to_epoch_ms
 class RecoveryService:
     def __init__(self, engine):
         self.engine = engine
+        self.rolling_segments = False
 
     def startup(self, character_id='default'):
         state=self.engine.state(character_id)
@@ -21,6 +22,8 @@ class RecoveryService:
         if now < state.updated_at:
             return {'status':'clock_rollback', 'write':False}
         if not state.active_sleep_session_id:
+            if self.rolling_segments:
+                return {'status': 'rolling_segments', 'write': False}
             with self.engine.database.read_view() as u:
                 planned=u.connection.execute("""SELECT p.item_id,p.plan_version FROM plan_item_checks p JOIN schedule_items i ON i.item_id=p.item_id
                     WHERE i.character_id=? AND i.plan_id=? AND i.status='planned' AND p.processed=0 AND p.deadline_at_ms<=?

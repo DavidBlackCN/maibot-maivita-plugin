@@ -79,11 +79,31 @@ class RoutineSettings(Strict):
     weekly_pattern: WeeklyPattern=Field(default_factory=WeeklyPattern)
 
 
+class SchedulerSettings(Strict):
+    enabled: bool=False
+    decision_interval_minutes: int=Field(default=15,ge=1,le=1080,strict=True)
+    change_chance_percent: int=Field(default=15,ge=0,le=100,strict=True)
+    daily_decision_budget: int=Field(default=20,ge=1,le=1000,strict=True)
+    segment_min_minutes: int=Field(default=15,ge=1,le=1080,strict=True)
+    segment_max_minutes: int=Field(default=180,ge=1,le=1080,strict=True)
+    segment_sleep_max_minutes: int=Field(default=720,ge=1,le=1080,strict=True)
+
+    @model_validator(mode='after')
+    def validate_limits(self):
+        self.runtime_config()
+        return self
+
+    def runtime_config(self):
+        from ..life.domain.segment import SchedulerConfig
+        return SchedulerConfig(**self.model_dump())
+
+
 class DevelopmentConfig(Strict):
     plugin: PluginSettings=Field(default_factory=PluginSettings)
     instance: InstanceSettings=Field(default_factory=InstanceSettings)
     model: ModelSettings=Field(default_factory=ModelSettings)
     routine: RoutineSettings=Field(default_factory=RoutineSettings)
+    scheduler: SchedulerSettings=Field(default_factory=SchedulerSettings)
 
     @model_validator(mode='after')
     def validate_instance(self):

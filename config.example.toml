@@ -58,3 +58,20 @@ thursday = ""
 friday = ""
 saturday = ""
 sunday = ""
+
+# 滚动分段：启用后角色每个决策窗检查当前活动，仍保留每日整表规划。
+[scheduler]
+# 默认关闭；需显式开启。关闭后沿用阶段一行为。
+enabled = false
+# 决策窗间隔，单位分钟；须在分段最短与最长时长之间。
+decision_interval_minutes = 15
+# 未到期且身体未越线时，换事决策概率，整数 0–100（百分比）。
+change_chance_percent = 15
+# 启用滚动分段时取代 model.daily_budget，按角色时区自然日计数。
+# 规划、即时决策、分段共用硬上限，失败和重试同样计入；整数 1–1000。
+daily_decision_budget = 20
+# 模型单次提出的最短与最长段时长，单位分钟，正整数。
+segment_min_minutes = 15
+segment_max_minutes = 180
+# 睡眠单次会话硬上限，含续做；不小于普通最长段，最多 1080 分钟。
+segment_sleep_max_minutes = 720

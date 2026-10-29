@@ -40,7 +40,10 @@ def candidate(candidate):
     require(isinstance(candidate,dict) and set(candidate) == {'kind','payload'}, 'invalid candidate envelope')
     kind,p = candidate['kind'],candidate['payload']
     require(isinstance(p,dict), 'invalid candidate payload')
-    if kind == 'start_sleep':
+    if kind == 'advance_segment':
+        from ..domain.segment import validate_segment
+        validate_segment(p)
+    elif kind == 'start_sleep':
         require(set(p) <= {'duration_minutes','kind','reason'} and 'duration_minutes' in p and isinstance(p.get('reason'),str) and p['reason'].strip(), 'invalid sleep schema')
         require(type(p['duration_minutes']) in (int,float) and 5 <= p['duration_minutes'] <= 1080, 'invalid sleep duration')
     elif kind == 'apply_plan_patch':
@@ -69,7 +72,7 @@ def decision_task_kind(triggers):
     for trigger in triggers:
         ids=trigger[6:].split(',') if trigger.startswith('batch:') else (trigger,)
         if any(key.startswith('daily-planning:') for key in ids): return 'planning'
-    return 'present'
+    return 'segment' if any(t.startswith('segment:') for t in triggers) else 'present'
 
 
 def validate_task_candidate(proposal, task_kind):
@@ -77,6 +80,10 @@ def validate_task_candidate(proposal, task_kind):
     if task_kind=='planning':
         require(proposal['kind'] in ('apply_plan_patch','update_direction'),
                 'daily planning may only change plans or direction')
+    elif task_kind=='segment':
+        require(proposal['kind']=='advance_segment', 'segment task may only advance a segment')
+    else:
+        require(proposal['kind']!='advance_segment', 'segment requires its own task contract')
     return proposal
 
 

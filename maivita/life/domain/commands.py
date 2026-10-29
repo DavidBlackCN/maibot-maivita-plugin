@@ -27,6 +27,9 @@ class Command:
         integer(self.expected_state_version)
         require(self.source in ('internal', 'legacy_observed', 'model', 'authorized'), "unknown command source")
         require(isinstance(self.payload, Mapping), "command payload must be an object")
+        if self.kind == 'advance_segment':
+            from .segment import validate_segment
+            validate_segment(self.payload)
         # These records have no authenticated source field in schema 4. Keep
         # old rows readable, but reject new promises of source-only visibility.
         records = [self.payload] if self.kind in ('start_activity', 'start_secondary', 'manage_goal') else []

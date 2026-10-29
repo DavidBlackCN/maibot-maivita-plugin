@@ -3,13 +3,15 @@
 Integration Ready permits isolated and joint testing only; privileged external
 identity and policy transports remain disabled until their contracts exist.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from uuid import uuid4
 import asyncio
 
 from ..coordinator.decisions import DecisionCoordinator, call_model
 from ..domain.commands import Command
+from ..domain.segment import SchedulerConfig
+from ..planning.segments import SegmentService
 from ..domain.models import require
 from ..events.dispatcher import EventDispatcher
 from ..storage.safety import WriterLease
@@ -30,6 +32,7 @@ class LifeRuntimeConfig:
     cleanup_enabled: bool = False
     daily_planning_enabled: bool = False
     daily_planning_time: str = '08:00'
+    scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
 
     def __post_init__(self):
         from zoneinfo import ZoneInfo
@@ -44,6 +47,8 @@ class LifeRuntimeConfig:
         require(type(self.fallback_check_minutes) is int and 30<=self.fallback_check_minutes<=60,'invalid fallback interval')
         require(type(self.model_timeout_seconds) is int and 1<=self.model_timeout_seconds<=300,'invalid model timeout')
         require(type(self.daily_budget) is int and 1<=self.daily_budget<=1000,'invalid decision budget')
+        require(isinstance(self.scheduler, SchedulerConfig), 'invalid scheduler config')
+        require(not self.scheduler.enabled or self.planning_mode == 'autonomous', 'rolling segments need autonomous planning')
 
     @classmethod
     def from_r0(cls, config, *, autonomous=False):
@@ -58,22 +63,35 @@ class DevelopmentRuntime:
     def __init__(self, database, model, *, config=None, lock_path):
         self.database,self.config=database,config or LifeRuntimeConfig()
         self.lease=WriterLease(lock_path)
-        self.engine=LifeStateEngine(database)
+        self.engine=LifeStateEngine(database, scheduler=self.config.scheduler)
         async def guarded_model(state,triggers,*,task_kind='present'):
             proposal=await call_model(model,state,triggers,task_kind)
+            if task_kind == 'segment' and isinstance(proposal, dict) and 'kind' not in proposal:
+                from ..domain.segment import validate_segment
+                proposal = {'kind': 'advance_segment', 'payload': validate_segment(proposal)}
             if self.config.sleep_mode=='disabled':
                 require(proposal.get('kind') not in ('start_sleep','extend_sleep'), 'sleep disabled')
+                require(not (proposal.get('kind') == 'advance_segment' and proposal['payload']['event'] == '睡眠'), 'sleep disabled')
             return proposal
-        self.coordinator=DecisionCoordinator(self.engine,guarded_model,daily_budget=self.config.daily_budget,
-            timeout_seconds=self.config.model_timeout_seconds)
+        self.coordinator=DecisionCoordinator(self.engine,guarded_model,daily_budget=self.decision_budget,
+            timeout_seconds=self.config.model_timeout_seconds,
+            budget_timezone=self.config.timezone if self.config.scheduler.enabled else None)
         self.queries=LifeQueries(self.engine)
         self.recovery=RecoveryService(self.engine)
+        self.recovery.rolling_segments = self.config.scheduler.enabled
+        self.segments=SegmentService(self, self.config.scheduler)
+        self.segment_due=False
+        self.last_segment_check=None
         self.dispatcher=EventDispatcher(database)
         self.opened=False
         self.last_check=None
         self.stop_event=asyncio.Event()
         self.worker_task=None
         self.background_tasks=set()
+
+    @property
+    def decision_budget(self):
+        return self.config.scheduler.daily_decision_budget if self.config.scheduler.enabled else self.config.daily_budget
 
     def start(self):
         self.lease.acquire()
@@ -101,10 +119,16 @@ class DevelopmentRuntime:
         return self.engine.execute(Command(idempotency_key=key,kind='propose_commitment',payload=payload,expected_state_version=state.state_version))
 
     def tick(self):
-        # No LLM polling: the fallback reports a check result; model decisions
-        # require an explicit significant trigger through request_replan.
+        # Local deadlines remain synchronous. The asynchronous trigger worker
+        # drains an optional rolling decision window without blocking recovery.
         require(self.opened, 'runtime not started')
         result=self.recovery.tick()
+        mono=self.engine.clock.monotonic()
+        if self.config.scheduler.enabled and (self.last_segment_check is None or
+                mono-self.last_segment_check >= self.config.scheduler.decision_interval_minutes*60):
+            self.last_segment_check=mono
+            self.segment_due=True
+            result['segment_due']=True
         if self.config.daily_planning_enabled and self.config.planning_mode=='autonomous':
             # One durable local-day trigger; coordinator owns budget and claims.
             now=self.engine.clock.now_utc()
@@ -125,7 +149,8 @@ class DevelopmentRuntime:
             now=self.engine.clock.now_utc()
             if now>state.last_advanced_at and now>=state.updated_at:
                 self.engine.execute(Command(idempotency_key='advance:'+now.isoformat(),kind='advance',
-                    expected_state_version=state.state_version,payload={'timezone':self.config.timezone}))
+                    expected_state_version=state.state_version,payload={'timezone':self.config.timezone,
+                        'segment_energy_rates':self.config.scheduler.enabled}))
             if self.config.habits_enabled:
                 with self.database.read_view() as u:
                     habits=u.habits.all()
@@ -137,15 +162,23 @@ class DevelopmentRuntime:
         return result
 
     async def process_triggers(self):
-        """An isolated Runner can call this after tick; no polling LLM calls."""
+        """Drain durable triggers and at most one due rolling window."""
         require(self.opened, 'runtime not started')
-        if self.config.planning_mode!='autonomous' or self.engine.state().sleep_phase=='sleeping': return {'status':'not_eligible'}
+        if self.config.planning_mode!='autonomous': return {'status':'not_eligible'}
+        if self.engine.state().sleep_phase=='sleeping' and not self.config.scheduler.enabled: return {'status':'not_eligible'}
         with self.database.read_view() as u:
             ids=[row[0] for row in u.connection.execute('SELECT trigger_id FROM decision_triggers WHERE consumed=0 ORDER BY created_at_ms,trigger_id LIMIT 100')]
-        if not ids: return {'status':'no_triggers'}
+        if not ids:
+            if self.segment_due:
+                self.segment_due=False
+                return await self.segments.tick()
+            return {'status':'no_triggers'}
         # Coalesce all durable triggers into one model call. Coordinator still
         # enforces daily budget/cooldown; pending rows survive deferral.
         result=await self.coordinator.request('batch:'+','.join(ids))
+        if self.segment_due:
+            self.segment_due=False
+            result={**result, 'segment': await self.segments.tick()}
         # Coordinator durably claims the batch before RPC. Post-await claiming
         # would replay a cancelled/unknown model request after restart.
         return result
@@ -185,7 +218,13 @@ class DevelopmentRuntime:
         state=self.engine.state()
         self.engine.execute(Command(idempotency_key=uuid4().hex,kind='configure',payload={},source='authorized',expected_state_version=state.state_version))
         self.config=config
-        self.coordinator.daily_budget=config.daily_budget
+        self.coordinator.daily_budget=self.decision_budget
+        self.coordinator.budget_timezone=config.timezone if config.scheduler.enabled else None
+        self.engine.scheduler=config.scheduler
+        self.segments.config=config.scheduler
+        self.recovery.rolling_segments=config.scheduler.enabled
+        self.last_segment_check=None
+        self.segment_due=False
         self.coordinator.timeout=config.model_timeout_seconds
 
     async def close(self):

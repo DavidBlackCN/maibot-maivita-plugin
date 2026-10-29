@@ -5,7 +5,7 @@ import inspect
 from datetime import timedelta
 from uuid import uuid4
 
-from ..domain.clock import to_epoch_ms
+from ..domain.clock import to_epoch_ms, local_day_bounds
 from ..domain.commands import Command
 from ..domain.models import DomainError, json_text, require
 from ..life_state.engine import digest
@@ -22,13 +22,21 @@ async def call_model(model, state, triggers, task_kind):
 
 
 class DecisionCoordinator:
-    def __init__(self, engine, model, *, daily_budget=24, cooldown_seconds=60, timeout_seconds=30):
+    def __init__(self, engine, model, *, daily_budget=24, cooldown_seconds=60, timeout_seconds=30, budget_timezone=None):
         require(type(daily_budget) is int and 1 <= daily_budget <= 1000, 'invalid model budget')
         require(0 <= cooldown_seconds <= 3600 and 0 < timeout_seconds <= 300, 'invalid decision timing')
         self.engine, self.model = engine, model  # model is an injected internal callable
         self.daily_budget, self.cooldown, self.timeout = daily_budget,cooldown_seconds,timeout_seconds
         self.tasks, self.pending, self.last_monotonic = {},{},{}
         self.closed = False
+        self.budget_timezone = budget_timezone
+
+    def _budget_start(self, now):
+        if self.budget_timezone:
+            local = self.engine.clock.to_local(now, self.budget_timezone)
+            start, _ = local_day_bounds(local.date(), self.budget_timezone)
+            return to_epoch_ms(start)
+        return to_epoch_ms(now-timedelta(days=1))
 
     def recover(self):
         # Call only after exclusive writer ownership is acquired. Unknown RPC
@@ -64,8 +72,8 @@ class DecisionCoordinator:
         require(now >= state.updated_at, 'clock rollback blocks new decisions')
         decision_id = uuid4().hex
         with self.engine.database.unit_of_work() as u:
-            recent = list(u.connection.execute('SELECT started_at_ms FROM decision_runs WHERE character_id=? AND started_at_ms>?',
-                (char,to_epoch_ms(now-timedelta(days=1)))))
+            recent = list(u.connection.execute('SELECT started_at_ms FROM decision_runs WHERE character_id=? AND started_at_ms>=?',
+                (char,self._budget_start(now))))
             if len(recent) >= self.daily_budget: return {'status':'budget_exhausted'}
             if recent and to_epoch_ms(now)-max(r[0] for r in recent) < self.cooldown*1000: return {'status':'cooldown'}
             triggers = sorted(self.pending.pop(char,set()))
@@ -97,8 +105,8 @@ class DecisionCoordinator:
                     return {'status':'stale','decision_id':decision_id}
                 now=self.engine.clock.now_utc()
                 with self.engine.database.unit_of_work() as u:
-                    used=u.connection.execute('SELECT count(*) FROM decision_runs WHERE character_id=? AND started_at_ms>?',
-                        (char,to_epoch_ms(now-timedelta(days=1)))).fetchone()[0]
+                    used=u.connection.execute('SELECT count(*) FROM decision_runs WHERE character_id=? AND started_at_ms>=?',
+                        (char,self._budget_start(now))).fetchone()[0]
                     if used>=self.daily_budget:
                         u.connection.execute("UPDATE decision_runs SET diagnostic='degraded:invalid_retry_budget_exhausted' WHERE decision_id=?",(decision_id,))
                         u.commit()

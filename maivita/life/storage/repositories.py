@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
 from enum import StrEnum
 from functools import wraps
 import json
@@ -39,6 +40,9 @@ class RecordSpec:
     date_fields: tuple[str, ...] = ()
     bool_fields: tuple[str, ...] = ()
     immutable: bool = False
+    # Domain units remain unchanged; only SQLite stores scaled integers.
+    fixed_fields: tuple[tuple[str, int], ...] = ()
+    positive_minutes: tuple[str, ...] = ()
 
     def column(self, name):
         if name in self.json_fields:
@@ -59,9 +63,16 @@ class RecordSpec:
         if type(model) is not self.model:
             raise TypeError("repository received the wrong domain model")
         values = []
+        scales = dict(self.fixed_fields)
         for name in self.names:
             value = getattr(model, name)
-            if name in self.json_fields:
+            if name in scales and value is not None:
+                # Match SQLite ROUND in migration 006 (ties away from zero),
+                # avoiding binary-float multiplication and banker's rounding.
+                value = int((Decimal(str(value)) * scales[name]).to_integral_value(rounding=ROUND_HALF_UP))
+                if name in self.positive_minutes:
+                    value = max(1, value)
+            elif name in self.json_fields:
                 value = json_text(value)
             elif isinstance(value, datetime):
                 value = to_epoch_ms(value)
@@ -76,10 +87,13 @@ class RecordSpec:
 
     def decode(self, row):
         data = {}
+        scales = dict(self.fixed_fields)
         for name, column in zip(self.names, self.columns):
             value = row[column]
             if value is not None:
-                if name in self.json_fields:
+                if name in scales:
+                    value = value if scales[name] == 1 else value / scales[name]
+                elif name in self.json_fields:
                     value = json.loads(value)
                 elif name in self.date_fields:
                     value = date.fromisoformat(value)
@@ -92,11 +106,15 @@ class RecordSpec:
 
 
 SPECS = {
-    "states": RecordSpec("life_state", LifeState, "character_id", ("secondary_activity_ids",)),
-    "activities": RecordSpec("activities", Activity, "activity_id"),
+    "states": RecordSpec("life_state", LifeState, "character_id", ("secondary_activity_ids",),
+                         fixed_fields=(("energy", 100), ("fatigue", 100), ("stress", 100), ("sleep_debt_minutes", 1))),
+    "activities": RecordSpec("activities", Activity, "activity_id", fixed_fields=(("energy_rate", 1000),)),
     "plans": RecordSpec("plans", Plan, "plan_id", date_fields=("local_date",)),
-    "items": RecordSpec("schedule_items", ScheduleItem, "item_id"),
-    "sessions": RecordSpec("sleep_sessions", SleepSession, "session_id"),
+    "items": RecordSpec("schedule_items", ScheduleItem, "item_id", fixed_fields=(("preferred_duration_minutes", 1),),
+                        positive_minutes=("preferred_duration_minutes",)),
+    "sessions": RecordSpec("sleep_sessions", SleepSession, "session_id",
+                           fixed_fields=(("initial_expected_duration_minutes", 1), ("actual_sleep_minutes", 1)),
+                           positive_minutes=("initial_expected_duration_minutes",)),
     "segments": RecordSpec("sleep_segments", SleepSegment, "segment_id"),
     "commitments": RecordSpec("commitments", Commitment, "commitment_id", ("participants",), ("local_date", "date_end")),
     "events": RecordSpec("life_events", LifeEvent, "event_id", ("payload",), immutable=True),
@@ -141,14 +159,24 @@ class Repository:
         old = self.get(getattr(model, self.spec.key))
         if old is None:
             raise RepositoryError("record does not exist")
+        encoded = self.spec.encode(model)
+        # Compare persisted precision, including when the caller closes the
+        # original Activity instance whose rate has since been quantized.
+        persisted = self.spec.decode(dict(zip(self.spec.columns, encoded)))
         if isinstance(model, LifeState):
             if expected_version is None or old.state_version != expected_version:
                 raise RepositoryError("stale state version")
-            validate_state_transition(old, model)
+            validate_state_transition(old, persisted)
         elif isinstance(model, Activity):
-            validate_activity_transition(old, model)
-        values = self.spec.encode(model)
-        assignments = ",".join(column + "=?" for column in self.spec.columns)
+            validate_activity_transition(old, persisted)
+        # Do not rewrite unchanged observed fields. Fixed-point encoding handles
+        # SQLite 3.37 compatibility even when body readings actually change.
+        changes = [(column, value) for name, column, value in zip(self.spec.names, self.spec.columns, encoded)
+                   if getattr(persisted, name) != getattr(old, name)]
+        if not changes:
+            return
+        values = [value for column, value in changes]
+        assignments = ",".join(column + "=?" for column, value in changes)
         sql = f"UPDATE {self.spec.table} SET {assignments} WHERE {self.spec.key}=?"
         values.append(getattr(model, self.spec.key))
         if isinstance(model, LifeState):

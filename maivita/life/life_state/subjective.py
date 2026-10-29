@@ -54,6 +54,8 @@ def advance(u, state, now, payload):
         sleeping=(actual.sleep_session_id,actual.started_at) in sleeping_starts
         demanding=actual.category in ('study','work','travel')
         rates=(6,-4,-1) if sleeping else (-3 if demanding else -1,2 if demanding else 1,1 if demanding else -0.5)
+        if actual.energy_rate != 0 or payload.get('segment_energy_rates'):
+            rates=(actual.energy_rate*60, rates[1], rates[2])
         for index,rate in enumerate(rates): delta[index]+=hours*rate
     values = {}
     for field, change in zip(('energy','fatigue','stress'), delta):

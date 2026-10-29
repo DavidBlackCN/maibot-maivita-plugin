@@ -23,6 +23,8 @@ def snapshot(runtime, timezone, stream_id):
         state=u.states.get('default')
         activity=u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
         if activity is not None and not visible(activity,scope): activity=None
+        checkpoint=u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=?',
+            (activity.activity_id,)).fetchone() if activity else None
         plans={p.plan_id:p for p in u.plans.for_character(state.character_id)}
         counts=Counter()
         for item in u.items.for_character(state.character_id):
@@ -42,7 +44,9 @@ def snapshot(runtime, timezone, stream_id):
             'wake':to_local(state.last_wake_at,timezone).strftime('%m-%d %H:%M') if state.last_wake_at else '未知',
             'activity':clean(activity.name) if activity else '暂无',
             'minutes':max(0,int((now-activity.started_at).total_seconds()//60)) if activity else None,
-            'counts':counts,'used':used,'budget':runtime.config.daily_budget,
+            'location':clean(activity.location) if activity else '',
+            'remaining_minutes':max(0, int((checkpoint[0]-to_epoch_ms(now))//60000)) if checkpoint else None,
+            'counts':counts,'used':used,'budget':runtime.decision_budget,
             'planning':to_local(from_epoch_ms(planning['started_at_ms']),timezone).strftime('%m-%d %H:%M') if planning else '未知',
             'degraded':degraded}
 
@@ -70,6 +74,8 @@ async def hush_reason(ctx, stream_id):
 def render_status(data, hush=None):
     activity=data['activity']
     if data['minutes'] is not None: activity+=f'（已进行 {data["minutes"]} 分钟）'
+    if data.get('location'): activity+=' | 在：'+data['location']
+    if data.get('remaining_minutes') is not None: activity+=f' | 预计还剩 {data["remaining_minutes"]} 分钟'
     counts=data['counts']
     reasons=[]
     if data['phase'] in ('sleeping','temporarily_awake'): reasons.append('睡眠静默（MaiVita）')

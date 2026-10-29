@@ -14,7 +14,7 @@ class ConfigExampleTests(unittest.TestCase):
         with (ROOT / 'config.example.toml').open('rb') as file:
             config = tomllib.load(file)
         model = IntegrationConfig.model_validate(config)
-        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine'})
+        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine', 'scheduler'})
         self.assertEqual(config['plugin']['config_version'], '3')
         self.assertEqual(model.model_dump(), config)
         self.assertIsInstance(model.selected_config(), DevelopmentConfig)
@@ -79,7 +79,7 @@ enabled = true
                 with self.assertNoLogs(module.logger, level='WARNING'):
                     plugin.set_plugin_config({'plugin': {'config_version': '3'}, **retired})
                     module.IntegrationConfig.model_validate(retired)
-                self.assertEqual(set(plugin.config.model_dump()), {'plugin', 'instance', 'model', 'routine'})
+                self.assertEqual(set(plugin.config.model_dump()), {'plugin', 'instance', 'model', 'routine', 'scheduler'})
 
     def test_clean_config_does_not_warn(self):
         import r0_support

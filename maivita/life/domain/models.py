@@ -261,10 +261,15 @@ class Activity:
     interruption_reason: str | None = None
     end_reason: str | None = None
     visibility: Visibility = Visibility.RESTRICTED
+    location: str = ''
+    emotion: str = ''
+    energy_rate: float = 0.0
 
     def __post_init__(self):
         common(self, enums={"status": ActivityStatus, "role": ActivityRole, "visibility": Visibility}, ids=("activity_id", "name", "provenance"))
         object.__setattr__(self, "category", category_for(self.category))
+        require(isinstance(self.location, str) and isinstance(self.emotion, str), 'activity context must be text')
+        number(self.energy_rate, -0.15, 0.2)
         require((self.status == ActivityStatus.ACTIVE) == (self.ended_at is None), "activity status/end mismatch")
         if self.ended_at is not None:
             interval(self.started_at, self.ended_at)

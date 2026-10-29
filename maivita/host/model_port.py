@@ -109,7 +109,38 @@ PLANNING_CONTRACT = {
 }
 
 
-def parse_candidate(text):
+SEGMENT_CONTRACT = {
+    'instruction': (
+        '你正在决定角色【从现在开始的这一小段】在做什么。'
+        '不是排一整天，只决定这一小段，之后的事到了时候会再决定。'
+        '\n\n'
+        '【决策依据】'
+        '\n- 她是谁（人设）：优先级最高'
+        '\n- 上一段在做什么、做了多久、还剩多久'
+        '\n- 她现在的身体读数（精力、疲劳、压力、睡眠债）'
+        '\n- 今天已经过完的时段'
+        '\n- 今天的大致样子（若有）'
+        '\n\n'
+        '【怎么决定】'
+        '\n1. 身体读数是输入：累到不行就休息/睡觉，饿到不行就去吃——怎么权衡由你判断'
+        '\n2. 一件事做到一半接着做很正常（continue=true）；做很久了、或身体不允许时就换'
+        '\n3. minutes 要真实：喝口水 15-30 分钟，出门办事 1-3 小时；别因为要填时间就往长了写'
+        '\n4. 换一件事要接得上：上一段在哪、刚做完什么，换地方要有说得过去的由头'
+        '\n5. 一天可以被小事打断（快递到了、朋友叫住）；也可以临时起意（突然想出去走走）'
+        '\n6. 别把一天排成流程模板；午睡不是每天必须有'
+        '\n7. 允许无所事事、发呆、刷手机——这也是她的一天'
+        '\n\n'
+        '【输出】只输出一个 JSON 对象：'
+        '\n{"event": "在做什么", "location": "在哪", "emotion": "心情", '
+        '"minutes": 45, "continue": false, "energy_rate": -0.08}'
+        '\n- event 要具体到能说出口（不要"翻个身"这种微动作；睡眠直接写"睡眠"）'
+        '\n- continue=true 时 event/location/emotion 可留空'
+        '\n- energy_rate：睡眠/休息为正（0.05~0.2），工作/外出/社交为负（-0.05~-0.15）'
+    ),
+    'example': {'event': '在家读小说', 'location': '家里的沙发', 'emotion': '放松', 'minutes': 45, 'continue': False, 'energy_rate': -0.05}
+}
+
+def parse_candidate(text, *, task_kind='present'):
     if not isinstance(text,str) or len(text)>65536: raise DomainError('invalid model response size')
     def unique(pairs):
         result={}
@@ -120,6 +151,9 @@ def parse_candidate(text):
     def reject_constant(value): raise DomainError('non-finite model number')
     try: value=json.loads(text,object_pairs_hook=unique,parse_constant=reject_constant)
     except (ValueError,RecursionError) as error: raise DomainError('invalid model JSON') from error
+    if task_kind == 'segment':
+        from ..life.domain.segment import validate_segment
+        return {'kind': 'advance_segment', 'payload': validate_segment(value)}
     return candidate(value)
 
 
@@ -130,11 +164,11 @@ class SDKModelPort:
         self.last={'status':'not_called'}
 
     async def __call__(self,state,triggers,*,task_kind='present'):
-        if task_kind not in ('planning','present'): raise DomainError('unknown model task')
+        if task_kind not in ('planning','present','segment'): raise DomainError('unknown model task')
         started=time.monotonic()
         # Weekly patterns are configuration-only until the next planning stage.
         context={**self.context(),'routine':self.routine.model_dump(exclude={'weekly_pattern'})}
-        contract=PLANNING_CONTRACT if task_kind=='planning' else PRESENT_CONTRACT
+        contract=SEGMENT_CONTRACT if task_kind=='segment' else PLANNING_CONTRACT if task_kind=='planning' else PRESENT_CONTRACT
         if task_kind=='planning':
             from ..life.domain.clock import to_local
             local_now=to_local(context['now'],context.get('character_timezone','Asia/Shanghai'))
@@ -165,7 +199,7 @@ class SDKModelPort:
                 rpc_timeout_ms=self.settings.timeout_seconds*1000),self.settings.timeout_seconds)
             if not isinstance(response,dict) or response.get('success') is not True:
                 raise ConnectionError('Host model service did not return success')
-            proposal=validate_task_candidate(parse_candidate(response.get('response')),task_kind)
+            proposal=validate_task_candidate(parse_candidate(response.get('response'), task_kind=task_kind),task_kind)
             self.last={'status':'candidate_validated','model_name':str(response.get('model_name',response.get('model','')))[:128],
                 'task_name':self.settings.task if self.settings.mode=='task' else '','elapsed_seconds':round(time.monotonic()-started,3)}
             return proposal

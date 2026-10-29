@@ -71,7 +71,7 @@ class ImportTests(EngineFixture,unittest.TestCase):
             self.assertEqual(validate_schema(c,migrations()[:1]),1)
             with self.assertRaisesRegex(Exception,'migration required'): LifeDatabase(old)
             migrate(c,self.clock)
-            self.assertEqual(validate_schema(c),4)
+            self.assertEqual(validate_schema(c),6)
             self.assertEqual(c.execute('SELECT migration_run_id FROM migration_runs').fetchone()[0],'r')
             self.assertEqual(c.execute('PRAGMA foreign_keys').fetchone()[0],1)
         archived=json.loads((ROOT/'tests/fixtures/preserved-files.json').read_text(encoding='utf-8'))
@@ -85,11 +85,15 @@ class ImportTests(EngineFixture,unittest.TestCase):
             migrate(c,self.clock,migrations()[:1])
             c.execute('BEGIN')
             for name,record in [('states',state(primary_activity_id='a1')),('activities',activity())]:
-                spec=SPECS[name]; values=spec.encode(record)
-                c.execute(f'INSERT INTO {spec.table} ({",".join(spec.columns)}) VALUES ({",".join("?" for _ in values)})',values)
+                spec=SPECS[name]
+                # Seed the historical schema, not columns added by later models.
+                columns={row[1] for row in c.execute(f'PRAGMA table_info({spec.table})')}
+                pairs=[(column,value) for column,value in zip(spec.columns,spec.encode(record)) if column in columns]
+                c.execute(f'INSERT INTO {spec.table} ({",".join(column for column,value in pairs)}) VALUES ({",".join("?" for _ in pairs)})',
+                          [value for column,value in pairs])
             c.commit()
             migrate(c,self.clock)
-            self.assertEqual(validate_schema(c),4)
+            self.assertEqual(validate_schema(c),6)
             self.assertEqual(c.execute('SELECT primary_activity_id FROM life_state').fetchone()[0],'a1')
             self.assertEqual(c.execute('SELECT name FROM activities').fetchone()[0],'Observed study')
             self.assertEqual(list(c.execute('PRAGMA foreign_key_check')),[])

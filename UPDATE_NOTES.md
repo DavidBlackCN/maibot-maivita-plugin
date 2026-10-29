@@ -1,5 +1,25 @@
 # 更新说明
 
+## v0.8.0
+
+### 新增
+- 滚动分段（实验性，默认关闭）：角色有「此刻正在做什么」的实时状态，
+  每 15 分钟一个决策窗，用概率压缩把模型调用控制在每日 20 次以内
+- `[scheduler]` 配置段：决策间隔、变动概率、每日预算、分段时长上限
+- `advance_segment` 命令：支持 continue（继续当前段）/ 换事 / 续做
+- `SEGMENT_CONTRACT`：只决定「从现在开始的这一小段」，不排一整天
+- 身体状态接入分段决策（疲劳 >=80 或精力 <=20 触发重新决策）
+- `/maivita status` 显示当前活动、地点、已进行/剩余时间
+
+### 修复
+- **SQLite 3.37 STRICT+REAL 兼容问题**（生产阻塞）：
+  系统 SQLite 3.37.2 下，STRICT 表 + BEFORE UPDATE 触发器 + REAL 列的
+  UPDATE 会报 `cannot store REAL value in REAL column`，导致 energy/fatigue/
+  stress 永远无法写入，身体状态始终为 NULL。
+  改为 INTEGER 定点数存储（energy ×100、energy_rate ×1000、分钟取整），
+  保留 STRICT 与触发器约束。系统 SQLite 下测试从 12 failed 变为 0 failed。
+- 新增迁移 `006_integer_fixed_point.sql`（Schema 5 -> 6）
+
 ## v0.7.0
 
 ### 新增

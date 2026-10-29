@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-import math
 
+from .clock import to_epoch_ms
 from .models import (
     Activity, ActivityRole, ActivityStatus, Category, LifeState, Plan, PlanStatus,
     SessionStatus, SleepPhase, SleepSegment, SleepSession, require,
@@ -39,9 +39,17 @@ def validate_state_transition(before: LifeState, after: LifeState) -> None:
 def validate_activity_transition(before: Activity, after: Activity) -> None:
     require(before.status == ActivityStatus.ACTIVE, "closed activity is immutable")
     for name in ("activity_id", "character_id", "started_at", "name", "description", "category", "role",
-                 "provenance", "source_schedule_item_id", "resumes_activity_id", "sleep_session_id", "visibility"):
+                 "provenance", "source_schedule_item_id", "resumes_activity_id", "sleep_session_id", "visibility",
+                 "location", "emotion", "energy_rate"):
         require(getattr(before, name) == getattr(after, name), "activity facts cannot be rewritten")
     require(after.status != ActivityStatus.ACTIVE, "activity update must close the observed segment")
+
+
+def observed_sleep_minutes(segments) -> int:
+    """Round the complete observed duration once, never individual pieces."""
+    milliseconds = sum(to_epoch_ms(s.ended_at) - to_epoch_ms(s.started_at)
+                       for s in segments if s.ended_at is not None and s.kind == "sleep")
+    return (milliseconds + 30000) // 60000
 
 
 def validate_aggregate(
@@ -118,9 +126,8 @@ def validate_aggregate(
                 require(segment.ended_at <= (session.ended_at or state.updated_at), "segment end outside session")
             if index:
                 require(own[index - 1].ended_at is not None and own[index - 1].ended_at <= segment.started_at, "sleep segments overlap")
-        total = sum((s.ended_at - s.started_at).total_seconds() / 60 for s in own
-                    if s.ended_at is not None and s.kind == "sleep")
-        require(math.isclose(total, session.actual_sleep_minutes, abs_tol=1 / 60000), "sleep duration cache disagrees with closed segments")
+        require(observed_sleep_minutes(own) == session.actual_sleep_minutes,
+                "sleep duration cache disagrees with closed segments")
         if session.status == SessionStatus.CLOSED:
             require(not opened, "closed session has open segment")
         else:

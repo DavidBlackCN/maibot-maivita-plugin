@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from ..domain.clock import as_utc, iso_instant, to_epoch_ms
 from ..domain.commands import Command
+from ..domain.constraints import observed_sleep_minutes
 from ..domain.models import (
     Activity, ActivityStatus, Commitment, DomainError, LifeEvent, LifeState, Plan,
     ScheduleItem, ScheduleRevision, SleepSegment, SleepSession, json_text, require,
@@ -33,7 +34,9 @@ def command_data(command):
 
 
 class LifeStateEngine:
-    def __init__(self, database, *, fault=None):
+    def __init__(self, database, *, fault=None, scheduler=None):
+        from ..domain.segment import SchedulerConfig
+        self.scheduler = scheduler or SchedulerConfig()
         self.database = database
         self.clock = database.clock
         self.fault = fault or (lambda point: None)
@@ -124,18 +127,24 @@ class LifeStateEngine:
             session_id=session.session_id, started_at=at, kind=kind, provenance=provenance))
         return replace(state, primary_activity_id=activity_id)
 
-    def _close_piece(self, u, state, session, at, reason):
-        self._close_activity(u, state, at, reason)
+    def _close_piece(self, u, state, session, at, reason, status='interrupted'):
+        self._close_activity(u, state, at, reason, status=status)
         opened = [s for s in u.segments.for_character(state.character_id) if s.session_id == session.session_id and s.ended_at is None]
         require(len(opened) == 1, 'missing open sleep segment')
         segment = opened[0]
         require(at > segment.started_at, 'transition would create a zero-length segment')
         u.segments.update(replace(segment, ended_at=at))
-        minutes = (at - segment.started_at).total_seconds() / 60 if segment.kind == 'sleep' else 0
-        return replace(session, actual_sleep_minutes=session.actual_sleep_minutes + minutes)
+        # The cache stores whole minutes. Recompute from all precise segment
+        # timestamps so repeated short interruptions cannot accumulate rounding.
+        minutes = observed_sleep_minutes(s for s in u.segments.for_character(state.character_id)
+                                         if s.session_id == session.session_id)
+        return replace(session, actual_sleep_minutes=minutes)
 
     def _apply(self, u, state, command, now):
         p, kind = command.payload, command.kind
+        if kind == 'advance_segment':
+            from ..planning.segments import apply_segment
+            return apply_segment(self, u, state, command, now), 'life.activity.segment_advanced'
         if kind == 'recover_observation_gap':
             require(command.source=='internal','recovery is internal only')
             start=instant(p['start_at'])

@@ -332,7 +332,7 @@ with db.unit_of_work() as u:
         with restored.unit_of_work() as uow:
             self.assertEqual(uow.events.get("e"), self.event())
             self.assertEqual(uow.states.get("default"), state())
-        self.assertEqual(report["schema_version"], 4)
+        self.assertEqual(report["schema_version"], 6)
         self.assertFalse(report["activated"])
         with self.assertRaises(FileExistsError):
             self.db.backup(snapshot)
