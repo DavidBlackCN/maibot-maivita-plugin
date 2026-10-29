@@ -1,31 +1,45 @@
-"""Version 3 deployment configuration; one explicitly selected engine."""
+"""Version 3 deployment configuration for the life engine."""
+import logging
+from collections.abc import Mapping
+from threading import Lock
 from typing import Literal
 from pydantic import Field, model_validator
-from .config import DevelopmentConfig, PluginSettings, Strict
-from ..legacy.config_models import MaiVitaConfig as LegacyConfig
+from .config import DevelopmentConfig, PluginSettings
+
+
+logger = logging.getLogger(__name__)
+_retired_warning_lock = Lock()
+_retired_warning_logged = False
+
+
+def _warn_retired_sections(sections):
+    """Warn once per process, including across validation and config reloads."""
+    global _retired_warning_logged
+    with _retired_warning_lock:
+        if not _retired_warning_logged:
+            logger.warning('检测到已退役的 %s 配置段，已忽略。请参照 config.example.toml 清理。',
+                           '、'.join(f'[{name}]' for name in sections))
+            _retired_warning_logged = True
 
 
 class PluginConfig(PluginSettings):
     config_version: Literal['3'] = '3'
 
 
-class EngineConfig(Strict):
-    mode: Literal['life', 'legacy'] = 'life'
-
-
 class IntegrationConfig(DevelopmentConfig):
+    model_config = {'extra': 'forbid'}
     plugin: PluginConfig = Field(default_factory=PluginConfig)
-    engine: EngineConfig = Field(default_factory=EngineConfig)
-    legacy: LegacyConfig = Field(default_factory=lambda: LegacyConfig(plugin={'enabled': False}))
 
-    @model_validator(mode='after')
-    def validate_engine(self):
-        if self.plugin.enabled and self.engine.mode == 'legacy':
-            if self.legacy.compatibility.legacy_empty_admin_all:
-                raise ValueError('resolve legacy open-admin semantics before activation')
-            if not self.legacy.admin.legacy_admin_users:
-                raise ValueError('legacy engine needs explicit administrator IDs')
-        return self
+    @model_validator(mode='before')
+    @classmethod
+    def discard_retired_sections(cls, data):
+        if isinstance(data, Mapping):
+            retired = tuple(name for name in ('engine', 'legacy') if name in data)
+            if retired:
+                _warn_retired_sections(retired)
+                # Do not retain retired values or mutate the caller's config.
+                return {key: value for key, value in data.items() if key not in retired}
+        return data
 
     def resolved(self, data):
         from pathlib import Path
@@ -37,18 +51,8 @@ class IntegrationConfig(DevelopmentConfig):
             result.instance.writer_lock = (record['writer_lock'] if record else str(Path(data) / 'writer.lock'))
         return type(self).model_validate(result.model_dump())
 
-    def selected_config(self):
-        if self.engine.mode == 'life':
-            return DevelopmentConfig.model_validate({
-                'plugin': {'enabled': self.plugin.enabled, 'config_version': '2'},
-                'instance': self.instance.model_dump(), 'model': self.model.model_dump(),
-                'routine': self.routine.model_dump()})
-        legacy = self.legacy.model_copy(deep=True)
-        legacy.plugin.enabled = self.plugin.enabled
-        legacy.storage.writer_lock = self.instance.writer_lock
-        legacy.storage.data_dir = ''  # Only the granted, engine-scoped SDK path.
-        legacy.integration.allowed_streams = list(self.instance.allowed_streams)
-        legacy.character.timezone = self.instance.timezone
-        legacy.compatibility.frequency.enable_sleep = False
-        legacy.compatibility.frequency.enable_activity = False
-        return LegacyConfig.model_validate(legacy.model_dump())
+    def selected_config(self) -> DevelopmentConfig:
+        return DevelopmentConfig.model_validate({
+            'plugin': {'enabled': self.plugin.enabled, 'config_version': '2'},
+            'instance': self.instance.model_dump(), 'model': self.model.model_dump(),
+            'routine': self.routine.model_dump()})

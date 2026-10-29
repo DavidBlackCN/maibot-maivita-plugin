@@ -9,10 +9,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from r0_support import ROOT
 
-from maibot_autonomous_planning_plugin.maivita.legacy.database.goal_db import GoalDatabase
 from maibot_autonomous_planning_plugin.maivita.life.storage.safety import (
     WriterLease, discover, fingerprint, inspect_database, resolve_data_dir, restore, snapshot,
 )
@@ -26,10 +24,20 @@ class StorageTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.source = self.root / "source" / "goals.db"
-        self.db = GoalDatabase(str(self.source), backup_on_init=False)
-        self.db.create_goal(goal_id="future", name="Synthetic promise", description="fixture only",
-                            goal_type="pending_commitment", priority="high", creator_id="synthetic",
-                            chat_id="global", parameters={"commitment_date": "2099-01-01"})
+        # A synthetic old-schema database exercises the retained migration tools.
+        self.source.parent.mkdir()
+        self.db = sqlite3.connect(self.source)
+        self.db.execute('PRAGMA journal_mode=WAL')
+        columns = ['goal_id', 'name', 'description', 'goal_type', 'priority', 'creator_id',
+                   'chat_id', 'status', 'created_at', 'deadline', 'interval_seconds',
+                   'conditions', 'parameters', 'progress', 'last_executed_at',
+                   'execution_count', 'updated_at']
+        self.db.execute('CREATE TABLE goals (' + ','.join(name + ' TEXT' for name in columns) + ')')
+        self.db.execute('CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT)')
+        self.db.execute("INSERT INTO metadata VALUES ('schema_version', '1')")
+        self.db.execute('INSERT INTO goals (goal_id, goal_type, parameters) VALUES (?, ?, ?)',
+                        ('future', 'pending_commitment', json.dumps({'commitment_date': '2099-01-01'})))
+        self.db.commit()
 
     def tearDown(self):
         self.db.close()
@@ -67,7 +75,7 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(fingerprint(backup), fingerprint(destination))
 
     def test_T01_unknown_version_and_structure_are_rejected_without_rewrite(self):
-        conn = self.db._get_connection()
+        conn = self.db
         conn.execute("UPDATE metadata SET value='99'")
         conn.commit()
         self.assertFalse(inspect_database(self.source)["valid_legacy_schema"])
@@ -78,11 +86,6 @@ class StorageTests(unittest.TestCase):
         conn.execute("ALTER TABLE goals ADD COLUMN future_field TEXT")
         conn.commit()
         self.assertFalse(inspect_database(self.source)["valid_legacy_schema"])
-
-    def test_T02_failed_backup_does_not_allow_database_initialization(self):
-        with patch("maibot_autonomous_planning_plugin.maivita.life.storage.safety.snapshot", side_effect=OSError("disk full")):
-            with self.assertRaisesRegex(OSError, "disk full"):
-                GoalDatabase(str(self.source))
 
     def test_T02_closed_WAL_requires_explicit_offline_and_creates_no_source_files(self):
         with self.assertRaisesRegex(ValueError, "existing WAL"):

@@ -8,37 +8,103 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ConfigExampleTests(unittest.TestCase):
     def test_example_is_valid_toml_and_contains_all_sections(self):
-        with (ROOT / "tests/fixtures/config.r0.example.toml").open("rb") as file:
+        import r0_support
+        from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
+        from maibot_autonomous_planning_plugin.maivita.host.config import DevelopmentConfig
+        with (ROOT / 'config.example.toml').open('rb') as file:
             config = tomllib.load(file)
-        from maibot_autonomous_planning_plugin.maivita.legacy.config_models import MaiVitaConfig
-        model = MaiVitaConfig.model_validate(config)
-        config = {"plugin": config["plugin"], "schedule": model.schedule.model_dump(),
-                  "inject": model.inject.model_dump(), "autonomous_planning": model.autonomous_planning.model_dump()}
-        self.assertEqual(
-            set(config),
-            {"plugin", "autonomous_planning", "schedule", "inject"},
-        )
-        self.assertEqual(config["plugin"]["config_version"], "1")
-        self.assertEqual(config["schedule"]["sleep_start_time"], "01:00")
-        self.assertEqual(config["schedule"]["sleep_end_time"], "08:00")
-        self.assertEqual(config["schedule"]["generation_timeout"], 180.0)
-        self.assertEqual(config["schedule"]["generation_max_retries"], 1)
-        self.assertEqual(config["schedule"]["generation_retry_backoff"], 30.0)
-        self.assertEqual(
-            config["schedule"]["model"],
-            {"mode": "task", "task": "replyer", "model": ""},
-        )
-        self.assertNotIn("llm_task_name", config["schedule"])
-        self.assertNotIn("day_start_time", config["schedule"])
-        self.assertNotIn("sync_sleep_frequency", config["schedule"])
-        self.assertNotIn("sleep_talk_adjust", config["schedule"])
-        self.assertNotIn("enable_frequency_modulation", config["schedule"])
-        self.assertNotIn("inject_mode", config["inject"])
-        self.assertEqual(config["schedule"]["frequency"]["sleep_factor"], 0.0)
-        self.assertEqual(
-            config["schedule"]["frequency"]["activity_factors"]["entertainment"],
-            1.5,
-        )
+        model = IntegrationConfig.model_validate(config)
+        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine'})
+        self.assertEqual(config['plugin']['config_version'], '3')
+        self.assertIsInstance(model.selected_config(), DevelopmentConfig)
+        self.assertEqual(model.selected_config().routine, model.routine)
+
+    def test_retired_sections_are_discarded_without_mutating_input(self):
+        import copy
+        import r0_support
+        from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
+        with (ROOT / 'config.example.toml').open('rb') as stream:
+            clean = tomllib.load(stream)
+        for retired in ({'engine': {'mode': 'life'}}, {'engine': {'mode': 'legacy'}},
+                        {'legacy': {}}, tomllib.loads('''
+[engine]
+mode = "legacy"
+[legacy.model]
+secret = "do-not-log-this"
+[legacy.planner.nested]
+enabled = true
+''')):
+            with self.subTest(sections=list(retired)):
+                source = {**clean, **retired}
+                original = copy.deepcopy(source)
+                model = IntegrationConfig.model_validate(source)
+                self.assertEqual(source, original)
+                self.assertEqual(model.model_dump(), clean)
+                self.assertEqual(model.selected_config(), IntegrationConfig.model_validate(clean).selected_config())
+                self.assertNotIn('engine', IntegrationConfig.model_fields)
+                self.assertNotIn('legacy', IntegrationConfig.model_fields)
+
+    def test_unknown_fields_still_fail_with_retired_sections(self):
+        import r0_support
+        from pydantic import ValidationError
+        from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
+        for unknown, location in (({'engnie': {}}, ('engnie',)),
+                                  ({'model': {'unknown_field': 1}}, ('model', 'unknown_field')),
+                                  ({'routine': {'typo': 1}}, ('routine', 'typo'))):
+            with self.subTest(location=location):
+                with self.assertRaises(ValidationError) as caught:
+                    IntegrationConfig.model_validate({'engine': {}, 'legacy': {}, **unknown})
+                self.assertIn((location, 'extra_forbidden'),
+                              [(e['loc'], e['type']) for e in caught.exception.errors()])
+
+    def test_startup_warns_once_and_never_logs_values(self):
+        import r0_support
+        from unittest.mock import patch
+        from maibot_autonomous_planning_plugin.maivita.host import integration_config as module
+        from maibot_autonomous_planning_plugin.maivita.host.entrypoint import MaiVitaPlugin
+        for retired in ({'engine': {'mode': 'secret-mode'}},
+                        {'legacy': {'secret': 'do-not-log-this'}},
+                        {'engine': {}, 'legacy': {'secret': 'do-not-log-this'}}):
+            with self.subTest(sections=list(retired)), patch.object(module, '_retired_warning_logged', False):
+                plugin = MaiVitaPlugin()
+                with self.assertLogs(module.logger, level='WARNING') as logs:
+                    plugin.set_plugin_config({'plugin': {'config_version': '3'}, **retired})
+                self.assertEqual(len(logs.records), 1)
+                message = logs.records[0].getMessage()
+                for name in retired:
+                    self.assertIn(f'[{name}]', message)
+                self.assertIn('config.example.toml', message)
+                self.assertNotIn('secret', message)
+                with self.assertNoLogs(module.logger, level='WARNING'):
+                    plugin.set_plugin_config({'plugin': {'config_version': '3'}, **retired})
+                    module.IntegrationConfig.model_validate(retired)
+                self.assertEqual(set(plugin.config.model_dump()), {'plugin', 'instance', 'model', 'routine'})
+
+    def test_clean_config_does_not_warn(self):
+        import r0_support
+        from unittest.mock import patch
+        from maibot_autonomous_planning_plugin.maivita.host import integration_config as module
+        with patch.object(module, '_retired_warning_logged', False):
+            with self.assertNoLogs(module.logger, level='WARNING'):
+                module.IntegrationConfig.model_validate({})
+            self.assertFalse(module._retired_warning_logged)
+
+    def test_retired_cli_entrypoints_fail_without_touching_input(self):
+        import subprocess
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            work=Path(temporary)
+            source=work/'config.toml'; source.write_text('sentinel')
+            output=work/'output.toml'
+            for name in ('convert_config.py','switch_engine.py'):
+                result=subprocess.run([sys.executable,str(ROOT/'tools'/name),str(source),str(output)],
+                                      cwd=work,capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,2,result.stderr)
+                self.assertIn('retired',result.stderr)
+                self.assertNotIn('Traceback',result.stderr)
+                self.assertEqual(source.read_text(),'sentinel')
+                self.assertFalse(output.exists())
 
 
 class ModelSettingsTests(unittest.TestCase):

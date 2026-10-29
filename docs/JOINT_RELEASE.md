@@ -1,4 +1,4 @@
-# MaiVita 0.5.4
+# MaiVita 0.6.0
 
 本轮完整功能、命令、联动和升级说明统一见 [PRODUCT_GUIDE](PRODUCT_GUIDE.md)。
 

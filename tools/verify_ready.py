@@ -33,7 +33,7 @@ def main():
     from maivita_static.maivita.integrations import contracts
     import tomllib
     config=IntegrationConfig.model_validate(tomllib.loads((root/'config.example.toml').read_text(encoding='utf-8')))
-    assert config.plugin.enabled and config.engine.mode=='life'
+    assert config.plugin.enabled and 'engine' not in type(config).model_fields
     generated={name:getattr(contracts,name).model_json_schema() for name in
                ('IdentityRequest','IdentityDecision','PolicyRequest','PolicyDecision','SocialEvent','SocialAck')}
     assert json.loads((root/'docs/contracts-v1.schema.json').read_text())==generated

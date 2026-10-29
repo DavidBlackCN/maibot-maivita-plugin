@@ -3,9 +3,6 @@
 enabled = true
 config_version = "3"
 
-[engine]
-mode = "life"
-
 [instance]
 acknowledgement = ""
 # Optional absolute override; empty uses the granted data directory.
@@ -39,20 +36,3 @@ life_context = ""
 # 作息偏好，仅作为模型参考，不强制
 preferred_sleep_time = "01:00"
 preferred_wake_time = "08:00"
-
-# For the legacy profile, fill [legacy] using the former version-1 example.
-# Lifecycle root enable/lock settings override the nested legacy values.
-[legacy.plugin]
-enabled = false
-config_version = "1"
-
-[legacy.planning]
-daily_enabled = false
-
-[legacy.admin]
-legacy_admin_users = []
-
-[legacy.compatibility]
-proactive_streams = []
-enable_proactive_trigger = false
-legacy_empty_admin_all = false

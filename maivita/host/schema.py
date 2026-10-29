@@ -10,7 +10,7 @@ def build_schema(**metadata):
             choices = field.get('choices')
             if choices and '' in choices:
                 # Radix Select.Item reserves the empty value for clearing.
-                # This legacy acknowledgement is optional, not an operator task.
+                # This historical acknowledgement is optional, not an operator task.
                 field.update(type='string', ui_type='text', choices=None,
                              hidden=True, disabled=True)
             elif choices == [False]:
@@ -20,10 +20,10 @@ def build_schema(**metadata):
                 field['disabled'] = True
             if field['type'] == 'object':
                 # Official plugin-config has no JSON editor (falls back to Input).
-                # Preserve advanced legacy tables; edit them in raw TOML mode.
+                # Preserve nested tables; edit them in raw TOML mode.
                 field.update(hidden=True, disabled=True)
             if field['type'] == 'object':
                 # Official plugin-config has no JSON editor (falls back to Input).
-                # Preserve advanced legacy tables; edit them in raw TOML mode.
+                # Preserve nested tables; edit them in raw TOML mode.
                 field.update(hidden=True, disabled=True)
     return schema

@@ -8,6 +8,8 @@ from maibot_autonomous_planning_plugin.maivita.host.integration_config import In
 def test_host_webui_schema_has_no_empty_select_and_roundtrips_defaults():
     schema = MaiVitaPlugin().get_webui_config_schema(plugin_id='vita', plugin_version='test')
     assert schema['plugin_id'] == 'vita'
+    assert 'engine' not in schema['sections']
+    assert 'legacy' not in schema['sections']
     fields = [f for s in schema['sections'].values() for f in s['fields'].values()]
     assert all('' not in (f.get('choices') or []) for f in fields if f['ui_type'] == 'select')
     assert schema['sections']['instance']['fields']['acknowledgement']['hidden']

@@ -1,21 +1,21 @@
-"""SDK lifecycle router: register and run exactly one engine per load."""
+"""SDK lifecycle entrypoint for the life engine."""
 from dataclasses import replace
-import asyncio
 
 from maibot_sdk import API, MaiBotPlugin
 from .activation import EngineAuthority
 from .config import stream_allowed
 from .integration_config import IntegrationConfig
+from .plugin import MaiVitaDevelopmentPlugin
 from ..life.storage.safety import resolve_data_dir
 from ..runtime_versions import runtime_pair, runtime_supported
 
 
 class EngineContext:
     """Scope granted paths; capabilities remain the original SDK proxies."""
-    def __init__(self, context, mode):
+    def __init__(self, context):
         self.context = context
-        self.paths = replace(context.paths, data_dir=context.paths.data_dir / mode,
-                             runtime_dir=context.paths.runtime_dir / mode)
+        self.paths = replace(context.paths, data_dir=context.paths.data_dir / 'life',
+                             runtime_dir=context.paths.runtime_dir / 'life')
 
     def __getattr__(self, name):
         return getattr(self.context, name)
@@ -32,7 +32,6 @@ class MaiVitaPlugin(MaiBotPlugin):
     def __init__(self):
         super().__init__()
         self.delegate = None
-        self.selected_mode = None
         self.active_config = None
         self.authority = None
         self.ready = False
@@ -48,19 +47,8 @@ class MaiVitaPlugin(MaiBotPlugin):
     def _select(self):
         if self._plugin_config_instance is None:
             self.set_plugin_config({})
-        if self.delegate is not None and self.selected_mode != self.config.engine.mode:
-            if self.ready or self.active_config is not None:
-                raise RuntimeError('active engine selection requires unload and reload')
-            self.delegate = None
         if self.delegate is None:
-            mode = self.config.engine.mode
-            if mode == 'life':
-                from .plugin import MaiVitaDevelopmentPlugin
-                self.delegate = MaiVitaDevelopmentPlugin()
-            else:
-                from ..legacy.plugin import MaiVitaPlugin as LegacyPlugin
-                self.delegate = LegacyPlugin()
-            self.selected_mode = mode
+            self.delegate = MaiVitaDevelopmentPlugin()
         if self.active_config is None:
             # SDK metadata discovery can happen before the actual config is
             # injected. Never activate a delegate using its earlier defaults.
@@ -99,21 +87,6 @@ class MaiVitaPlugin(MaiBotPlugin):
                 return {'api_version': 1, 'ok': False, 'data': None,
                         'error': {'code': self.failure_code or 'NOT_READY', 'retryable': False},
                         'state_version': None, 'as_of': None}
-            if self.selected_mode == 'legacy':
-                component = self.component_names[name]
-                denied = types[name] == 'TOOL' and component != 'get_planning_status_v4' and not (
-                    component == 'manage_goal_v4' and kwargs.get('action', 'list') in ('list', 'get'))
-                if types[name] == 'COMMAND':
-                    text = str(kwargs.get('text', kwargs.get('message', '')))
-                    groups = kwargs.get('matched_groups') or {}
-                    texts = (text, str(groups.get('planning_cmd', text))) if isinstance(groups, dict) else ('invalid command',)
-                    denied = any(len(parts) > 1 and parts[1] not in ('help', 'status', 'list', 'frequency', 'freq')
-                                 for parts in (value.strip().split() for value in texts))
-                if denied:
-                    return ({'api_version': 1, 'ok': False, 'data': None,
-                             'error': {'code': 'PERMISSION_DENIED', 'retryable': False},
-                             'state_version': None, 'as_of': None} if types[name] != 'COMMAND'
-                            else (True, 'MaiVita management requires a trusted identity contract', 2))
             return await getattr(self.delegate, name)(**kwargs)
         return invoke
 
@@ -132,13 +105,11 @@ class MaiVitaPlugin(MaiBotPlugin):
             resolved = self.config.resolved(data)
             authority.check(resolved)
             delegate = self._select()
-            if self.selected_mode != self.config.engine.mode:
-                raise RuntimeError('engine configuration changed after registration; reload required')
             delegate.set_plugin_config(resolved.selected_config().model_dump())
-            delegate._set_context(EngineContext(self.ctx, self.selected_mode))
+            delegate._set_context(EngineContext(self.ctx))
             await delegate.on_load()
-            lease = getattr(delegate, 'deployment_lease', getattr(delegate, '_writer_lease', None))
-            if not bool(getattr(delegate, 'ready', getattr(delegate, '_loaded', False))) or lease is None or lease.file is None:
+            lease = delegate.deployment_lease
+            if not delegate.ready or lease is None or lease.file is None:
                 raise RuntimeError('selected delegate did not become ready and acquire its writer lease')
             # Recheck and persist only after the delegate owns the common lock.
             self.authority = authority.activate(resolved)
@@ -166,7 +137,7 @@ class MaiVitaPlugin(MaiBotPlugin):
         if self.active_config is not None and config_data == self.active_config.model_dump():
             return
         # Even invalid updates stop the current writer. Nothing starts a second
-        # delegate in this process; Host reload re-registers the chosen profile.
+        # delegate in this process; Host reload re-registers the life components.
         await self.on_unload()
         self.failure_code = 'RELOAD_REQUIRED'
         IntegrationConfig.model_validate(config_data)
@@ -174,10 +145,10 @@ class MaiVitaPlugin(MaiBotPlugin):
 
     @API('get_engine_status', public=True, version='1')
     async def get_engine_status(self, **kwargs):
-        live = self.ready and bool(getattr(self.delegate, 'ready', getattr(self.delegate, '_loaded', False)))
+        live = self.ready and self.delegate.ready
         public_authority = ({key: self.authority[key] for key in ('engine', 'revision', 'database')}
                             if self.authority else None)
-        return {'api_version': 1, 'ready': live, 'engine': self.selected_mode,
+        return {'api_version': 1, 'ready': live, 'engine': 'life',
                 'authority': public_authority, 'failure_code': self.failure_code or getattr(self.delegate, 'failure_code', None),
                 'production_switch': False}
 
@@ -195,12 +166,9 @@ class MaiVitaPlugin(MaiBotPlugin):
     async def life_query(self, method):
         if not self.ready:
             return self.unavailable(self.failure_code or 'NOT_READY')
-        if self.selected_mode != 'life':
-            return self.unavailable('ENGINE_UNAVAILABLE')
         return await self.delegate.read(method)
 
-    # Stable static bindings are required by the native WebUI validator even
-    # when legacy is selected. Legacy reports unavailability, never fake state.
+    # Stable static bindings are required by the native WebUI validator.
     @API('get_life_state', public=True, version='1')
     async def get_life_state(self, **kwargs): return await self.life_query('get_life_state')
     @API('get_plan', public=True, version='1')
@@ -212,7 +180,6 @@ class MaiVitaPlugin(MaiBotPlugin):
     @API('get_public_events', public=True, version='1')
     async def get_public_events(self, after_version=0, after_index=-1, limit=50, **kwargs):
         if not self.ready: return self.unavailable('NOT_READY')
-        if self.selected_mode != 'life': return self.unavailable('ENGINE_UNAVAILABLE')
         if not self.delegate.ready: return self.unavailable('NOT_READY')
         from ..integrations.social import public_events
         from ..life.domain.models import DomainError
@@ -223,7 +190,7 @@ class MaiVitaPlugin(MaiBotPlugin):
 
     @API('get_public_persona', public=True, version='1')
     async def get_public_persona(self, **kwargs):
-        if not self.ready or self.selected_mode!='life' or not self.delegate.ready:return self.unavailable('NOT_READY')
+        if not self.ready or not self.delegate.ready:return self.unavailable('NOT_READY')
         delegate=self.delegate;cfg=delegate.active_config
         from .persona import read_persona
         data=await read_persona(delegate.ctx,cfg.model.life_context)
@@ -232,7 +199,7 @@ class MaiVitaPlugin(MaiBotPlugin):
 
     @API('get_public_route_scope', public=True, version='1')
     async def get_public_route_scope(self, stream_id=None, **kwargs):
-        if not self.ready or self.selected_mode != 'life' or not self.delegate.ready:
+        if not self.ready or not self.delegate.ready:
             return self.unavailable('ENGINE_UNAVAILABLE')
         if not stream_allowed(stream_id, self.active_config.instance.allowed_streams):
             return self.unavailable('ROUTE_UNAVAILABLE')

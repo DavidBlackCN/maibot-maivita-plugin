@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "version": "0.5.4",
+  "version": "0.6.0",
   "name": "MaiVita",
   "description": "Life planning, sleep and public state; official Host command entry; finite management commands.",
   "author": {
@@ -42,19 +42,9 @@
   "capabilities": [
     "api.call",
     "send.text",
-    "send.image",
-    "send.forward",
     "config.get",
     "llm.generate",
-    "message.get_recent",
-    "message.get_by_time_in_chat",
     "chat.get_all_streams",
-    "chat.get_stream_by_group_id",
-    "chat.get_stream_by_user_id",
-    "knowledge.search",
-    "maisaka.proactive.trigger",
-    "frequency.get_adjust",
-    "frequency.get_current_talk_value",
     "component.list_loaded_plugins"
   ],
   "i18n": {

@@ -1,1 +1,1 @@
-"""Explicit v5.1 configuration and public API compatibility."""
+"""Public API and tool projections backed by the life engine."""

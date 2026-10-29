@@ -13,9 +13,11 @@ class ManifestTests(unittest.TestCase):
         self.assertIn("llm.generate", capabilities)
         self.assertNotIn("llm.get_available_models", capabilities)
         self.assertNotIn("frequency.set_adjust", capabilities)
-        self.assertIn("frequency.get_adjust", capabilities)
-        self.assertIn("frequency.get_current_talk_value", capabilities)
-        self.assertEqual(manifest["version"], "0.5.4")
+        self.assertNotIn("frequency.get_adjust", capabilities)
+        self.assertNotIn("frequency.get_current_talk_value", capabilities)
+        self.assertEqual(capabilities, {'api.call', 'send.text', 'config.get', 'llm.generate',
+                                        'chat.get_all_streams', 'component.list_loaded_plugins'})
+        self.assertEqual(manifest["version"], "0.6.0")
 
 
 if __name__ == "__main__":

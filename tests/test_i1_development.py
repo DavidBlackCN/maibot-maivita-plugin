@@ -156,7 +156,7 @@ class DevelopmentConfigTests(unittest.TestCase):
             self.assertEqual(manifest,file_manifest())
             self.assertFalse(any(name.endswith(('config.toml','.db','.pyc','.env')) or name.startswith(('tests/','evidence/')) for name in manifest))
             self.assertIn('LICENSE',manifest); self.assertIn('ROLLBACK.md',manifest)
-            self.assertIn('maivita/legacy/plugin.py',manifest)
+            self.assertFalse(any(name.startswith('maivita/legacy/') for name in manifest))
             # Internal notes must stay private even if an operator recreates
             # the ignored directory next to an otherwise installable package.
             import importlib

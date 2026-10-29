@@ -8,20 +8,12 @@
 
 1. 停止旧完整规划插件，安装本包的唯一 MaiVita ID。保留旧代码和数据库，不同版本不得同时运行。隔离环境须有 Manifest 声明的 pillow、tzdata（时区校验使用标准库 zoneinfo，不再强依赖 pytz）；若 uv 创建的环境没有 pip，先用 uv pip 在该环境安装这些依赖，不能假设 Host 自动安装必定成功。
 2. 首次安装由 Host 生成默认配置，默认启用 life。无需填写 acknowledgement、writer_lock 或 allowed_streams；空会话列表跟随 Host/适配器接入范围。已在 Snowluma 限制测试群时可直接使用。非空列表仍是精确白名单，禁止通配符。
-3. 默认 engine.mode=`life`。模型通过 Host 专用配置的 utils 任务路由；model.generate_on_start 默认 false，设 true 后每次加载最多请求一次，预算与超时生效。后续显著事件仍由已有协调器按预算调度，不定时轮询模型。
-4. 配置版本 1/2 不自动升级。旧版 1 字段可放入 legacy 部分，但必须重新检查管理员和隔离目录；engine.mode=legacy 需要明确管理员，旧开放管理员语义拒绝。
-5. 数据根由真实 SDK paths.data_dir 注入；life/maivita.db 与 legacy/goals.db 分目录，根 engine-authority.json 指定唯一权威。根下发现未分目录旧库时拒绝启动，不能手工改名搬入绕过审查。
+3. 入口只运行 life。模型默认通过 Host 的 planner 任务路由；model.generate_on_start 默认 false，设 true 后每次加载最多请求一次，预算与超时生效。后续显著事件仍由已有协调器按预算调度，不定时轮询模型。
+4. 有效配置段为 plugin、instance、model、routine；按 config.example.toml 清理其他配置段，不自动转换旧格式。
+5. 数据根由真实 SDK paths.data_dir 注入，生活库位于 life/maivita.db，根 engine-authority.json 记录 life 权威与锁路径。根下发现未分目录旧库时拒绝启动，不能手工改名搬入绕过审查。
 6. 启动后发送 `/maivita status`。默认不在启动时调用模型；如需启动规划，可在已有 Host 模型配置就绪后设置 model.generate_on_start=true。睡眠和 Hush 硬静音仍可阻止状态消息，无发送豁免。
 
-升级保留现有 config.toml 和数据。原 writer_lock 可以保留；清空时若已有 engine-authority.json，会沿用其中原锁路径。acknowledgement 兼容旧值但不再作为启用门禁。普通升级不要改 engine.mode 或移动数据库。
-
-跨引擎切换先禁用/停止 Host，保存当前配置副本。在相同环境安装 tools/requirements.txt 后执行：
-
-```text
-python tools/switch_engine.py --config <绝对配置路径> --data-dir <SDK授予数据根> --target legacy --output <新的配置副本> --isolated-instance
-```
-
-工具取得同一 writer_lock，保存所有已有引擎库的一致快照及 checksum，产生绑定源 revision、目标模式及完整配置摘要的切换票据；不改原配置、不启动 Host。检查输出后替换配置并显式重载。切回 life 同理，需要新的票据；不能只改 mode。首次空实例可直接激活指定的一个引擎。
+升级前备份配置和数据，按当前示例保留有效配置段。原 writer_lock 可以保留；清空时若已有 engine-authority.json，会沿用其中原锁路径。acknowledgement 兼容旧值但不再作为启用门禁。保持原数据目录；非 life 权威记录会拒绝启动，不自动改写或迁移。
 
 旧库导入仅针对已验证的离线快照，使用 stage_legacy.py 的显式 snapshot/target/source-id/timezone/writer-lock 和 --development-staging；目标为 life/maivita.db，旧引擎必须停写。歧义行保留并阻止自主激活，不猜测约定或真实历史。完整参数见 `python tools/stage_legacy.py --help`，恢复步骤见 [ROLLBACK](ROLLBACK.md)。
 
@@ -33,6 +25,6 @@ python tools/switch_engine.py --config <绝对配置路径> --data-dir <SDK授�
 
 用 prepare_ready_instance.py 的 --host/--python/--instance 和可选 --test-model-config 指定仅测试配置，实例必须是本工作区 .integration 下的新目录。准备工具强制该自动验收实例的 daily_budget=1，包含不确定结果；重新加载不能额外消耗请求。
 
-设置 MAIVITA_HOST_SOURCE、MAIVITA_HOST_PYTHON、MAIVITA_TEST_INSTANCE 为对应绝对路径，再运行 `tools/run_i1_host_smoke.py --agreements-confirmed --exercise-model`。协议开关仅在操作者确已同意后使用。它将通过真实认证验证 API/重载并停止 Host。之后 `tools/rehearse_ready.py --instance <实例绝对路径>` 运行原生组件、新旧回切和恢复；不会自行补足模型预算或重试未知结果。
+设置 MAIVITA_HOST_SOURCE、MAIVITA_HOST_PYTHON、MAIVITA_TEST_INSTANCE 为对应绝对路径，再运行 `tools/run_i1_host_smoke.py --agreements-confirmed --exercise-model`。协议开关仅在操作者确已同意后使用。它将通过真实认证验证 API/重载并停止 Host。之后 `tools/rehearse_ready.py --instance <实例绝对路径>` 运行原生 life 组件和仅写入临时目录的快照恢复验证；不会自行补足模型预算或重试未知结果。
 
 tools/verify_ready.py 和 CI 不需要私有配置。audit_ready.py 另包含本工作区历史来源及相邻只读项目的校验，依赖相应本地历史证据；这些非公共工作记录不随 Git 分发，不能用缺失记录冒称来源已验收。

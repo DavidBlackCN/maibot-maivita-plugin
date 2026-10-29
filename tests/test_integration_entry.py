@@ -1,15 +1,10 @@
-"""Unified lifecycle and offline transition tests against real temporary SQLite."""
+"""Life lifecycle and ownership tests against real temporary SQLite."""
 from pathlib import Path
-from contextlib import closing
 import asyncio
-import hashlib
-import importlib.util
 import json
-import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
-import tomli_w
 
 import r0_support
 from maibot_sdk.context import PluginContext, PluginPaths
@@ -17,10 +12,6 @@ from maibot_autonomous_planning_plugin.maivita.host.entrypoint import create_plu
 from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
 from maibot_autonomous_planning_plugin.maivita.life.storage.safety import WriterLease
 from maibot_autonomous_planning_plugin.maivita.integrations.contracts import IdentityDecision, IdentityRequest, contract_descriptor
-
-spec=importlib.util.spec_from_file_location('switch_fixture',r0_support.ROOT/'tools/switch_engine.py')
-switch=importlib.util.module_from_spec(spec); spec.loader.exec_module(switch)
-
 
 class EntryTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -34,21 +25,14 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
             raise AssertionError('unexpected SDK side effect '+cap)
         self.ctx=PluginContext('davidblackcn.maibot-maivita-plugin',rpc_call=rpc,
                                paths=PluginPaths(self.work/'data',self.work/'runtime'))
-        self.config={'plugin':{'enabled':True,'config_version':'3'},'engine':{'mode':'life'},
+        self.config={'plugin':{'enabled':True,'config_version':'3'},
             'instance':{'acknowledgement':'isolated-test-instance','writer_lock':str(self.work/'writer.lock'),
-                        'allowed_streams':['test-stream']},
-            'legacy':{'planning':{'daily_enabled':False},'admin':{'legacy_admin_users':['test-admin']},
-                      'compatibility':{'enable_proactive_trigger':False}}}
+                        'allowed_streams':['test-stream']}}
 
     def plugin(self,config=None):
         plugin=create_plugin(); plugin._set_context(self.ctx)
         plugin.set_plugin_config(config or self.config); plugin.get_components()
         self.instances.append(plugin); return plugin
-
-    def save(self,plugin,name):
-        path=self.work/name
-        with path.open('wb') as stream: tomli_w.dump(plugin.config.model_dump(mode='json'),stream)
-        return path
 
     async def asyncTearDown(self):
         for plugin in self.instances: await plugin.on_unload()
@@ -89,15 +73,14 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((await plugin.get_public_route_scope(stream_id='outside'))['ok'])
         self.assertEqual(plugin.delegate.inject({'session_id':'outside'})['action'],'continue')
 
-    async def test_unsupported_host_refuses_both_engines_before_storage(self):
-        for mode in ('life','legacy'):
-            with self.subTest(mode=mode), patch.dict('os.environ',{'MAIBOT_HOST_VERSION':'1.3.14'}):
-                plugin=self.plugin({**self.config,'engine':{'mode':mode}})
-                with self.assertRaisesRegex(RuntimeError,'unsupported Host/SDK pair'):
-                    await plugin.on_load()
-                self.assertFalse(plugin.ready)
-                self.assertFalse((self.work/'data').exists())
-                self.assertEqual(self.calls,[])
+    async def test_unsupported_host_refuses_before_storage(self):
+        with patch.dict('os.environ',{'MAIBOT_HOST_VERSION':'1.3.14'}):
+            plugin=self.plugin()
+            with self.assertRaisesRegex(RuntimeError,'unsupported Host/SDK pair'):
+                await plugin.on_load()
+            self.assertFalse(plugin.ready)
+            self.assertFalse((self.work/'data').exists())
+            self.assertEqual(self.calls,[])
 
     async def test_sdk_default_discovery_before_config_does_not_freeze_disabled_delegate(self):
         plugin=create_plugin(); plugin.get_components()  # Real Host discovers metadata first.
@@ -106,44 +89,37 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((await plugin.get_life_state())['ok'])
         self.assertIsNotNone(plugin.delegate.deployment_lease.file)
 
-    async def test_switch_and_roundtrip_require_offline_ticket_and_keep_both_databases(self):
-        first=self.plugin(); await first.on_load(); config=self.save(first,'life.toml')
-        with self.assertRaisesRegex(RuntimeError,'another life writer'):
-            switch.prepare(config,self.work/'data','legacy',self.work/'blocked.toml')
-        await first.on_unload()
-        ticket=switch.prepare(config,self.work/'data','legacy',self.work/'legacy.toml')
-        import tomllib
-        legacy=self.plugin(tomllib.loads((self.work/'legacy.toml').read_text()))
-        await legacy.on_load()
-        self.assertEqual((await legacy.get_engine_status())['engine'],'legacy')
-        self.assertIsNone(getattr(legacy.delegate,'runtime',None))
-        self.assertEqual((await legacy.get_life_state())['error']['code'],'ENGINE_UNAVAILABLE')
-        self.assertTrue((self.work/'data/legacy/goals.db').is_file())
-        self.assertEqual(legacy.authority['revision'],2)
-        self.assertEqual((await legacy.handle_generate_schedule(owner=True))['error']['code'],'PERMISSION_DENIED')
-        denied=await legacy.handle_planning_command(text='/plan status',matched_groups={'planning_cmd':'/plan clear'})
-        self.assertIn('trusted identity',denied[1])
-        self.assertFalse(any(p['capability']=='frequency.set_adjust' for p in self.calls))
-        for backup in ticket['snapshots']:
-            path=self.work/'data'/backup['path']
-            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),backup['sha256'])
-            with closing(sqlite3.connect(path)) as db: self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0],'ok')
-        await legacy.on_unload()
-        switch.prepare(self.work/'legacy.toml',self.work/'data','life',self.work/'back.toml')
-        back=self.plugin(tomllib.loads((self.work/'back.toml').read_text())); await back.on_load()
-        self.assertEqual(back.authority['revision'],3)
-        self.assertTrue((await back.get_life_state())['ok'])
-        self.assertTrue((self.work/'data/legacy/goals.db').exists())
-
-    async def test_hot_switch_stops_writer_but_never_activates_other_engine(self):
+    async def test_retired_engine_hot_update_requires_reload_then_starts_life(self):
         first=self.plugin(); await first.on_load()
-        changed=first.config.model_dump(); changed['engine']['mode']='legacy'
-        with self.assertRaisesRegex(RuntimeError,'reload'):
+        changed=first.config.model_dump(); changed['engine']={'mode':'legacy'}
+        with self.assertRaisesRegex(RuntimeError, 'reload'):
             await first.on_config_update('self',changed,'3')
         self.assertFalse(first.ready); self.assertFalse(first.delegate.runtime)
-        bypass=self.plugin(changed)
-        with self.assertRaisesRegex(ValueError,'offline engine transition'): await bypass.on_load()
+        with WriterLease(self.work/'writer.lock'): pass
+        second=self.plugin(changed); await second.on_load()
+        self.assertTrue(second.ready)
+        self.assertEqual(second.authority['engine'], 'life')
+        self.assertNotIn('engine', second.config.model_dump())
         self.assertFalse((self.work/'data/legacy/goals.db').exists())
+
+    async def test_life_config_change_requires_reload_and_reuses_authority(self):
+        first=self.plugin(); await first.on_load()
+        changed=first.config.model_dump(); changed['model']['task']='replyer'
+        with self.assertRaisesRegex(RuntimeError,'reload'):
+            await first.on_config_update('self',changed,'4')
+        self.assertFalse(first.ready)
+        second=self.plugin(changed); await second.on_load()
+        self.assertEqual(second.authority['engine'],'life')
+        self.assertEqual(second.authority['revision'],1)
+        self.assertEqual(second.authority['database'],'life/maivita.db')
+        self.assertTrue((await second.get_life_state())['ok'])
+
+    async def test_empty_writer_lock_inherits_persisted_authority(self):
+        first=self.plugin(); await first.on_load(); await first.on_unload()
+        changed=first.config.model_dump(); changed['instance']['writer_lock']=''
+        second=self.plugin(changed); await second.on_load()
+        self.assertEqual(second.authority['writer_lock'],str(self.work/'writer.lock'))
+        self.assertFalse((self.work/'data/writer.lock').exists())
 
     async def test_failed_authority_commit_self_cleans_and_retains_lease_recoverability(self):
         plugin=self.plugin()
@@ -165,13 +141,57 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError,'offline migration'): await plugin.on_load()
         self.assertEqual((self.work/'data/goals.db').read_bytes(),b'sentinel')
 
-    async def test_tampered_target_config_cannot_consume_transition(self):
-        first=self.plugin(); await first.on_load(); config=self.save(first,'life.toml'); await first.on_unload()
-        switch.prepare(config,self.work/'data','legacy',self.work/'target.toml')
-        changed=first.config.model_dump(); changed['engine']['mode']='legacy'; changed['model']['task']='changed'
-        second=self.plugin(changed)
-        with self.assertRaisesRegex(ValueError,'offline engine transition'): await second.on_load()
-        self.assertEqual(json.loads((self.work/'data/engine-authority.json').read_text())['revision'],1)
+    async def test_retired_or_unknown_authority_cannot_activate_or_modify_data(self):
+        first=self.plugin(); await first.on_load(); await first.on_unload()
+        path=self.work/'data/engine-authority.json'
+        db=self.work/'data/life/maivita.db'
+        before=db.read_bytes()
+        for engine in ('legacy','unknown'):
+            record={**first.authority,'engine':engine}
+            path.write_text(json.dumps(record))
+            # An obsolete ticket cannot reactivate the retired engine.
+            (self.work/'data/engine-transition.json').write_text(json.dumps({
+                'schema_version':1,'from_engine':engine,'from_revision':1,'to_engine':'life'}))
+            with self.subTest(engine=engine), self.assertRaisesRegex(ValueError,'unrecognized engine authority'):
+                await self.plugin().on_load()
+            self.assertEqual(json.loads(path.read_text()),record)
+            self.assertEqual(db.read_bytes(),before)
+        self.assertFalse((self.work/'data/legacy').exists())
+
+    async def test_life_restore_rehearsal_requires_stop_and_preserves_live_files(self):
+        from tools.rehearse_ready import rehearse_restore
+        from maibot_autonomous_planning_plugin.maivita.host.management_requests import Requests
+        first=self.plugin(); await first.on_load()
+        first.delegate.management=Requests(self.work/'data/life/management.sqlite3')
+        with self.assertRaisesRegex(RuntimeError,'another life writer'):
+            rehearse_restore(self.work/'data',self.work)
+        await first.on_unload()
+        files=[self.work/'data/engine-authority.json', self.work/'data/life/maivita.db',
+               self.work/'data/life/management.sqlite3']
+        before={path:path.read_bytes() for path in files}
+        report=rehearse_restore(self.work/'data',self.work)
+        self.assertEqual({row['database'] for row in report['rollback_snapshots']},
+                         {'maivita.db','management.sqlite3'})
+        self.assertEqual(report['authority_revision'],1)
+        self.assertEqual({path:path.read_bytes() for path in files},before)
+        self.assertEqual(list(self.work.glob('maivita-life-restore-*')),[])
+        self.assertTrue(report['restored_temporary_files_removed'])
+
+    async def test_life_restore_rehearsal_rejects_corrupt_copy_and_retired_authority(self):
+        from tools.rehearse_ready import rehearse_restore
+        first=self.plugin(); await first.on_load(); await first.on_unload()
+        def corrupt(source,target): Path(target).write_bytes(b'corrupt fixture')
+        with patch('tools.rehearse_ready.shutil.copyfile',side_effect=corrupt):
+            with self.assertRaisesRegex(ValueError,'checksum'):
+                rehearse_restore(self.work/'data',self.work)
+        self.assertEqual(list(self.work.glob('maivita-life-restore-*')),[])
+        with WriterLease(self.work/'writer.lock'): pass
+        path=self.work/'data/engine-authority.json'
+        path.write_text(json.dumps({**first.authority,'engine':'legacy'}))
+        before=path.read_bytes()
+        with self.assertRaisesRegex(ValueError,'life authority'):
+            rehearse_restore(self.work/'data',self.work)
+        self.assertEqual(path.read_bytes(),before)
 
     async def test_cancelled_durable_model_trigger_is_not_retried_on_restart(self):
         plugin=self.plugin(); await plugin.on_load(); db=plugin.delegate.runtime.database

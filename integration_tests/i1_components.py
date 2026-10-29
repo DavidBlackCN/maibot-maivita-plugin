@@ -24,17 +24,6 @@ async def run():
         scheduled=asyncio.create_task(system.schedule_tasks())
         await asyncio.sleep(.5)
         manager=get_plugin_runtime_manager()
-        if os.environ.get('MAIVITA_EXPECT_ENGINE')=='legacy':
-            supervisor=next(s for s in manager.supervisors if 'davidblackcn.maibot-maivita-plugin' in s._registered_plugins)
-            response=await supervisor.invoke_plugin('plugin.invoke_api','davidblackcn.maibot-maivita-plugin',
-                'get_engine_status',args={},timeout_ms=3000)
-            status=response.payload['result']
-            assert status['ready'] and status['engine']=='legacy',status
-            assert component_query_service.get_tool_executor('maivita_status') is None
-            denied=component_query_service.get_tool_executor('generate_schedule_v4')
-            assert (await denied({'owner':True}))['error']['code']=='PERMISSION_DENIED'
-            results['legacy_engine']={'passed':True,'status':status,'life_tool_absent':True,'mutations_denied':True}
-            return results
         tool=component_query_service.get_tool_executor('maivita_status')
         assert tool is not None,'new Tool not registered'
         result=await tool({'view':'state','owner':True,'private_details':True})

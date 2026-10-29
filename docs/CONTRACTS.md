@@ -10,7 +10,7 @@
 
 get_public_events@1 是无副作用的公开拉取接口，参数 after_version / after_index 为游标，limit 为 1..100。返回事件数组、扫描游标和 as_of；即使遇到过滤或过期事件也推进扫描游标。事件摘要由固定白名单产生，绝不透传内部 payload。消费者应将接收记录与游标放在自己的同一事务中。它不创建订阅、不确认 Vita 的内部 outbox、不授权事件参数中的生产者；协调层从固定全名 API 读取以绑定来源。
 
-get_public_route_scope@1 只检查给定 stream_id 是否由当前 life 引擎守卫覆盖，返回 character_id、guarded 和活动配置摘要；不是用户身份或发送许可。legacy/not-ready 均返回不可用。
+get_public_route_scope@1 只检查给定 stream_id 是否由当前 life 引擎守卫覆盖，返回 character_id、guarded 和活动配置摘要；不是用户身份或发送许可。未就绪时返回不可用。
 
 SocialEvent / SocialAck 通过 from_wire 的 JSON-aware 严格解析处理 ISO 时间，Python model_validate 的严格语义保持不变。SocialConsumer 校验 event_id/consumer_id，将 accepted/duplicate 转内部确认，expired 转过期，rejected 转失败终态。推送适配器仍是可测试端口，不开放任意远端注册。
 
@@ -28,7 +28,7 @@ SocialEvent / SocialAck 通过 from_wire 的 JSON-aware 严格解析处理 ISO �
 
 社交事件带 contract_version、event_id、character_id、event_type、state_version、event_index、occurred_at、recorded_at、expires_at、visibility、最小摘要。按角色 state_version/event_index 顺序，至少一次投递；消费者持久去重同 event_id，返回 accepted/duplicate/expired/rejected。重试沿用原 ID，未知结果不能生成新社交机会，过期不发送。生活事实不等待消费者成功；失败留待诊断。
 
-公开查询 get_life_state/get_plan/get_availability/get_diagnostics/get_current_activity 只返回 public_summary；旧完整当前活动 alias 读同一被选引擎。特权 request_replan/request_wakeup 与旧变更 Tool 在两个模式均明确拒绝。engine/contract 状态 API 不触发模型。legacy 模式保留新查询的静态绑定以满足原生 WebUI 校验，调用返回 ENGINE_UNAVAILABLE；只运行旧引擎，不伪造新生活状态。
+公开查询 get_life_state/get_plan/get_availability/get_diagnostics/get_current_activity 只返回 public_summary；旧完整当前活动 alias 读取同一 life 引擎。特权 request_replan/request_wakeup 与旧变更 Tool 均明确拒绝。engine/contract 状态 API 不触发模型。查询的静态绑定满足原生 WebUI 校验；get_engine_status 的 engine 固定为 life，ready 表示实际加载状态。
 
 当前没有绑定任何外部 API 路由、授权令牌或回调注册入口。联合阶段先协商版本、声明可信来源与最小能力，再实现单独适配器并复验；本项目不改 Host、Owner Auth、策略或社交插件来制造接口。错误包括 PERMISSION_DENIED、POLICY_UNAVAILABLE、NOT_READY、RELOAD_REQUIRED、STALE_STATE、IDEMPOTENCY_CONFLICT，默认不允许自动权限回退。
 

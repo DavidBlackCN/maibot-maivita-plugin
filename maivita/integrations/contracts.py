@@ -95,7 +95,7 @@ class SocialAck(Contract):
 def contract_descriptor():
     return {'contract_version': VERSION, 'status': 'frozen_for_joint_testing',
             **runtime_descriptor(),
-            'plugin_version': '0.5.4', 'features':['public_persona_v1','confirmed_life_management_v1','public_events_v1'],
+            'plugin_version': '0.6.0', 'features':['public_persona_v1','confirmed_life_management_v1','public_events_v1'],
             'local_command_adapter': {'host_patch_required':False,'official_host_support':True,
                 'identity_api':'get_vita_policy','commands':['wake','replan','sleep','activity','plan','goal','confirm','cancel','result'],
                 'requires':'own official Command envelope and read-only local policy rules',
