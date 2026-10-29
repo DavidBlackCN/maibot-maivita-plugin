@@ -41,7 +41,8 @@ class IntegrationConfig(DevelopmentConfig):
         if self.engine.mode == 'life':
             return DevelopmentConfig.model_validate({
                 'plugin': {'enabled': self.plugin.enabled, 'config_version': '2'},
-                'instance': self.instance.model_dump(), 'model': self.model.model_dump()})
+                'instance': self.instance.model_dump(), 'model': self.model.model_dump(),
+                'routine': self.routine.model_dump()})
         legacy = self.legacy.model_copy(deep=True)
         legacy.plugin.enabled = self.plugin.enabled
         legacy.storage.writer_lock = self.instance.writer_lock

@@ -19,7 +19,7 @@ from maibot_autonomous_planning_plugin.maivita.life.storage.safety import Writer
 def settings(work,**model):
     return {'plugin':{'enabled':True,'config_version':'2'},
         'instance':{'acknowledgement':'isolated-test-instance','writer_lock':str(work/'instance-writer.lock'),
-                    'allowed_streams':['test-stream']},'model':model}
+                    'allowed_streams':['test-stream']},'model':{'daily_planning_enabled':False,**model}}
 
 
 class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
@@ -86,7 +86,8 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['status'],'invalid')
         self.assertEqual(self.plugin.runtime.engine.state(),before)
         self.assertEqual(self.plugin.model_port.last['status'],'invalid_response')
-        self.assertEqual(len([p for m,p in self.calls if p['capability']=='llm.generate']),1)
+        self.assertEqual(len([p for m,p in self.calls if p['capability']=='llm.generate']),2)
+        self.assertTrue(result['degraded'])
         async def delayed(*args,**kwargs): await asyncio.sleep(2)
         self.plugin.model_port.settings.timeout_seconds=1
         with patch.object(self.ctx.llm,'generate',side_effect=delayed):
@@ -117,15 +118,15 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
         state=self.plugin.runtime.engine.state()
         self.plugin.runtime.engine.execute(Command(kind='start_sleep',idempotency_key='observed-sleep',
             expected_state_version=state.state_version,source='legacy_observed',payload={'duration_minutes':5}))
-        before=len(self.calls)
+        before=sum(p['capability']=='send.text' for _,p in self.calls)
         await self.plugin.command(message='/maivita status',stream_id='test-stream',owner=True)
-        self.assertEqual(len(self.calls),before)
+        self.assertEqual(sum(p['capability']=='send.text' for _,p in self.calls),before)
         hook=await self.plugin.silence_hook(message={'session_id':'test-stream','source_plugin_id':'trusted','owner':True})
         self.assertEqual(hook['action'],'abort')
         self.assertEqual((await self.plugin.silence_hook(message={'session_id':'other-stream'}))['action'],'continue')
 
     async def test_config_change_stops_writer_until_explicit_reload(self):
-        await self.plugin.on_load(); update=settings(self.work,model_name='new-model')
+        await self.plugin.on_load(); update=settings(self.work,mode='model',model='new-model')
         with self.assertRaisesRegex(RuntimeError,'reload'): await self.plugin.on_config_update('self',update,'2')
         self.assertFalse(self.plugin.ready); self.assertIsNone(self.plugin.deployment_lease)
         self.assertEqual((await self.plugin.get_life_state())['error']['code'],'RELOAD_REQUIRED')
@@ -133,7 +134,7 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_SDK_model_route_is_explicit_and_never_uses_reasoning_as_facts(self):
         await self.plugin.on_load(); await self.plugin.runtime.request_replan('route')
         args=[p['args'] for m,p in self.calls if p['capability']=='llm.generate'][0]
-        self.assertEqual(args['task_name'],'utils'); self.assertNotIn('model_name',args)
+        self.assertEqual(args['task_name'],'planner'); self.assertNotIn('model_name',args)
         prompt=json.loads(args['prompt']); self.assertIn('contract',prompt)
         for raw in ('{"kind":"winding_down","kind":"start_sleep","payload":{}}',
                     '{"kind":"winding_down","payload":{"reason":NaN}}','[]'):
@@ -180,3 +181,52 @@ class DevelopmentConfigTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'incomplete'):
                     build_default_zip(target,evidence)
                 self.assertFalse(target.exists())
+
+
+class ModelRoutingTests(unittest.IsolatedAsyncioTestCase):
+    asyncSetUp = DevelopmentTests.asyncSetUp
+    asyncTearDown = DevelopmentTests.asyncTearDown
+
+    async def test_custom_routes_and_full_timeout_wiring(self):
+        for mode, task, model, timeout in [('task','replyer','ignored',90),
+                                         ('model','planner','custom-model',300)]:
+            with self.subTest(mode=mode):
+                self.plugin.set_plugin_config(settings(self.work,mode=mode,task=task,
+                    model=model,timeout_seconds=timeout,max_tokens=16384))
+                await self.plugin.on_load()
+                runtime=self.plugin.runtime
+                self.assertEqual(runtime.config.model_timeout_seconds,timeout)
+                self.assertEqual(runtime.coordinator.timeout,timeout)
+                # A real SDK call verifies payload serialization, not just Python kwargs.
+                await self.plugin.model_port(runtime.engine.state(),('route-test',))
+                args=[p['args'] for m,p in self.calls if p['capability']=='llm.generate'][-1]
+                self.assertEqual(args['max_tokens'],16384)
+                self.assertEqual(args['rpc_timeout_ms'],timeout*1000)
+                self.assertEqual(args['task_name' if mode=='task' else 'model_name'],
+                                 task if mode=='task' else model)
+                self.assertNotIn('model_name' if mode=='task' else 'task_name',args)
+                await self.plugin.on_unload()
+
+    async def test_inner_timeout_records_failure_before_outer_cancellation(self):
+        self.plugin.set_plugin_config(settings(self.work,timeout_seconds=1))
+        await self.plugin.on_load()
+        async def delayed(*args,**kwargs):
+            await asyncio.sleep(2)
+        with patch.object(self.ctx.llm,'generate',side_effect=delayed):
+            result=await self.plugin.runtime.request_replan('nested-timeout')
+        self.assertEqual(result['status'],'uncertain')
+        self.assertEqual(self.plugin.model_port.last['status'],'unavailable_unknown_outcome')
+
+    async def test_outer_wait_has_buffer_at_maximum_configuration(self):
+        self.plugin.set_plugin_config(settings(self.work,timeout_seconds=300))
+        await self.plugin.on_load()
+        original=asyncio.wait_for
+        timeouts=[]
+        async def capture(awaitable, timeout):
+            timeouts.append(timeout)
+            return await original(awaitable,timeout)
+        with patch('asyncio.wait_for',side_effect=capture):
+            result=await self.plugin.runtime.request_replan('timeout-buffer')
+        self.assertEqual(result['status'],'applied')
+        self.assertIn(310,timeouts)
+        self.assertIn(300,timeouts)

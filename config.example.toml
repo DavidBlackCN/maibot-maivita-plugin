@@ -18,15 +18,27 @@ owner_auth_enabled = false
 privileged_writes_enabled = false
 
 [model]
-task_name = "utils"
-model_name = ""
-timeout_seconds = 25
-max_tokens = 2048
-daily_budget = 8
+# 模型路由模式：task = 跟随 MaiBot 任务类别（推荐，开箱即用）
+#               model = 指定 model_config.toml 中的具体模型
+mode = "task"
+# mode=task 时使用：planner（推荐）/ replyer / utils
+task = "planner"
+# mode=model 时填写 model_config.toml 里某个模型的 name
+model = ""
+timeout_seconds = 90
+max_tokens = 8192
+# 每日模型调用预算（每次调用尝试计一次，非法内容重试也计入）
+daily_budget = 16
 generate_on_start = false
-# One durable local-day decision trigger, sharing the existing budget.
-daily_planning_enabled = false
+daily_planning_enabled = true
+# HH:MM，角色时区；错过后当天补触发一次
+daily_planning_time = "08:00"
 life_context = ""
+
+[routine]
+# 作息偏好，仅作为模型参考，不强制
+preferred_sleep_time = "01:00"
+preferred_wake_time = "08:00"
 
 # For the legacy profile, fill [legacy] using the former version-1 example.
 # Lifecycle root enable/lock settings override the nested legacy values.

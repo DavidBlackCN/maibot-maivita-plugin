@@ -1,6 +1,6 @@
 # 超级麦麦插件成品候选使用说明
 
-本轮组合：MaiVita 0.5.3、MaiIdentity 3.2.2、MaiHush 0.2.2、现有 MaiCoordinate 0.3.1。使用官方 Host，不需要私有补丁，也没有新增插件。支持的精确配对为 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0；中间版本、混搭和未来版本不自动放行。
+本轮组合：MaiVita 0.5.4、MaiIdentity 3.2.2、MaiHush 0.2.2、现有 MaiCoordinate 0.3.1。使用官方 Host，不需要私有补丁，也没有新增插件。支持的精确配对为 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0；中间版本、混搭和未来版本不自动放行。
 
 ## 安装与最少设置
 
@@ -15,7 +15,13 @@ vita_admin_accounts = ["你的QQ号"]
 
 修改后重载 Identity。默认空名单不给任何人管理权；群主称号、关系、昵称、模型生成的内容都不替代此配置。Hush 继续使用自身 routes 的 owner_accounts/admin_accounts，不从 Identity 推导静音管理员。
 
-生活自动规划需要把 Vita 的 `[model] daily_planning_enabled = true`。主动表达需要把 Coordinator 的 `mode = "controlled"`，其 `model_task` 指向 Host 已配置的任务（默认 utils）。两项默认不开启模型费用；所有密钥只放在 Host 模型配置中。先确认已有任务可用，再重载相应插件。
+生活自动规划默认已启用（Vita 的 `[model] daily_planning_enabled = true`），默认以 `mode = "task"`、`task = "planner"` 使用 MaiBot 已配置的 planner 任务，无需单独配置模型。需要指定模型时，将 `mode = "model"` 并把 `model` 填为 `model_config.toml` 中具体模型的 name 或 model_identifier。`daily_budget` 默认 16，限制滚动 24 小时内的模型调用尝试次数；一次规划或一次即时决策算一次，失败或结果不确定也消耗预算。主动表达需要把 Coordinator 的 `mode = "controlled"`，其 `model_task` 指向 Host 已配置的任务（默认 utils）。Vita 默认规划会产生模型调用费用，Coordinator 主动表达默认关闭；所有密钥只放在 Host 模型配置中。先确认已有任务可用，再重载相应插件。
+
+每日规划按角色时区在 `[model] daily_planning_time = "08:00"` 到时后触发；当天晚启动会补触发一次，重启不会重复已调用的规划。每日规划只能生成日程补丁或更新方向，不能直接开始活动或入睡。非法模型内容最多重试一次，每次尝试单独计入预算；超时、网络失败和取消不自动重试。失败尝试保留 `invalid`/`uncertain` 状态，最终降级以 `decision_runs.diagnostic` 的 `degraded:` 前缀持久化，后续成功决策恢复正常展示。
+
+`[routine] preferred_sleep_time = "01:00"`、`preferred_wake_time = "08:00"` 是模型参考偏好，均要求 HH:MM 格式；偏离时由模型在 `payload.reason` 说明，不触发硬性入睡或拦截。
+
+仅显式 `/maivita status` 展示起床时间、活动时长、今日计划统计、今日调用数、上次规划尝试时间、模型降级和不回复原因。今日统计按角色时区自然日；预算仍按滚动 24 小时限制。计划统计排除取消、替换及当前会话不可见条目；有明确时间的条目按与今天的重叠计算，无排时条目按所属计划日期计算。Hush 查询失败不阻止 Vita 状态渲染。当前 Hush v1 不返回硬静音剩余时间，显示“剩余时间未知”；若接口增加 `hard_remaining_seconds`，则显示分秒，绝不把 `valid_until` 当成解禁时间。状态命令沿用正常发送权限，睡眠或硬静音期间不提供发送豁免。这些新增详情不进入自动消息、Hook、Tool 或日常聊天上下文。
 
 ## 生活管理
 

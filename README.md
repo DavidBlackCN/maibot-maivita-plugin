@@ -1,4 +1,4 @@
-# MaiVita 0.5.3
+# MaiVita 0.5.4
 
 MaiBot 的持久生活引擎：活动、计划、目标、睡眠、历史与公开上下文。本版支持官方 Host 命令管理与有限中文管理，使用现有 MaiIdentity 权限规则；无需私有 Host 补丁。
 

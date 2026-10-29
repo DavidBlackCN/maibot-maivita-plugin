@@ -60,8 +60,9 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
                     'character_timezone':cfg.instance.timezone,
                     'local_time':db.clock.to_local(db.clock.now_utc(),cfg.instance.timezone).isoformat(),
                     'plan':self.runtime.queries.get_plan(),'goals':self.runtime.queries.get_goals()}
-            self.model_port=SDKModelPort(self.ctx,cfg.model,context=context)
+            self.model_port=SDKModelPort(self.ctx,cfg.model,context=context,routine=cfg.routine)
             self.runtime=DevelopmentRuntime(db,self.model_port,config=LifeRuntimeConfig(timezone=cfg.instance.timezone,
+                model_timeout_seconds=cfg.model.timeout_seconds,daily_planning_time=cfg.model.daily_planning_time,
                 daily_budget=cfg.model.daily_budget,daily_planning_enabled=cfg.model.daily_planning_enabled),lock_path=data/'runtime-writer.lock')
             self.runtime.start()
             self.api=LifeAPI(self.runtime)  # no trusted end-user contract: privileged writes denied
@@ -180,6 +181,10 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             rendered=HELP;result={'ok':True,'data':{}}
         elif action in ACTIONS and raw.strip().startswith('/maivita '):
             result=await execute(self,{**kwargs,'text':text,'stream_id':stream_id,'message':message})
+        elif action=='status' and raw.strip()=='/maivita status':
+            from .command_status import status_text
+            rendered=await status_text(self,stream_id)
+            result={'ok':True,'data':{}}
         elif method:
             result=await self.read(method)
         else:

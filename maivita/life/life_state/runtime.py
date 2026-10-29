@@ -8,7 +8,7 @@ from datetime import timedelta
 from uuid import uuid4
 import asyncio
 
-from ..coordinator.decisions import DecisionCoordinator
+from ..coordinator.decisions import DecisionCoordinator, call_model
 from ..domain.commands import Command
 from ..domain.models import require
 from ..events.dispatcher import EventDispatcher
@@ -23,19 +23,26 @@ class LifeRuntimeConfig:
     planning_mode: str = 'autonomous'
     sleep_mode: str = 'autonomous'
     timezone: str = 'Asia/Shanghai'
+    model_timeout_seconds: int = 90
     daily_budget: int = 24
     fallback_check_minutes: int = 45
     habits_enabled: bool = False
     cleanup_enabled: bool = False
     daily_planning_enabled: bool = False
+    daily_planning_time: str = '08:00'
 
     def __post_init__(self):
         from zoneinfo import ZoneInfo
         ZoneInfo(self.timezone)
+        import re
+        require(isinstance(self.daily_planning_time,str) and
+                re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',self.daily_planning_time) is not None,
+                'invalid daily planning time')
         require(self.planning_mode in ('legacy','autonomous'), 'invalid planning mode')
         require(self.sleep_mode in ('legacy_fixed','autonomous','disabled'), 'invalid sleep mode')
         require(self.sleep_mode!='autonomous' or self.planning_mode=='autonomous', 'autonomous sleep needs autonomous planning')
         require(type(self.fallback_check_minutes) is int and 30<=self.fallback_check_minutes<=60,'invalid fallback interval')
+        require(type(self.model_timeout_seconds) is int and 1<=self.model_timeout_seconds<=300,'invalid model timeout')
         require(type(self.daily_budget) is int and 1<=self.daily_budget<=1000,'invalid decision budget')
 
     @classmethod
@@ -52,12 +59,13 @@ class DevelopmentRuntime:
         self.database,self.config=database,config or LifeRuntimeConfig()
         self.lease=WriterLease(lock_path)
         self.engine=LifeStateEngine(database)
-        async def guarded_model(state,triggers):
-            proposal=await model(state,triggers)
+        async def guarded_model(state,triggers,*,task_kind='present'):
+            proposal=await call_model(model,state,triggers,task_kind)
             if self.config.sleep_mode=='disabled':
                 require(proposal.get('kind') not in ('start_sleep','extend_sleep'), 'sleep disabled')
             return proposal
-        self.coordinator=DecisionCoordinator(self.engine,guarded_model,daily_budget=self.config.daily_budget)
+        self.coordinator=DecisionCoordinator(self.engine,guarded_model,daily_budget=self.config.daily_budget,
+            timeout_seconds=self.config.model_timeout_seconds)
         self.queries=LifeQueries(self.engine)
         self.recovery=RecoveryService(self.engine)
         self.dispatcher=EventDispatcher(database)
@@ -100,9 +108,10 @@ class DevelopmentRuntime:
         if self.config.daily_planning_enabled and self.config.planning_mode=='autonomous':
             # One durable local-day trigger; coordinator owns budget and claims.
             now=self.engine.clock.now_utc()
-            day=self.engine.clock.to_local(now,self.config.timezone).date().isoformat()
+            local=self.engine.clock.to_local(now,self.config.timezone)
+            day=local.date().isoformat()
             key='daily-planning:'+day
-            if getattr(self,'last_daily_trigger',None)!=key:
+            if local.strftime('%H:%M')>=self.config.daily_planning_time and getattr(self,'last_daily_trigger',None)!=key:
                 with self.database.unit_of_work() as u:
                     u.connection.execute('INSERT OR IGNORE INTO decision_triggers VALUES(?,?,?,?,0)',
                         (key,'default','enqueue_replan',int(now.timestamp()*1000)))
@@ -177,6 +186,7 @@ class DevelopmentRuntime:
         self.engine.execute(Command(idempotency_key=uuid4().hex,kind='configure',payload={},source='authorized',expected_state_version=state.state_version))
         self.config=config
         self.coordinator.daily_budget=config.daily_budget
+        self.coordinator.timeout=config.model_timeout_seconds
 
     async def close(self):
         try:

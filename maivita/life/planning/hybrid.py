@@ -45,7 +45,8 @@ def candidate(candidate):
         require(isinstance(p.get('upserts',[]),list) and isinstance(p.get('remove_ids',[]),list), 'invalid patch arrays')
         for item in p.get('upserts',[]): parse_item(item,character_id='validation',plan_id='validation',source='model')
     elif kind == 'start_activity':
-        require(set(p) <= {'name','category','description','visibility','source_schedule_item_id','resumes_activity_id','check_after_minutes'} and p.get('name'), 'invalid activity schema')
+        require(set(p) <= {'name','category','description','visibility','source_schedule_item_id','resumes_activity_id','check_after_minutes','reason'} and p.get('name'), 'invalid activity schema')
+        if 'reason' in p: require(isinstance(p['reason'],str) and p['reason'].strip(), 'invalid activity reason')
         require(type(p.get('check_after_minutes')) in (int,float) and 0<p['check_after_minutes']<=1440, 'activity needs explicit next checkpoint')
     elif kind == 'update_direction':
         require(set(p) == {'goals','reason'} and p.get('reason') and isinstance(p['goals'],list), 'invalid direction schema')
@@ -59,6 +60,21 @@ def candidate(candidate):
     else:
         require(False, 'model command not allowed')
     return candidate
+
+
+def decision_task_kind(triggers):
+    for trigger in triggers:
+        ids=trigger[6:].split(',') if trigger.startswith('batch:') else (trigger,)
+        if any(key.startswith('daily-planning:') for key in ids): return 'planning'
+    return 'present'
+
+
+def validate_task_candidate(proposal, task_kind):
+    proposal=candidate(proposal)
+    if task_kind=='planning':
+        require(proposal['kind'] in ('apply_plan_patch','update_direction'),
+                'daily planning may only change plans or direction')
+    return proposal
 
 
 def update_direction(u,state,command,now):

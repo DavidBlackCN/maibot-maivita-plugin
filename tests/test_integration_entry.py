@@ -168,7 +168,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
     async def test_tampered_target_config_cannot_consume_transition(self):
         first=self.plugin(); await first.on_load(); config=self.save(first,'life.toml'); await first.on_unload()
         switch.prepare(config,self.work/'data','legacy',self.work/'target.toml')
-        changed=first.config.model_dump(); changed['engine']['mode']='legacy'; changed['model']['task_name']='changed'
+        changed=first.config.model_dump(); changed['engine']['mode']='legacy'; changed['model']['task']='changed'
         second=self.plugin(changed)
         with self.assertRaisesRegex(ValueError,'offline engine transition'): await second.on_load()
         self.assertEqual(json.loads((self.work/'data/engine-authority.json').read_text())['revision'],1)

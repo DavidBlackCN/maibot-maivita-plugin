@@ -1,6 +1,7 @@
 """One in-flight model call per character; persisted basis and budget audit."""
 import asyncio
 import json
+import inspect
 from datetime import timedelta
 from uuid import uuid4
 
@@ -8,7 +9,16 @@ from ..domain.clock import to_epoch_ms
 from ..domain.commands import Command
 from ..domain.models import DomainError, json_text, require
 from ..life_state.engine import digest
-from ..planning.hybrid import candidate
+from ..planning.hybrid import decision_task_kind, validate_task_candidate
+
+
+async def call_model(model, state, triggers, task_kind):
+    # Older internal injected ports take two arguments. Inspect before calling:
+    # a TypeError from inside an RPC must never cause an accidental extra call.
+    parameters=inspect.signature(model).parameters.values()
+    supports_task=any(p.name=='task_kind' or p.kind==inspect.Parameter.VAR_KEYWORD for p in parameters)
+    if supports_task: return await model(state,triggers,task_kind=task_kind)
+    return await model(state,triggers)
 
 
 class DecisionCoordinator:
@@ -79,32 +89,60 @@ class DecisionCoordinator:
                                      [(key,char) for key in sorted(durable)])
             u.commit()
         self.last_monotonic[char] = mono
-        try:
-            proposal = await asyncio.wait_for(self.model(state,tuple(triggers)),self.timeout)
-            proposal = candidate(proposal)
-        except asyncio.CancelledError:
-            self._finish(decision_id,'uncertain','cancelled_unknown_outcome')
-            raise
-        except (TimeoutError,ConnectionError):
-            self._finish(decision_id,'uncertain','rpc_outcome_unknown_no_retry')
-            return {'status':'uncertain','decision_id':decision_id}
-        except Exception as exc:
-            self._finish(decision_id,'invalid',type(exc).__name__)
-            return {'status':'invalid','decision_id':decision_id}
-        current = self.engine.state(char)
-        if (current.state_version,current.plan_version,current.config_revision) != (state.state_version,state.plan_version,state.config_revision):
-            self._finish(decision_id,'stale','basis_changed_while_awaiting_model')
-            return {'status':'stale','decision_id':decision_id}
-        self._finish(decision_id,'validated',None,proposal)
-        try:
-            result = self.engine.execute(Command(idempotency_key='decision:'+decision_id,kind=proposal['kind'],payload=proposal['payload'],
-                character_id=char,source='model',decision_id=decision_id,expected_state_version=state.state_version,
-                expected_plan_version=state.plan_version,expected_config_revision=state.config_revision,
-                expires_at=now+timedelta(minutes=5)))
-        except DomainError as exc:
-            self._finish(decision_id,'stale' if 'stale' in str(exc) else 'invalid',type(exc).__name__)
-            return {'status':'rejected','decision_id':decision_id}
-        return {'status':'applied','decision_id':decision_id,**result}
+        task_kind=decision_task_kind(triggers)
+        for attempt in range(2):
+            if attempt:
+                current=self.engine.state(char)
+                if self._basis(current)!=self._basis(state):
+                    return {'status':'stale','decision_id':decision_id}
+                now=self.engine.clock.now_utc()
+                with self.engine.database.unit_of_work() as u:
+                    used=u.connection.execute('SELECT count(*) FROM decision_runs WHERE character_id=? AND started_at_ms>?',
+                        (char,to_epoch_ms(now-timedelta(days=1)))).fetchone()[0]
+                    if used>=self.daily_budget:
+                        u.connection.execute("UPDATE decision_runs SET diagnostic='degraded:invalid_retry_budget_exhausted' WHERE decision_id=?",(decision_id,))
+                        u.commit()
+                        return {'status':'invalid','decision_id':decision_id,'degraded':True}
+                    decision_id=uuid4().hex
+                    u.connection.execute('INSERT INTO decision_runs (decision_id,character_id,basis_state_version,basis_plan_version,basis_config_revision,started_at_ms,trigger_ids_json,status) VALUES (?,?,?,?,?,?,?,?)',
+                        (decision_id,char,state.state_version,state.plan_version,state.config_revision,to_epoch_ms(now),json_text(triggers),'running'))
+                    u.commit()
+                self.last_monotonic[char]=self.engine.clock.monotonic()
+            try:
+                # Give the model port time to record its own timeout before cancellation.
+                proposal=await asyncio.wait_for(call_model(self.model,state,tuple(triggers),task_kind),self.timeout+10)
+                proposal=validate_task_candidate(proposal,task_kind)
+            except asyncio.CancelledError:
+                self._finish(decision_id,'uncertain','degraded:cancelled_unknown_outcome')
+                raise
+            except (TimeoutError,ConnectionError,OSError):
+                self._finish(decision_id,'uncertain','degraded:rpc_outcome_unknown_no_retry')
+                return {'status':'uncertain','decision_id':decision_id,'degraded':True}
+            except Exception as exc:
+                self._finish(decision_id,'invalid',('degraded:' if attempt else '')+type(exc).__name__)
+                if not attempt: continue
+                return {'status':'invalid','decision_id':decision_id,'degraded':True}
+            current=self.engine.state(char)
+            if self._basis(current)!=self._basis(state):
+                self._finish(decision_id,'stale','basis_changed_while_awaiting_model')
+                return {'status':'stale','decision_id':decision_id}
+            self._finish(decision_id,'validated',None,proposal)
+            try:
+                result=self.engine.execute(Command(idempotency_key='decision:'+decision_id,kind=proposal['kind'],payload=proposal['payload'],
+                    character_id=char,source='model',decision_id=decision_id,expected_state_version=state.state_version,
+                    expected_plan_version=state.plan_version,expected_config_revision=state.config_revision,
+                    expires_at=now+timedelta(minutes=5)))
+            except DomainError as exc:
+                stale='stale' in str(exc)
+                self._finish(decision_id,'stale' if stale else 'invalid',
+                    ('degraded:' if attempt and not stale else '')+type(exc).__name__)
+                if not stale and not attempt: continue
+                return {'status':'rejected','decision_id':decision_id,'degraded':not stale}
+            return {'status':'applied','decision_id':decision_id,**result}
+
+    @staticmethod
+    def _basis(state):
+        return state.state_version,state.plan_version,state.config_revision
 
     def _finish(self, decision_id, status, diagnostic, proposal=None):
         with self.engine.database.unit_of_work() as u:

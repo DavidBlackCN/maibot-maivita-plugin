@@ -15,7 +15,8 @@ class DailyTests(unittest.IsolatedAsyncioTestCase):
             db=LifeDatabase.create(root/'life.db',clock=clock); calls=[]
             async def model(state,triggers):
                 calls.append(triggers)
-                return {'kind':'winding_down','payload':{'reason':'synthetic daily decision'}}
+                return {'kind':'apply_plan_patch','payload':{'local_date':clock.to_local(clock.now_utc(),'Asia/Shanghai').date().isoformat(),
+                    'upserts':[],'reason':'synthetic daily decision'}}
             cfg=LifeRuntimeConfig(daily_planning_enabled=True)
             runtime=DevelopmentRuntime(db,model,config=cfg,lock_path=root/'lock').start()
             try:
