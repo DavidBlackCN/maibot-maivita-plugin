@@ -7,6 +7,7 @@ from collections import Counter
 from ..life.domain.clock import from_epoch_ms, local_day_bounds, to_epoch_ms, to_local
 from ..life.life_state.projections import QueryScope, visible
 from ..life.planning.hybrid import decision_task_kind
+from ..life.planning.availability import LABELS, derive_availability
 from .presentation import clean
 
 HUSH_API='davidblackcn.maibot-maihush-plugin.get_public_constraints'
@@ -22,6 +23,8 @@ def snapshot(runtime, timezone, stream_id):
     with runtime.database.read_view() as u:
         state=u.states.get('default')
         activity=u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
+        availability=derive_availability(state,activity,runtime.config.availability,
+            activity_visible=activity is not None and visible(activity,scope))
         if activity is not None and not visible(activity,scope): activity=None
         checkpoint=u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=?',
             (activity.activity_id,)).fetchone() if activity else None
@@ -41,6 +44,8 @@ def snapshot(runtime, timezone, stream_id):
     latest=runs[0] if runs else None
     degraded=bool(latest and (latest['diagnostic'] or '').startswith('degraded:'))
     return {'phase':state.sleep_phase,
+            'availability':availability.state,'availability_reason':availability.reason,
+            'availability_enabled':runtime.config.availability.enabled,
             'wake':to_local(state.last_wake_at,timezone).strftime('%m-%d %H:%M') if state.last_wake_at else '未知',
             'activity':clean(activity.name) if activity else '暂无',
             'minutes':max(0,int((now-activity.started_at).total_seconds()//60)) if activity else None,
@@ -79,13 +84,21 @@ def render_status(data, hush=None):
     counts=data['counts']
     reasons=[]
     if data['phase'] in ('sleeping','temporarily_awake'): reasons.append('睡眠静默（MaiVita）')
+    elif data.get('availability_enabled') and data.get('availability')=='busy':
+        reasons.append('忙碌静默（MaiVita：'+data['availability_reason']+'）')
     if hush: reasons.append(hush)
     model=f'模型调用：{data["used"]}/{data["budget"]} 次 | 上次规划：{data["planning"]}'
     if data['degraded']: model+=' | 模型状态：degraded（降级）'
-    return '\n'.join([
+    lines=[
         f'MaiVita：{PHASES.get(data["phase"],"状态未知")}（{data["wake"]}）| 当前活动：{activity}',
         f'今日计划：{sum(counts.values())} 项（{counts["done"]} 完成 / {counts["started"]} 进行中 / {counts["planned"]} 待开始）',
-        model,'不回复原因：'+('、'.join(reasons) or '无')])
+        model,'不回复原因：'+('、'.join(reasons) or '无')]
+    if 'availability' in data:
+        state=data['availability']
+        behavior='忙闲守卫已开启' if data['availability_enabled'] else '忙闲守卫已关闭'
+        if state=='slow': behavior+='；半忙等同空闲，不延迟回复'
+        lines.insert(1,f'状态：{state}（{LABELS[state]}）| 原因：{data["availability_reason"]} | {behavior}')
+    return '\n'.join(lines)
 
 
 async def status_text(plugin, stream_id):

@@ -75,3 +75,17 @@ segment_min_minutes = 15
 segment_max_minutes = 180
 # 睡眠单次会话硬上限，含续做；不小于普通最长段，最多 1080 分钟。
 segment_sleep_max_minutes = 720
+
+# 忙闲三态驱动回复（方案 B）。free 正常；slow 等同 free，仅状态显示；busy 拦截。
+[availability]
+# 实验性功能，默认关闭；状态仍可查看，原有睡眠静默始终独立生效。
+enabled = false
+# 半忙活动类别；其他活动 energy_rate <= -0.05 时也显示半忙，不会单独触发 busy。
+slow_categories = ["study", "work", "travel", "creative"]
+# 活跃睡眠会话（含临时醒来）推导为 busy；关闭此项不会解除原有睡眠守卫。
+busy_when_sleeping = true
+# 身体极值（包含边界）；整数 0–100，未知身体值不会被当作极值。
+busy_fatigue_threshold = 90
+busy_energy_threshold = 10
+# 本阶段不实现恢复补发，仅支持 false；不缓存、不重发被拦截的消息。
+followup_after_busy = false

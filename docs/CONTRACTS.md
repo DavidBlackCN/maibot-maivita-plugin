@@ -26,6 +26,8 @@ SocialEvent / SocialAck 通过 from_wire 的 JSON-aware 严格解析处理 ISO �
 
 公开查询 get_life_state/get_plan/get_availability/get_diagnostics/get_current_activity 只返回 public_summary；旧完整当前活动 alias 读取同一 life 引擎。特权 request_replan/request_wakeup 与旧变更 Tool 均明确拒绝。engine/contract 状态 API 不触发模型。查询的静态绑定满足原生 WebUI 校验；get_engine_status 的 engine 固定为 life，ready 表示实际加载状态。
 
+get_availability@1 保留原有字段，新增 `state`（free/slow/busy）、`reason`（显示原因）、`enforcement_enabled`（忙闲守卫开关）。私密活动只提供通用原因，不暴露活动名或类别。睡眠会话优先，其次身体极值，再按类别及能耗率推导；推导不受开关影响。启用守卫后 busy 使 available/can_reply_recommendation/can_proactively_contact_recommendation 为 false；slow 等同 free。关闭守卫保留原有睡眠可用性判断。以上均为 Vita 的状态建议，不是发送许可，也不替代 MaiHush；状态查询不写数据库、不唤醒、不补发消息。
+
 官方有限管理命令读取 MaiIdentity 的 get_vita_policy@1，状态展示读取 MaiHush 的 get_public_constraints@1；这些查询不依赖 MaiCoordinate。通用特权传输不绑定授权令牌或回调注册入口，不通过公开查询获得执行权限。错误包括 PERMISSION_DENIED、POLICY_UNAVAILABLE、NOT_READY、RELOAD_REQUIRED、STALE_STATE、IDEMPOTENCY_CONFLICT，默认不允许自动权限回退。
 
 

@@ -2,7 +2,7 @@
 
 为 MaiBot 提供持久的生活状态、活动、计划、目标与睡眠，让日常回复感知角色正在做什么。
 
-- 当前版本：`0.8.0`
+- 当前版本：`0.8.1`
 - MaiBot 版本范围：`1.3.12–1.3.15`
 - Plugin SDK 版本范围：`2.15.0–2.16.0`
 - 项目地址：[MaiVita](https://github.com/DavidBlackCN/maibot-maivita-plugin)
@@ -24,6 +24,10 @@
 ### 睡眠与静音
 
 睡眠时普通出站消息会被守卫拦截，包括命令回执。MaiHush 的硬静音独立生效：唤醒不会解除硬静音，解除硬静音也不会唤醒。作息配置是模型偏好，不是强制睡眠时刻。
+
+忙闲三态功能默认关闭，可通过 `[availability] enabled = true` 开启。`/maivita status` 显示三态、原因及开关状态：学习、工作、出行、创作为 slow；其他活动能耗率 `energy_rate <= -0.05` 也为 slow；其余为 free。slow 与 free 均正常回复。活跃睡眠会话或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 busy，启用后出站守卫返回 abort。类别与身体阈值可配置。
+
+本阶段采用方案 B：不延迟、不缓存、不补发消息，`followup_after_busy` 仅支持 `false`。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
 
 ### 可选主动表达
 
@@ -66,7 +70,7 @@ vita_admin_accounts = ["你的真实QQ号"]
 
 ### 从旧版本更新
 
-停机备份代码、`config.toml` 和完整插件数据目录，再替换代码。保留现有数据与写锁设置；配置版本为 `"3"`，仅使用 `plugin`、`instance`、`model`、`routine` 四段。旧 `owner_auth_enabled` / `privileged_writes_enabled` 无论真假均被忽略，不产生权限；其他未知字段仍会报错。
+停机备份代码、`config.toml` 和完整插件数据目录，再替换代码。保留现有数据与写锁设置；配置版本为 `"3"`，使用 `plugin`、`instance`、`model`、`routine`、`scheduler`、`availability` 六段。旧 `owner_auth_enabled` / `privileged_writes_enabled` 无论真假均被忽略，不产生权限；其他未知字段仍会报错。
 
 不自动导入旧规划库或降级数据库。数据中的非 life 权威记录、未知 schema 和损坏库会阻止启动。备份应包含 `life/maivita.db`、`life/management.sqlite3` 与 `engine-authority.json`；恢复须使用匹配的代码、配置和完整数据，不能覆盖正在运行的数据库。详见[回滚指南](docs/ROLLBACK.md)。
 

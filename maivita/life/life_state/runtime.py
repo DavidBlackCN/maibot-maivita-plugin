@@ -12,6 +12,7 @@ from ..coordinator.decisions import DecisionCoordinator, call_model
 from ..domain.commands import Command
 from ..domain.segment import SchedulerConfig
 from ..planning.segments import SegmentService
+from ..planning.availability import AvailabilityConfig
 from ..domain.models import require
 from ..events.dispatcher import EventDispatcher
 from ..storage.safety import WriterLease
@@ -33,6 +34,7 @@ class LifeRuntimeConfig:
     daily_planning_enabled: bool = False
     daily_planning_time: str = '08:00'
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
+    availability: AvailabilityConfig = field(default_factory=AvailabilityConfig)
 
     def __post_init__(self):
         from zoneinfo import ZoneInfo
@@ -48,6 +50,7 @@ class LifeRuntimeConfig:
         require(type(self.model_timeout_seconds) is int and 1<=self.model_timeout_seconds<=300,'invalid model timeout')
         require(type(self.daily_budget) is int and 1<=self.daily_budget<=1000,'invalid decision budget')
         require(isinstance(self.scheduler, SchedulerConfig), 'invalid scheduler config')
+        require(isinstance(self.availability, AvailabilityConfig), 'invalid availability config')
         require(not self.scheduler.enabled or self.planning_mode == 'autonomous', 'rolling segments need autonomous planning')
 
     @classmethod
@@ -76,7 +79,7 @@ class DevelopmentRuntime:
         self.coordinator=DecisionCoordinator(self.engine,guarded_model,daily_budget=self.decision_budget,
             timeout_seconds=self.config.model_timeout_seconds,
             budget_timezone=self.config.timezone if self.config.scheduler.enabled else None)
-        self.queries=LifeQueries(self.engine)
+        self.queries=LifeQueries(self.engine, availability=self.config.availability)
         self.recovery=RecoveryService(self.engine)
         self.recovery.rolling_segments = self.config.scheduler.enabled
         self.segments=SegmentService(self, self.config.scheduler)
@@ -218,6 +221,7 @@ class DevelopmentRuntime:
         state=self.engine.state()
         self.engine.execute(Command(idempotency_key=uuid4().hex,kind='configure',payload={},source='authorized',expected_state_version=state.state_version))
         self.config=config
+        self.queries.availability=config.availability
         self.coordinator.daily_budget=self.decision_budget
         self.coordinator.budget_timezone=config.timezone if config.scheduler.enabled else None
         self.engine.scheduler=config.scheduler

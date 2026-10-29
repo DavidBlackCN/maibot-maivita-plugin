@@ -65,7 +65,8 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             self.runtime=DevelopmentRuntime(db,self.model_port,config=LifeRuntimeConfig(timezone=cfg.instance.timezone,
                 model_timeout_seconds=cfg.model.timeout_seconds,daily_planning_time=cfg.model.daily_planning_time,
                 daily_budget=cfg.model.daily_budget,daily_planning_enabled=cfg.model.daily_planning_enabled,
-                scheduler=cfg.scheduler.runtime_config()),lock_path=data/'runtime-writer.lock')
+                scheduler=cfg.scheduler.runtime_config(),availability=cfg.availability.runtime_config()),
+                lock_path=data/'runtime-writer.lock')
             self.runtime.start()
             self.api=LifeAPI(self.runtime)  # no trusted end-user contract: privileged writes denied
             self.worker=asyncio.create_task(self.runtime.run(),name='maivita-i1-worker')
@@ -229,9 +230,17 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
                 (not stream or stream_allowed(stream,self.guarded_streams)) else {'action':'continue'})
         # Host message serialization carries session_id. Unknown identity while
         # asleep cannot establish a trusted exception.
-        phase=self.runtime.engine.state().sleep_phase
+        state=self.runtime.engine.state()
+        phase=state.sleep_phase
         if phase in ('sleeping','temporarily_awake') and (not stream or stream_allowed(stream,self.active_config.instance.allowed_streams)):
             return {'action':'abort','reason':'maivita_sleeping_no_receipt_exception'}
+        config=self.active_config.availability
+        if config.enabled and (not stream or stream_allowed(stream,self.active_config.instance.allowed_streams)):
+            from ..life.planning.availability import derive_availability
+            # Busy depends only on sleep/body. Reuse the existing state read;
+            # no activity query, host RPC, timer or send in this 1000ms hook.
+            if derive_availability(state,None,config).state=='busy':
+                return {'action':'abort','reason':'maivita_busy'}
         return {'action':'continue'}
 
 

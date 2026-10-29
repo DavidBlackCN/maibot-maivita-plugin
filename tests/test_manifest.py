@@ -17,7 +17,7 @@ class ManifestTests(unittest.TestCase):
         self.assertNotIn("frequency.get_current_talk_value", capabilities)
         self.assertEqual(capabilities, {'api.call', 'send.text', 'config.get', 'llm.generate',
                                         'chat.get_all_streams', 'component.list_loaded_plugins'})
-        self.assertEqual(manifest["version"], "0.8.0")
+        self.assertEqual(manifest["version"], "0.8.1")
 
 
 if __name__ == "__main__":

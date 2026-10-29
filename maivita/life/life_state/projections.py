@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 
 from ..domain.clock import iso_instant,to_epoch_ms
+from ..planning.availability import AvailabilityConfig, derive_availability
 
 
 @dataclass(frozen=True)
@@ -20,8 +21,9 @@ def visible(record, scope):
 
 
 class LifeQueries:
-    def __init__(self, engine):
+    def __init__(self, engine, *, availability=None):
         self.engine = engine
+        self.availability = availability if availability is not None else AvailabilityConfig()
 
     def get_life_state(self, scope=QueryScope(), character_id='default'):
         with self.engine.database.read_view() as u:
@@ -65,13 +67,25 @@ class LifeQueries:
                 for g in u.goals.for_character(character_id) if visible(g,scope)]
 
     def get_availability(self, scope=QueryScope(), character_id='default'):
-        state = self.get_life_state(scope,character_id)
-        return {'state_version':state['state_version'], 'sleep_phase':state['sleep_phase'],
-                'available':state['sleep_phase'] in ('awake','winding_down'),
-                'can_reply_recommendation':state['sleep_phase'] in ('awake','winding_down'),
-                'can_proactively_contact_recommendation':state['sleep_phase'] in ('awake','winding_down'),
-                'interruptibility':'requires_policy' if state['sleep_phase']=='sleeping' else 'policy_dependent',
-                'valid_until':state['next_deadline_at']}
+        from ..domain.clock import from_epoch_ms
+        with self.engine.database.read_view() as u:
+            state = u.states.get(character_id)
+            activity = u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
+            session = u.sessions.get(state.active_sleep_session_id) if state.active_sleep_session_id else None
+            checkpoint = u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=? AND processed=0',
+                (state.primary_activity_id,)).fetchone() if activity else None
+            deadline = (session.interrupt_until or session.expected_wake_at) if session else from_epoch_ms(checkpoint[0]) if checkpoint else None
+            availability = derive_availability(state, activity, self.availability,
+                activity_visible=activity is not None and visible(activity, scope))
+        allowed = state.sleep_phase in ('awake','winding_down') and not (
+            self.availability.enabled and availability.state == 'busy')
+        return {'state_version':state.state_version, 'sleep_phase':state.sleep_phase,
+                'state':availability.state, 'reason':availability.reason,
+                'enforcement_enabled':self.availability.enabled,
+                'available':allowed, 'can_reply_recommendation':allowed,
+                'can_proactively_contact_recommendation':allowed,
+                'interruptibility':'requires_policy' if state.sleep_phase=='sleeping' else 'policy_dependent',
+                'valid_until':iso_instant(deadline) if deadline else None}
 
     def get_diagnostics(self, scope=QueryScope(), character_id='default'):
         state = self.get_life_state(scope,character_id)

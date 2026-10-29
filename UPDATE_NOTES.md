@@ -1,5 +1,20 @@
 # 更新说明
 
+## v0.8.1
+
+### 新增
+- 忙闲三态（`free` / `slow` / `busy`）推导与显示，默认关闭
+- `[availability]` 配置段：慢速活动类别、睡眠即忙、身体极值阈值
+- `/maivita status` 显示当前三态与原因
+- `get_availability` API 返回三态与是否可回复建议
+
+### 说明
+- 本阶段采用方案 B：`slow` 仅用于显示（等同正常回复），`busy` 通过
+  发送守卫 abort（与原有睡眠静默并存，MaiHush 优先）
+- `send_service.before_send` 只支持 continue/abort 且超时 1000ms，
+  无法实现真正的延迟回复；半忙的延迟体验留待后续评估
+- 不实现恢复后补发（`followup_after_busy` 仅支持 false）
+
 ## v0.8.0
 
 ### 新增

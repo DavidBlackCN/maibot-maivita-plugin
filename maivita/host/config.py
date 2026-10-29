@@ -98,12 +98,33 @@ class SchedulerSettings(Strict):
         return SchedulerConfig(**self.model_dump())
 
 
+class AvailabilitySettings(Strict):
+    enabled: bool=Field(default=False, strict=True)
+    slow_categories: list[Literal['rest','study','work','entertainment','daily_life',
+                                 'social','travel','creative','other']]=Field(
+        default_factory=lambda: ['study','work','travel','creative'])
+    busy_when_sleeping: bool=Field(default=True, strict=True)
+    busy_fatigue_threshold: int=Field(default=90,ge=0,le=100,strict=True)
+    busy_energy_threshold: int=Field(default=10,ge=0,le=100,strict=True)
+    followup_after_busy: Literal[False]=False
+
+    @model_validator(mode='after')
+    def validate_availability(self):
+        self.runtime_config()
+        return self
+
+    def runtime_config(self):
+        from ..life.planning.availability import AvailabilityConfig
+        return AvailabilityConfig(**self.model_dump())
+
+
 class DevelopmentConfig(Strict):
     plugin: PluginSettings=Field(default_factory=PluginSettings)
     instance: InstanceSettings=Field(default_factory=InstanceSettings)
     model: ModelSettings=Field(default_factory=ModelSettings)
     routine: RoutineSettings=Field(default_factory=RoutineSettings)
     scheduler: SchedulerSettings=Field(default_factory=SchedulerSettings)
+    availability: AvailabilitySettings=Field(default_factory=AvailabilitySettings)
 
     @model_validator(mode='after')
     def validate_instance(self):
