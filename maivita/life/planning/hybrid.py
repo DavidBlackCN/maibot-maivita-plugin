@@ -1,10 +1,13 @@
 """Three-layer prompt contracts and incremental, commitment-safe patches."""
 from dataclasses import replace
 from datetime import date, timedelta
+import logging
 from uuid import uuid4
 
 from ..domain.clock import local_day_bounds
 from ..domain.models import Plan, ScheduleItem, ScheduleRevision, require
+
+logger = logging.getLogger(__name__)
 
 PROMPTS = {
  'direction':'Choose goals for days/weeks from preferences, actual evidence and confirmed commitments. Return a direction proposal; never claim completed work.',
@@ -75,6 +78,22 @@ def validate_task_candidate(proposal, task_kind):
         require(proposal['kind'] in ('apply_plan_patch','update_direction'),
                 'daily planning may only change plans or direction')
     return proposal
+
+
+def validate_plan_quality(proposal):
+    """Report daily patch quality without rejecting a schema-valid proposal."""
+    if proposal['kind'] != 'apply_plan_patch': return None
+    items = proposal['payload'].get('upserts', [])
+    timed = sum(item.get('time_mode') in ('fixed', 'window') for item in items)
+    diagnostics = []
+    if items and not timed:
+        diagnostics.append('degraded:all_unscheduled')
+    elif items and timed < 3:
+        diagnostics.append('degraded:insufficient_timed_items')
+    if not 1 <= len(items) <= 12:
+        logger.warning('Daily planning item count outside 1..12: %d', len(items))
+        diagnostics.append('warning:item_count_out_of_range')
+    return ';'.join(diagnostics) or None
 
 
 def update_direction(u,state,command,now):

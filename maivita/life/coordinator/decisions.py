@@ -9,7 +9,7 @@ from ..domain.clock import to_epoch_ms
 from ..domain.commands import Command
 from ..domain.models import DomainError, json_text, require
 from ..life_state.engine import digest
-from ..planning.hybrid import decision_task_kind, validate_task_candidate
+from ..planning.hybrid import decision_task_kind, validate_task_candidate, validate_plan_quality
 
 
 async def call_model(model, state, triggers, task_kind):
@@ -126,7 +126,8 @@ class DecisionCoordinator:
             if self._basis(current)!=self._basis(state):
                 self._finish(decision_id,'stale','basis_changed_while_awaiting_model')
                 return {'status':'stale','decision_id':decision_id}
-            self._finish(decision_id,'validated',None,proposal)
+            diagnostic=validate_plan_quality(proposal) if task_kind=='planning' else None
+            self._finish(decision_id,'validated',diagnostic,proposal)
             try:
                 result=self.engine.execute(Command(idempotency_key='decision:'+decision_id,kind=proposal['kind'],payload=proposal['payload'],
                     character_id=char,source='model',decision_id=decision_id,expected_state_version=state.state_version,
@@ -138,7 +139,8 @@ class DecisionCoordinator:
                     ('degraded:' if attempt and not stale else '')+type(exc).__name__)
                 if not stale and not attempt: continue
                 return {'status':'rejected','decision_id':decision_id,'degraded':not stale}
-            return {'status':'applied','decision_id':decision_id,**result}
+            quality={'degraded':True} if diagnostic and diagnostic.startswith('degraded:') else {}
+            return {'status':'applied','decision_id':decision_id,**result,**quality}
 
     @staticmethod
     def _basis(state):

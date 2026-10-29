@@ -1,5 +1,6 @@
 """SDK-only real model boundary. No Host internals, keys, chat reads or retries."""
 import asyncio
+from datetime import datetime
 import json
 import time
 
@@ -27,21 +28,84 @@ PRESENT_CONTRACT={
 }
 
 
-PLANNING_CONTRACT={
-    'instruction':('这是每日规划，请生成今天的日程，不要直接开始活动。'
+PLANNING_CONTRACT = {
+    'instruction': (
+        '这是每日规划。请为角色生成今天的一整天日程，共 6-12 个活动。'
         '只允许 apply_plan_patch 或 update_direction；日程使用角色时区的今天日期。'
-        '禁止 start_activity、winding_down、start_sleep、extend_sleep。'
-        'Return exactly one JSON object with only kind and payload. '
-        'Use apply_plan_patch to propose fixed/window/unscheduled items; free time and empty plans are valid. '
+        '禁止 start_activity、winding_down、start_sleep、extend_sleep——这是规划，不是执行，不要直接开始活动。'
+        '\n\n'
+        '【时间模式】每个活动必须选择一种 time_mode：'
+        '\n- fixed：明确的开始和结束时间，用 start_at/end_at（ISO 8601，带时区）。'
+        '  适合有确定时间的活动（上课、会议、固定饭点、睡觉）。'
+        '\n- window：一个时间窗内灵活安排，用 window_start_at/window_end_at + '
+        'preferred_duration_minutes。适合「下午学习 1-2 小时」这类不精确的事。'
+        '\n- unscheduled：今天想做但不定时，只有 name。'
+        '  只用于确实无法定时的事，且全天最多 2 条。'
+        '\n\n'
+        '【覆盖要求】'
+        '\n- 6-12 个活动，覆盖早/中/晚主要时段（不能只写上午或只写晚上）。'
+        '\n- 至少 3 条必须是 fixed 或 window（有明确时间），不能全是 unscheduled。'
+        '\n- 允许且鼓励用 free_time / rest / daily_life 表达空白时段，不要排满 24 小时。'
+        '\n- 活动之间不能时间重叠（fixed 项）。'
+        '\n\n'
+        '【生活质感】'
+        '\n- 不要排成流程模板（起床→上班→午休→下班→晚饭→睡觉一条龙）。'
+        '\n- 每天不应该长得差不多；允许临时起意、无所事事、赖床、发呆。'
+        '\n- 结合人设、作息偏好（只是参考）、当前季节/节日。'
+        '\n- 有明确时间的事要合理（不要凌晨 3 点学习，除非人设是夜猫子）。'
+        '\n\n'
+        '【输出】'
+        '\nexample 只是格式示范，不要求恰好 6 条，也不要照抄活动或 item_id。'
+        '每项使用有意义且不与其他日期混淆的 item_id；修改已有事项时保留原 item_id。'
+        '\nReturn exactly one JSON object with only kind and payload. '
         'Plans are not actual history. Preserve confirmed commitments. '
         'Never create authorization, completion evidence or confirmed commitments. '
         'Private visibility must not be widened. No markdown or reasoning text. '
-        '作息偏好只是参考，可以根据实际情况偏离，但偏离时在 payload.reason 字段说明原因。'),
-    'commands':{key:PRESENT_CONTRACT['commands'][key] for key in ('apply_plan_patch','update_direction')},
-    'example':{'kind':'apply_plan_patch','payload':{'local_date':'2026-10-29',
-        'upserts':[{'item_id':'today-study','name':'学习','category':'study','time_mode':'unscheduled',
-                    'visibility':'public_summary'}],
-        'remove_ids':[],'reason':'根据今天的安排预留学习时间，具体开始时间由即时决策决定'}}
+        '作息偏好只是参考，可以根据实际情况偏离，但偏离时在 payload.reason 字段说明原因。'
+    ),
+    'commands': {key: PRESENT_CONTRACT['commands'][key] for key in ('apply_plan_patch', 'update_direction')},
+    'example': {
+        'kind': 'apply_plan_patch',
+        'payload': {
+            'local_date': '2026-10-29',
+            'upserts': [
+                {'item_id': 'd1', 'name': '起床洗漱', 'category': 'daily_life',
+                 'time_mode': 'fixed',
+                 'start_at': '2026-10-29T08:00:00+08:00',
+                 'end_at': '2026-10-29T08:40:00+08:00',
+                 'visibility': 'public_summary'},
+                {'item_id': 'd2', 'name': '早餐', 'category': 'daily_life',
+                 'time_mode': 'fixed',
+                 'start_at': '2026-10-29T08:40:00+08:00',
+                 'end_at': '2026-10-29T09:10:00+08:00',
+                 'visibility': 'public_summary'},
+                {'item_id': 'd3', 'name': '学习', 'category': 'study',
+                 'time_mode': 'window',
+                 'window_start_at': '2026-10-29T09:30:00+08:00',
+                 'window_end_at': '2026-10-29T12:00:00+08:00',
+                 'preferred_duration_minutes': 120,
+                 'visibility': 'public_summary'},
+                {'item_id': 'd4', 'name': '午饭', 'category': 'daily_life',
+                 'time_mode': 'fixed',
+                 'start_at': '2026-10-29T12:00:00+08:00',
+                 'end_at': '2026-10-29T13:00:00+08:00',
+                 'visibility': 'public_summary'},
+                {'item_id': 'd5', 'name': '自由时间', 'category': 'free_time',
+                 'time_mode': 'window',
+                 'window_start_at': '2026-10-29T13:00:00+08:00',
+                 'window_end_at': '2026-10-29T18:00:00+08:00',
+                 'preferred_duration_minutes': 180,
+                 'visibility': 'public_summary'},
+                {'item_id': 'd6', 'name': '晚饭', 'category': 'daily_life',
+                 'time_mode': 'fixed',
+                 'start_at': '2026-10-29T18:00:00+08:00',
+                 'end_at': '2026-10-29T19:00:00+08:00',
+                 'visibility': 'public_summary'},
+            ],
+            'remove_ids': [],
+            'reason': '这是格式示例：6 个活动覆盖早中晚，fixed 与 window 混用，空档用 free_time 表达'
+        }
+    }
 }
 
 
@@ -68,14 +132,24 @@ class SDKModelPort:
     async def __call__(self,state,triggers,*,task_kind='present'):
         if task_kind not in ('planning','present'): raise DomainError('unknown model task')
         started=time.monotonic()
-        context={**self.context(),'routine':self.routine.model_dump()}
+        # Weekly patterns are configuration-only until the next planning stage.
+        context={**self.context(),'routine':self.routine.model_dump(exclude={'weekly_pattern'})}
         contract=PLANNING_CONTRACT if task_kind=='planning' else PRESENT_CONTRACT
         if task_kind=='planning':
             from ..life.domain.clock import to_local
-            today=to_local(context['now'],context.get('character_timezone','Asia/Shanghai')).date().isoformat()
+            local_now=to_local(context['now'],context.get('character_timezone','Asia/Shanghai'))
+            today=local_now.date().isoformat()
+            items=[]
+            for template in contract['example']['payload']['upserts']:
+                item={**template,'item_id':template['item_id']+'-'+today}
+                for key in ('start_at','end_at','window_start_at','window_end_at'):
+                    if key in item:
+                        item[key]=datetime.fromisoformat(item[key]).replace(
+                            year=local_now.year,month=local_now.month,day=local_now.day,
+                            tzinfo=local_now.tzinfo).isoformat()
+                items.append(item)
             contract={**contract,'example':{**contract['example'],
-                'payload':{**contract['example']['payload'],'local_date':today,
-                    'upserts':[{**item,'item_id':item['item_id']+'-'+today} for item in contract['example']['payload']['upserts']]}}}
+                'payload':{**contract['example']['payload'],'local_date':today,'upserts':items}}}
         from .persona import read_persona
         persona=await read_persona(self.ctx,self.settings.life_context)
         prompt=json.dumps({'task_kind':task_kind,'contract':contract,'as_of':iso_instant(context['now']),

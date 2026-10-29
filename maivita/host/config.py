@@ -63,9 +63,20 @@ class ModelSettings(Strict):
         return self
 
 
+class WeeklyPattern(Strict):
+    monday: str=''
+    tuesday: str=''
+    wednesday: str=''
+    thursday: str=''
+    friday: str=''
+    saturday: str=''
+    sunday: str=''
+
+
 class RoutineSettings(Strict):
     preferred_sleep_time: ClockTime='01:00'
     preferred_wake_time: ClockTime='08:00'
+    weekly_pattern: WeeklyPattern=Field(default_factory=WeeklyPattern)
 
 
 class DevelopmentConfig(Strict):

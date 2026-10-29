@@ -3,6 +3,7 @@ import asyncio
 import json
 import tempfile
 import unittest
+from copy import deepcopy
 from collections import Counter
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -101,7 +102,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(u.connection.execute('SELECT count(*) FROM decision_triggers WHERE consumed=0').fetchone()[0],0)
 
     async def test_invalid_then_valid_retry_count_and_planning_only(self):
-        self.responses=[{'bad':'json envelope'},plan()]
+        self.responses=[{'bad':'json envelope'},deepcopy(PLANNING_CONTRACT['example'])]
         result=await self.runtime.request_replan('daily-planning:2026-10-29')
         self.assertEqual(result['status'],'applied'); self.assertEqual(len(self.calls),2)
         self.assertEqual([r['status'] for r in self.runs()],['invalid','applied'])

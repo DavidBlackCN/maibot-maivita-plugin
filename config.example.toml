@@ -47,3 +47,14 @@ life_context = ""
 preferred_sleep_time = "01:00"
 # 偏好起床时刻，HH:MM（00:00–23:59）；可选，默认 08:00。
 preferred_wake_time = "08:00"
+
+# 周表：一周的稳定节奏。留空则不使用。
+# 每项是一句话描述，将作为 prompt 参考，不强制覆盖 24 小时；阶段一仅保存配置。
+[routine.weekly_pattern]
+monday = ""
+tuesday = ""
+wednesday = ""
+thursday = ""
+friday = ""
+saturday = ""
+sunday = ""
