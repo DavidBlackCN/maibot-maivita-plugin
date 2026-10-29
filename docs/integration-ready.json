@@ -1,6 +1,6 @@
 {
   "status": "not_ready",
-  "plugin_version": "0.5.2",
+  "plugin_version": "0.5.3",
   "host_commit": "062d45cf8bd4272ac57d7ec03fcf405e5a458211",
   "sdk": "2.16.0",
   "config_version": "3",

@@ -3,7 +3,7 @@ from datetime import datetime,timedelta
 import json,secrets,sqlite3
 from ..life.domain.commands import Command
 from .life_commands import parse,describe
-from .management import local_request,API
+from .management import local_request,API,diagnostic
 from .routes import command_route
 import asyncio
 
@@ -65,7 +65,11 @@ async def dispatch(plugin,command):
     runtime=plugin.runtime;cfg=plugin.active_config
     if not plugin.ready:return 'MaiVita 未就绪'
     try:
-        operation=parse(command['text'],runtime.engine,cfg.instance.timezone)
+        try:
+            operation=parse(command['text'],runtime.engine,cfg.instance.timezone)
+        except Exception:
+            diagnostic('MANAGEMENT_PARSE_FAILED','parse','text' in command,type(command.get('text')) is str,False)
+            raise
         route=await command_route(plugin.ctx,command)
         if not plugin.ready or plugin.runtime is not runtime or plugin.active_config is not cfg:raise ValueError('配置已改变，请重新操作')
         query,origin=local_request(plugin,command,route['account_id'],management_action=operation.get('kind','inspect'))

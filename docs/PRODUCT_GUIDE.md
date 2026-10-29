@@ -1,6 +1,6 @@
 # 超级麦麦插件成品候选使用说明
 
-本轮组合：MaiVita 0.5.2、MaiIdentity 3.2.2、MaiHush 0.2.2、现有 MaiCoordinate 0.3.1。使用官方 Host，不需要私有补丁，也没有新增插件。支持的精确配对为 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0；中间版本、混搭和未来版本不自动放行。
+本轮组合：MaiVita 0.5.3、MaiIdentity 3.2.2、MaiHush 0.2.2、现有 MaiCoordinate 0.3.1。使用官方 Host，不需要私有补丁，也没有新增插件。支持的精确配对为 Host 1.3.12 / SDK 2.15.0 和 Host 1.3.15 / SDK 2.16.0；中间版本、混搭和未来版本不自动放行。
 
 ## 安装与最少设置
 
