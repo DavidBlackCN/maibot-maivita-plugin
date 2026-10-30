@@ -87,6 +87,8 @@ class LifeStateEngine:
             # Events expose a public summary only; private names/reasons remain
             # in scoped records. Consumers fetch details through query policy.
             event_id = uuid4().hex
+            if command.kind=='advance_segment' and before.primary_activity_id!=after.primary_activity_id:
+                event_type='life.sleep.started' if after.active_sleep_session_id else 'life.activity.started'
             occurred_at=after.last_wake_at if command.kind=='wake' else now
             u.events.add(LifeEvent(event_id=event_id, character_id=after.character_id,
                 event_type=event_type, state_version=after.state_version, event_index=0,
@@ -95,7 +97,7 @@ class LifeStateEngine:
                 correlation_id=command.decision_id, expires_at=occurred_at + timedelta(minutes=30)))
             if command.kind in ('wake','check_activity','check_plan_item','propose_commitment','enqueue_replan','recover_observation_gap'):
                 u.connection.execute('INSERT INTO decision_triggers VALUES(?,?,?,?,0)',
-                    (event_id,after.character_id,command.kind,to_epoch_ms(now)))
+                    (('manual-planning:' if command.kind=='enqueue_replan' and command.payload.get('task_kind')=='planning' else '')+event_id,after.character_id,command.kind,to_epoch_ms(now)))
             result = {'state_version': after.state_version, 'event_id': event_id, 'kind': command.kind,
                       'primary_activity_id': after.primary_activity_id}
             u.connection.execute('INSERT INTO command_receipts VALUES (?,?,?,?,?,?)',

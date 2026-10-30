@@ -6,12 +6,14 @@ import os
 import subprocess
 import sys
 
-root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
+root=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from tools.workspace_paths import EVIDENCE
 from integration_tests.process_job import ProcessJob
 from tools.package import runtime_manifest as file_manifest
 
 if __name__=='__main__':
-    (root/'evidence/integration-ready').mkdir(parents=True,exist_ok=True)
+    (EVIDENCE/'integration-ready').mkdir(parents=True,exist_ok=True)
     host=Path(os.environ.get('MAIVITA_HOST_SOURCE',root.parent/'maibot')); instance=Path(os.environ.get('MAIVITA_TEST_INSTANCE',root/'.integration/ready-instance'))
     env={k:v for k,v in os.environ.items() if k.upper() in ('SYSTEMROOT','WINDIR','COMSPEC','PATHEXT')}
     env.update(PYTHONPATH=os.pathsep.join((str(root),str(host))),PYTHONUTF8='1',PYTHONDONTWRITEBYTECODE='1',
@@ -32,6 +34,6 @@ if __name__=='__main__':
     path=instance/'i1-components.json'
     report=json.loads(path.read_text()) if path.exists() else {}
     report.update(process_exit_code=p.returncode,passed=p.returncode==0,candidate_files=file_manifest())
-    (root/'evidence/integration-ready/components.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    (EVIDENCE/'integration-ready/components.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     print(json.dumps({k:v for k,v in report.items() if k!='candidate_files'},indent=2))
     raise SystemExit(p.returncode!=0)

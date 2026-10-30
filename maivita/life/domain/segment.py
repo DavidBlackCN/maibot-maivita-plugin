@@ -30,13 +30,16 @@ class SchedulerConfig:
 
 def validate_segment(payload, config=None, *, current=None):
     require(isinstance(payload, Mapping), 'segment must be an object')
-    required = {'event', 'location', 'emotion', 'minutes', 'continue', 'energy_rate'}
-    require(required <= set(payload) <= required | {'resumes_activity_id'}, 'invalid segment fields')
+    required = {'event', 'location', 'emotion', 'minutes', 'continue'}
+    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate'}, 'invalid segment fields')
+    # Old saved candidates remain readable. New candidates use categories only.
+    category = payload.get('category', 'rest' if payload.get('energy_rate', 0) > 0 else 'other')
+    require(category in ('rest','study','work','entertainment','daily_life','social','travel','creative','other'), 'invalid activity category')
     require(type(payload['continue']) is bool, 'continue must be boolean')
     for name in ('event', 'location', 'emotion'):
         require(isinstance(payload[name], str) and len(payload[name]) <= 1000, 'invalid segment '+name)
     require(payload['continue'] or payload['event'].strip(), 'segment event required')
-    number(payload['energy_rate'], -0.15, 0.2)
+    if 'energy_rate' in payload: number(payload['energy_rate'], -0.15, 0.2)
     require(type(payload['minutes']) is int and payload['minutes'] > 0, 'invalid segment minutes')
     resume = payload.get('resumes_activity_id')
     require(resume is None or isinstance(resume, str) and bool(resume.strip()), 'invalid resume ID')
@@ -45,4 +48,4 @@ def validate_segment(payload, config=None, *, current=None):
         sleeping = (current.name if current and payload['continue'] else payload['event']) == '睡眠'
         maximum = config.segment_sleep_max_minutes if sleeping else config.segment_max_minutes
         require(config.segment_min_minutes <= payload['minutes'] <= maximum, 'segment duration outside bounds')
-    return dict(payload)
+    return {**dict(payload), 'category': category}

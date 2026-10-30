@@ -23,7 +23,7 @@ def _warn_retired_sections(sections):
 
 
 class PluginConfig(PluginSettings):
-    config_version: Literal['3'] = '3'
+    config_version: Literal['4'] = '4'
 
 
 class IntegrationConfig(DevelopmentConfig):
@@ -34,6 +34,19 @@ class IntegrationConfig(DevelopmentConfig):
     @classmethod
     def discard_retired_sections(cls, data):
         if isinstance(data, Mapping):
+            from copy import deepcopy
+            data=deepcopy(dict(data))
+            old=str(data.get('plugin',{}).get('config_version','4'))
+            if old in ('2','3'):
+                scheduler=data.get('scheduler',{})
+                model=data.setdefault('model',{})
+                model['daily_budget']=scheduler.get('daily_decision_budget',20) if scheduler.get('enabled',False) else model.get('daily_budget',16)
+                data.setdefault('plugin',{})['config_version']='4'
+            # One execution path. Keep retired keys readable for migration only.
+            scheduler=data.setdefault('scheduler',{})
+            scheduler['enabled']=True
+            scheduler['change_chance_percent']=0
+            scheduler['daily_decision_budget']=data.get('model',{}).get('daily_budget',20)
             retired = tuple(name for name in ('engine', 'legacy') if name in data)
             if retired:
                 _warn_retired_sections(retired)
@@ -53,7 +66,7 @@ class IntegrationConfig(DevelopmentConfig):
 
     def selected_config(self) -> DevelopmentConfig:
         return DevelopmentConfig.model_validate({
-            'plugin': {'enabled': self.plugin.enabled, 'config_version': '2'},
+            'plugin': {'enabled': self.plugin.enabled, 'config_version': '3'},
             'instance': self.instance.model_dump(), 'model': self.model.model_dump(),
             'routine': self.routine.model_dump(), 'scheduler': self.scheduler.model_dump(),
             'availability': self.availability.model_dump()})

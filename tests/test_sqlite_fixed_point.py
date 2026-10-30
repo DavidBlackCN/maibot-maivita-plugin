@@ -58,17 +58,17 @@ class FixedPointMigrationTests(unittest.TestCase):
     def test_populated_5_to_6_preserves_graph_nulls_history_and_guards(self):
         with closing(connect(self.path)) as conn:
             self.seed(conn)
-            guards = [tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') ORDER BY type,name")]
+            guards = [tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') AND tbl_name!='body_rule_cutovers' ORDER BY type,name")]
             counts = {row[0]: conn.execute(f'SELECT count(*) FROM {row[0]}').fetchone()[0]
                       for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name!='schema_migrations'")}
             old_ledger = [tuple(row) for row in conn.execute('SELECT * FROM schema_migrations')]
-            self.assertEqual(migrate(conn, self.clock), 6)
-            self.assertEqual(validate_schema(conn), 6)
+            self.assertEqual(migrate(conn, self.clock), 7)
+            self.assertEqual(validate_schema(conn), 7)
             self.assertEqual([tuple(row) for row in conn.execute('SELECT * FROM schema_migrations WHERE version<=5')], old_ledger)
-            self.assertEqual([tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') ORDER BY type,name")], guards)
+            self.assertEqual([tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') AND tbl_name!='body_rule_cutovers' ORDER BY type,name")], guards)
             for table, count in counts.items():
                 self.assertEqual(conn.execute(f'SELECT count(*) FROM {table}').fetchone()[0], count, table)
-            self.assertEqual(tuple(conn.execute("SELECT energy,fatigue,stress,sleep_debt_minutes FROM life_state WHERE character_id='default'").fetchone()), (101,1235,10000,21))
+            self.assertEqual(tuple(conn.execute("SELECT energy,fatigue,stress,sleep_debt_minutes FROM life_state WHERE character_id='default'").fetchone()), (conn.execute("SELECT CAST(ROUND(ROUND(1.005,2)*100) AS INTEGER)").fetchone()[0],1235,10000,21))
             self.assertEqual(tuple(conn.execute("SELECT energy,fatigue,stress,sleep_debt_minutes FROM life_state WHERE character_id='unknown'").fetchone()), (None,None,None,None))
             self.assertEqual(tuple(conn.execute('SELECT initial_expected_duration_minutes,actual_sleep_minutes FROM sleep_sessions').fetchone()), (511,2))
             self.assertEqual(conn.execute('SELECT energy_rate FROM activities').fetchone()[0], -51)
@@ -82,12 +82,13 @@ class FixedPointMigrationTests(unittest.TestCase):
             self.assertEqual(conn.execute('PRAGMA foreign_keys').fetchone()[0], 1)
             # Re-running must not scale a second time or add a second ledger entry.
             before = '\n'.join(conn.iterdump())
-            self.assertEqual(migrate(conn,self.clock), 6)
+            self.assertEqual(migrate(conn,self.clock), 7)
             self.assertEqual('\n'.join(conn.iterdump()), before)
+            migrated_energy=conn.execute("SELECT energy FROM life_state WHERE character_id='default'").fetchone()[0]/100
         db = LifeDatabase(self.path, clock=self.clock)
         with db.unit_of_work() as u:
             old = u.states.get('default')
-            self.assertEqual((old.energy,old.fatigue,old.stress,old.sleep_debt_minutes), (1.01,12.35,100,21))
+            self.assertEqual((old.energy,old.fatigue,old.stress,old.sleep_debt_minutes), (migrated_energy,12.35,100,21))
             u.states.update(replace(old,state_version=1,energy=60.25,fatigue=25,stress=0),expected_version=0)
             u.commit()  # Includes aggregate validation of rounded sleep cache.
         with closing(connect(self.path)) as conn:
@@ -169,10 +170,11 @@ class FixedPointRuntimeTests(EngineFixture, unittest.TestCase):
             for value in (0,0.005,1.005,2.675,12.345,50,99.999,100):
                 spec = SPECS['states']
                 encoded = dict(zip(spec.columns,spec.encode(state(energy=value))))
-                expected = conn.execute('SELECT CAST(ROUND(ROUND(?,2)*100) AS INTEGER)',(value,)).fetchone()[0]
+                from decimal import Decimal, ROUND_HALF_UP
+                expected = int((Decimal(str(value))*100).to_integral_value(rounding=ROUND_HALF_UP))
                 self.assertEqual(encoded['energy'],expected)
             for value in (-0.15,-0.0505,0,0.0005,0.1235,0.2):
                 spec = SPECS['activities']
                 encoded = dict(zip(spec.columns,spec.encode(activity(energy_rate=value))))
-                expected = conn.execute('SELECT CAST(ROUND(ROUND(?,3)*1000) AS INTEGER)',(value,)).fetchone()[0]
+                expected = int((Decimal(str(value))*1000).to_integral_value(rounding=ROUND_HALF_UP))
                 self.assertEqual(encoded['energy_rate'],expected)

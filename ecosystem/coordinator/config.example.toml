@@ -26,5 +26,18 @@ privileged_writes = false
 [plugin]
 # 是否加载本插件；布尔值，可选，默认 true；默认加载仍为 shadow 观察模式。
 enabled = true
-# 配置格式版本；可选，固定 "1"，默认 "1"，不是插件发布版本。
-config_version = "1"
+# 配置格式版本；可选，固定 "2"，默认 "2"，不是插件发布版本。
+config_version = "2"
+
+# 空间独立于群运行；旧配置转换后为 disabled，新安装先观察。
+[space]
+mode = "shadow" # disabled / shadow / controlled
+# 所有空间额度按此时区的自然日计数。
+timezone = "Asia/Shanghai"
+post_daily_limit = 2
+post_interval_seconds = 14400
+browse_daily_limit = 6
+browse_interval_seconds = 3600
+max_feeds = 5
+# 明确 QQ 号；空名单不互动。还须包含在 MaiTrace monitor.read_list 中。
+interaction_whitelist = []

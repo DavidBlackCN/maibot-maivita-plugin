@@ -7,8 +7,8 @@ from pathlib import Path
 import argparse,hashlib,json,os,shutil,sqlite3,tomllib,zipfile
 
 IDS=('davidblackcn.maibot-maivita-plugin','davidblackcn.maibot-maiidentity-plugin',
-     'davidblackcn.maibot-maihush-plugin','davidblackcn.maibot-maicoordinate-plugin')
-PAIRS={('1.3.12','2.15.0'),('1.3.15','2.16.0')}
+     'davidblackcn.maibot-maihush-plugin','davidblackcn.maibot-maicoordinate-plugin','Rabbit-Jia-Er.MaiTrace')
+PAIRS={('1.3.12','2.15.0'),('1.3.15','2.16.0'),('1.3.18','2.19.0')}
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def write(p,v):p.write_text(json.dumps(v,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
 def files(root):
@@ -56,7 +56,8 @@ def verify_bundle(bundle,host=None):
             m=json.loads(z.read(next(iter(roots))+'/_manifest.json'))
             if m['id'] not in IDS or m['version']!=item['version']:raise ValueError('Manifest mismatch')
             found.append(m['id'])
-    if set(found)!=set(IDS) or len(found)!=4:raise ValueError('Incomplete/duplicate bundle')
+    expected={IDS[0],IDS[3],IDS[4]} if manifest.get('phase')==1 else set(IDS[:4])
+    if set(found)!=expected or len(found)!=len(expected):raise ValueError('Incomplete/duplicate bundle')
     return {'verified':True,'plugins':len(found),'host_checked':host is not None}
 
 def backup(host,out,stopped):

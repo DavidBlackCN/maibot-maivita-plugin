@@ -45,6 +45,9 @@ def snapshot(runtime, timezone, stream_id):
     latest=runs[0] if runs else None
     degraded=bool(latest and (latest['diagnostic'] or '').startswith('degraded:'))
     return {'phase':state.sleep_phase,
+            'body':{key:getattr(state,key) for key in ('energy','fatigue','stress')},
+            'next_check_seconds':max(0,int(runtime.config.scheduler.decision_interval_minutes*60-
+                (runtime.engine.clock.monotonic()-runtime.last_segment_check))) if runtime.last_segment_check is not None else 0,
             'body_warnings':[(field,getattr(state,field)) for field in ('energy','fatigue','stress')
                              if body_value_warning(field,getattr(state,field))],
             'availability':availability.state,'availability_reason':availability.reason,
@@ -55,6 +58,7 @@ def snapshot(runtime, timezone, stream_id):
             'location':clean(activity.location) if activity else '',
             'remaining_minutes':max(0, int((checkpoint[0]-to_epoch_ms(now))//60000)) if checkpoint else None,
             'counts':counts,'used':used,'budget':runtime.decision_budget,
+            'check_minutes':runtime.config.scheduler.decision_interval_minutes,
             'planning':to_local(from_epoch_ms(planning['started_at_ms']),timezone).strftime('%m-%d %H:%M') if planning else '未知',
             'degraded':degraded}
 
@@ -94,7 +98,9 @@ def render_status(data, hush=None):
     if data['degraded']: model+=' | 模型状态：degraded（降级）'
     lines=[
         f'MaiVita：{PHASES.get(data["phase"],"状态未知")}（{data["wake"]}）| 当前活动：{activity}',
-        f'今日计划：{sum(counts.values())} 项（{counts["done"]} 完成 / {counts["started"]} 进行中 / {counts["planned"]} 待开始）',
+        f'今日参考计划：{sum(counts.values())} 项（不作为实际经历或完成证明）',
+        '身体依据：固定活动类别规则（模拟估计）；睡眠以真实睡眠会话识别',
+        f'生活检查间隔：{data.get("check_minutes",15)} 分钟（检查不等于调用模型）',
         model,'不回复原因：'+('、'.join(reasons) or '无')]
     if 'availability' in data:
         state=data['availability']
@@ -105,6 +111,10 @@ def render_status(data, hush=None):
         labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}
         values='、'.join(f'{labels[field]} {value:.2f}' for field,value in data['body_warnings'])
         lines.append('⚠ 身体数值异常：'+values+'（请检查活动历史或测试数据）')
+    if data.get('body'):
+        labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}
+        lines.append('身体估计：'+' / '.join(labels[k]+' '+('未知' if v is None else f'{v:.1f}') for k,v in data['body'].items())+
+            f'；下次检查约 {data.get("next_check_seconds",0)} 秒后')
     return '\n'.join(lines)
 
 

@@ -53,3 +53,28 @@ images/
 !/tools/audit_ready.py
 !/tools/acceptance_baseline.py
 !/tools/product_bundle.py
+
+!/tools/phase1_config.py
+!/tools/phase1_data.py
+!/tools/server_acceptance.py
+!/tools/server_probe_plugin.py
+
+# Only user-facing reference documents belong in this repository.
+/docs/*
+!/docs/CONTRACTS.md
+!/docs/contracts-v1.schema.json
+!/docs/DIAGNOSTICS.md
+!/docs/LIMITATIONS.md
+!/docs/ROLLBACK.md
+!/docs/SOURCES.md
+
+# Generated reports, local records and caches are never release sources.
+/evidence/
+/reports/
+/logs/
+/handoff/
+*.log
+*.tmp
+.mypy_cache/
+.ruff_cache/
+!/tools/workspace_paths.py

@@ -6,6 +6,10 @@ binds the caller and Host still enforces the same manifest capabilities.
 class APIPort:
     def __init__(self,ctx): self.ctx=ctx
 
+    async def call_space(self,api_name,*,timeout_seconds,**args):
+        return await self.ctx.call_host_method('cap.call',payload={'capability':'api.call',
+            'args':{'api_name':api_name,'version':'1','args':args}},timeout_ms=int(timeout_seconds*1000))
+
     async def call(self,api_name,*,version,**args):
         return await self.ctx.call_host_method('cap.call',payload={'capability':'api.call',
             'args':{'api_name':api_name,'version':version,'args':args}},timeout_ms=2000)

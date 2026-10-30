@@ -10,7 +10,9 @@ import sys
 import tempfile
 import tomllib
 
-root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
+root=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from tools.workspace_paths import EVIDENCE
 from verify_ready import verification_manifest
 from tools.package import entries,runtime_manifest,HOST_COMMIT
 
@@ -67,10 +69,10 @@ def main():
     preserved=json.loads((root/'tests/fixtures/preserved-files.json').read_text())
     assert all(digest(root/name)==sha for name,sha in preserved.items())
     old=reference_root/'maibot-autonomous-planning-plugin'
-    baseline=json.loads((root/'evidence/baseline.json').read_text())
+    baseline=json.loads((EVIDENCE/'baseline.json').read_text())
     old_changed=[item['path'] for item in baseline['files'] if item.get('kind')!='original_design' and digest(old/item['path'])!=item['sha256']]
     owner=reference_root/'maibot-owner-auth-plugin'
-    expected=json.loads((root/'evidence/r3-contract-matrix.json').read_text())['owner_auth']
+    expected=json.loads((EVIDENCE/'r3-contract-matrix.json').read_text())['owner_auth']
     owner_changed=[name for name,sha in expected['source_files'].items() if digest(owner/name)!=sha]
     assert not old_changed and not owner_changed
     # Export only public source candidates; no private evidence is copied.
@@ -92,7 +94,7 @@ def main():
         for number,args in enumerate(commands):
             process=subprocess.run([sys.executable]+args,cwd=destination,env=env,
                 stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
-            (root/'evidence/integration-ready'/('export-'+str(number)+'.txt')).write_bytes(process.stdout)
+            (EVIDENCE/'integration-ready'/('export-'+str(number)+'.txt')).write_bytes(process.stdout)
             outcomes.append(process.returncode==0)
             if process.returncode: raise RuntimeError('clean public export check failed; see export-'+str(number)+'.txt')
     if inputs!=verification_manifest() or runtime_before!=runtime_manifest():
@@ -103,7 +105,7 @@ def main():
         'host_source_changed':host_changes,'original_plugin_changed':old_changed,'owner_auth_changed':owner_changed,
         'public_export_pytest_runner_and_cleanup':all(outcomes),'temporary_export_removed':True,
         'runtime_files':runtime_before,'verification_files':inputs,'production_data':False}
-    (root/'evidence/integration-ready/source-audit.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+    (EVIDENCE/'integration-ready/source-audit.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     print(json.dumps({key:value for key,value in result.items() if key not in ('runtime_files','verification_files')},indent=2))
 
 

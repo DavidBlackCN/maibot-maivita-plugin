@@ -15,7 +15,7 @@ class ConfigExampleTests(unittest.TestCase):
             config = tomllib.load(file)
         model = IntegrationConfig.model_validate(config)
         self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine', 'scheduler', 'availability'})
-        self.assertEqual(config['plugin']['config_version'], '3')
+        self.assertEqual(config['plugin']['config_version'], '4')
         self.assertEqual(model.model_dump(), config)
         self.assertIsInstance(model.selected_config(), DevelopmentConfig)
         self.assertEqual(model.selected_config().routine, model.routine)
@@ -115,7 +115,7 @@ class ModelSettingsTests(unittest.TestCase):
         from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
         defaults = ModelSettings().model_dump()
         self.assertEqual(defaults, dict(mode='task', task='planner', model='',
-            timeout_seconds=90, max_tokens=8192, daily_budget=16,
+            timeout_seconds=90, max_tokens=8192, daily_budget=20,
             generate_on_start=False, daily_planning_enabled=True, daily_planning_time='08:00', life_context=''))
         with (ROOT / 'config.example.toml').open('rb') as stream:
             example = tomllib.load(stream)
@@ -130,7 +130,7 @@ class ModelSettingsTests(unittest.TestCase):
                        {'mode':'task','task':''}, {'task':'  '}, {'task':42},
                        {'mode':'unknown'}, {'timeout_seconds':301}, {'timeout_seconds':0},
                        {'max_tokens':16385}, {'max_tokens':127},
-                       {'daily_budget':201}, {'daily_budget':0}):
+                       {'daily_budget':1001}, {'daily_budget':0}):
             with self.subTest(values=values), self.assertRaises(ValidationError):
                 ModelSettings(**values)
         self.assertEqual(ModelSettings(mode='model', model='custom', timeout_seconds=300,

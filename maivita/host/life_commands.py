@@ -6,6 +6,8 @@ import shlex
 import uuid
 
 HELP='''MaiVita 生活管理（新增变更先预览，再确认）
+/maivita replan（重新决定当前活动）
+/maivita plan regenerate（重新生成今日参考计划）
 /maivita sleep 30 或 麦麦管理 请休息30分钟
 /maivita activity start study 阅读 / activity end
 /maivita plan add 明天 09:00 10:00 阅读
@@ -36,6 +38,7 @@ def parse(text,engine,timezone='Asia/Shanghai'):
     sleep=re.fullmatch(r'(?:休息|睡|睡觉)\s*(\d+)\s*(分钟|小时)',body)
     if sleep: body='sleep '+str(int(sleep[1])*(60 if sleep[2]=='小时' else 1))
     words=shlex.split(body)
+    if words==['plan','regenerate']:return {'kind':'enqueue_replan','payload':{'reason':'authorized_command','task_kind':'planning'}}
     if words in (['wake'],['replan']):return {'kind':'wake' if words[0]=='wake' else 'enqueue_replan','payload':{'reason':'authorized_command'}}
     if len(words)==2 and words[0] in ('confirm','cancel','result') and re.fullmatch('[a-f0-9]{12}',words[1]):
         return {'control':words[0],'token':words[1]}
@@ -95,7 +98,8 @@ def describe(operation):
     p=operation['payload'];kind=operation['kind']
     if kind=='start_sleep':return f"睡眠 {p['duration_minutes']} 分钟"
     if kind=='start_activity':return '开始公开活动：'+p['name']
-    if kind=='end_activity':return '结束当前活动并记为已完成'
+    if kind=='end_activity':return '结束当前活动段（不代表目标或任务完成）'
+    if kind=='enqueue_replan':return '重新生成今日参考计划' if p.get('task_kind')=='planning' else '重新决定当前活动'
     if kind=='manage_goal':return '目标 '+p['action']+'：'+p.get('title',p['goal_id'])+('（新目标公开可见）' if p['action']=='create' else '')
     if kind=='apply_plan_patch':return ('移除计划 '+','.join(p['remove_ids'])) if p['remove_ids'] else '计划 '+p['upserts'][0]['name']+' '+p['upserts'][0]['start_at']+' 至 '+p['upserts'][0]['end_at']+'（'+p['upserts'][0]['visibility']+'）'
     return kind

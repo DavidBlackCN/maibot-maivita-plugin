@@ -171,6 +171,8 @@ class MaiVitaPlugin(MaiBotPlugin):
     # Stable static bindings are required by the native WebUI validator.
     @API('get_life_state', public=True, version='1')
     async def get_life_state(self, **kwargs): return await self.life_query('get_life_state')
+    @API('get_public_life_context', public=True, version='1')
+    async def get_public_life_context(self, **kwargs): return await self.life_query('get_public_life_context')
     @API('get_plan', public=True, version='1')
     async def get_plan(self, **kwargs): return await self.life_query('get_plan')
     @API('get_availability', public=True, version='1')

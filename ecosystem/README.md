@@ -16,8 +16,4 @@ python maibot-maivita-plugin/ecosystem/sync_from_workspace.py --workspace /path/
 
 本地可运行：`python tools/run_joint_native.py --host-source /path/to/pinned/Host --source-lock maibot-maihush-plugin/tests/fixtures/source-lock-1.3.15.json --output /path/to/new/evidence --auto-routes --trusted-management`。输出目录必须全新；`--trusted-management` 测试官方命令入口，不代表 H03 已实现。
 
-## 文档更新与发布工具
-
-README、UPDATE_NOTES 和 config.example.toml 的工作区副本与此目录同步维护。现有 sync_from_workspace.py 的白名单尚未包含 UPDATE_NOTES.md；文档重构后，旧 coordinator-source.json 中的 README 与配置示例摘要也不再代表当前文件。该文件保留作历史记录，不能作为当前文档的完整性证明。后续允许调整工具时，需更新白名单并重新生成摘要，再执行发布检查。
-
-Vita 与 Identity 的旧打包工具仍引用已并入 README/UPDATE_NOTES 的文档名；发布前需更新打包文档清单。文档重构不修改这些工具，也不生成新包。
+联合验收与内部审查记录保存在工作区根目录 `docs/`，不作为插件源码分发。同步工具包含 README、UPDATE_NOTES、配置示例和必要测试；每次发布前校验两份协调层源码与摘要一致。

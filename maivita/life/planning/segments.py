@@ -38,28 +38,19 @@ def apply_segment(engine, u, state, command, now):
         name = previous.name if previous else p['event'].strip()
         sleeping = name == '睡眠'
         require(not previous or name == p['event'].strip(), 'resumed event must match history')
-        require(not (state.fatigue is not None and state.fatigue >= 95 and p['energy_rate'] <= -0.05),
+        demanding=p['category'] in ('study','work','travel','creative')
+        require(not (state.fatigue is not None and state.fatigue >= 95 and demanding),
                 'fatigue forbids demanding activity')
-        require(not (state.energy is not None and state.energy <= 5 and p['energy_rate'] <= -0.05),
+        require(not (state.energy is not None and state.energy <= 5 and demanding),
                 'energy forbids demanding activity')
-        require(not sleeping or p['energy_rate'] > 0, 'sleep must restore energy')
+        require(not state.active_sleep_session_id, 'sleep changes require the existing wake policy or deadline')
         # Keep the existing commitment protection at the command boundary.
         from .hybrid import bounds
         for commitment in u.commitments.for_character(state.character_id):
             if commitment.status in ('confirmed', 'needs_review'):
                 left, right = bounds(commitment)
                 require(deadline <= left or now >= right, 'segment conflicts with protected commitment')
-        if state.active_sleep_session_id:
-            require(not sleeping, 'continue the current sleep session')
-            session = u.sessions.get(state.active_sleep_session_id)
-            require(now <= session.hard_deadline_at, 'sleep recovery required')
-            session = engine._close_piece(u, state, session, now, 'segment_changed', status='completed')
-            u.sessions.update(replace(session, status='closed', ended_at=now, end_reason='segment_changed',
-                                      interrupt_until=None, revision=session.revision+1))
-            state = replace(state, active_sleep_session_id=None, primary_activity_id=None,
-                            sleep_phase='awake', last_wake_at=now, awake_since_at=now)
-        else:
-            engine._close_activity(u, state, now, 'segment_changed', status='completed')
+        engine._close_activity(u, state, now, 'segment_changed', status='interrupted')
         activity_id = uuid4().hex
         session_id = None
         if sleeping:
@@ -73,10 +64,10 @@ def apply_segment(engine, u, state, command, now):
                 session_id=session_id, started_at=now, kind='sleep', provenance=command.source))
         u.activities.add(Activity(activity_id=activity_id, character_id=state.character_id,
             name=name, started_at=now, provenance=command.source,
-            category=previous.category if previous else 'rest' if p['energy_rate'] > 0 else 'other',
+            category=previous.category if previous else 'rest' if sleeping else p['category'],
             visibility=previous.visibility if previous else 'public_summary',
             resumes_activity_id=resume, sleep_session_id=session_id,
-            location=p['location'], emotion=p['emotion'], energy_rate=p['energy_rate']))
+            location=p['location'], emotion=p['emotion'], energy_rate=0.0))
         state = replace(state, primary_activity_id=activity_id, secondary_activity_ids=(),
             sleep_phase='sleeping' if sleeping else 'awake', active_sleep_session_id=session_id,
             awake_since_at=None if sleeping else state.awake_since_at or now)
@@ -95,11 +86,12 @@ class SegmentService:
         if not state.primary_activity_id:
             return True, 'no_current_segment'
         with engine.database.read_view() as u:
+            current=u.activities.get(state.primary_activity_id)
             row = u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=?',
                                        (state.primary_activity_id,)).fetchone()
         if row is None or to_epoch_ms(engine.clock.now_utc()) >= row[0]:
             return True, 'segment_due'
-        if (state.fatigue is not None and state.fatigue >= 80) or (state.energy is not None and state.energy <= 20):
+        if current.category!='rest' and ((state.fatigue is not None and state.fatigue >= 80) or (state.energy is not None and state.energy <= 20)):
             return True, 'body_threshold'
         if random.random()*100 < self.config.change_chance_percent:
             return True, 'chance'
@@ -137,11 +129,16 @@ class SegmentService:
         engine = self.runtime.engine
         state = engine.state()
         p = {'event': '', 'location': '', 'emotion': '', 'minutes': self.config.decision_interval_minutes,
-             'continue': True, 'energy_rate': 0.0}
-        if state.primary_activity_id is None:
+             'continue': True, 'category': 'rest'}
+        tired=(state.fatigue is not None and state.fatigue>=80) or (state.energy is not None and state.energy<=20)
+        with engine.database.read_view() as u:
+            current=u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
+        if state.active_sleep_session_id:
+            return {'status':'sleeping','reason':reason}
+        if current is None or (tired and current.category!='rest'):
             # Empty bootstrap or deterministic wake with no budget: establish an
             # explicitly internal neutral activity instead of inventing a model decision.
-            p.update(event='休息', **{'continue': False}, energy_rate=0.05)
+            p.update(event='休息', **{'continue': False})
         try:
             result = engine.execute(Command(idempotency_key='segment-fallback:'+uuid4().hex, kind='advance_segment',
                 expected_state_version=state.state_version, payload=p))
@@ -172,10 +169,12 @@ class SegmentService:
             engine.execute(Command(idempotency_key='segment-body:'+uuid4().hex, kind='advance',
                 expected_state_version=state.state_version, payload={'timezone': self.runtime.config.timezone,
                     'segment_energy_rates': True}))
+        if engine.state().active_sleep_session_id:
+            return {'status':'sleeping'}
         decide, reason = await self._should_decide()
         if not decide:
-            return self._continue(reason)
+            return {'status':'continuing','reason':reason}
         result = await self._generate_segment({'reason': reason})
-        if result['status'] in ('budget_exhausted', 'invalid', 'uncertain', 'rejected'):
+        if result['status'] in ('budget_exhausted', 'invalid', 'uncertain', 'rejected','failed'):
             return self._continue(result['status'])
         return result

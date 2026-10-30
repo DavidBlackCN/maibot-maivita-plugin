@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from maibot_sdk import PluginConfigBase
 from pydantic import Field,model_validator
 
-VERSION='2'
+VERSION='3'
 
 ClockTime = Annotated[str, Field(pattern=r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$')]
 
@@ -17,7 +17,7 @@ class Strict(PluginConfigBase):
 
 class PluginSettings(Strict):
     enabled: bool=True
-    config_version: Literal['2']='2'
+    config_version: Literal['3']='3'
 
 
 class InstanceSettings(Strict):
@@ -48,7 +48,7 @@ class ModelSettings(Strict):
     model: str=''
     timeout_seconds: int=Field(default=90,ge=1,le=300)
     max_tokens: int=Field(default=8192,ge=128,le=16384)
-    daily_budget: int=Field(default=16,ge=1,le=200)
+    daily_budget: int=Field(default=20,ge=1,le=1000,description='角色时区自然日的生活模型总额度；参考计划、滚动决策、失败和重试共用。')
     generate_on_start: bool=False
     daily_planning_enabled: bool=True
     daily_planning_time: ClockTime='08:00'
@@ -81,9 +81,9 @@ class RoutineSettings(Strict):
 
 
 class SchedulerSettings(Strict):
-    enabled: bool=False
+    enabled: bool=False  # Internal legacy fixture compatibility; deployment forces rolling.
     decision_interval_minutes: int=Field(default=15,ge=1,le=1080,strict=True)
-    change_chance_percent: int=Field(default=15,ge=0,le=100,strict=True)
+    change_chance_percent: int=Field(default=0,ge=0,le=100,strict=True)
     daily_decision_budget: int=Field(default=20,ge=1,le=1000,strict=True)
     segment_min_minutes: int=Field(default=15,ge=1,le=1080,strict=True)
     segment_max_minutes: int=Field(default=180,ge=1,le=1080,strict=True)
@@ -126,6 +126,15 @@ class DevelopmentConfig(Strict):
     routine: RoutineSettings=Field(default_factory=RoutineSettings)
     scheduler: SchedulerSettings=Field(default_factory=SchedulerSettings)
     availability: AvailabilitySettings=Field(default_factory=AvailabilitySettings)
+
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_internal_config(cls,data):
+        if isinstance(data,Mapping) and str(data.get('plugin',{}).get('config_version','3'))=='2':
+            from copy import deepcopy
+            data=deepcopy(dict(data))
+            data['plugin']['config_version']='3'
+        return data
 
     @model_validator(mode='after')
     def validate_instance(self):

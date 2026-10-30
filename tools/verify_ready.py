@@ -8,7 +8,9 @@ import subprocess
 import sys
 import types
 
-root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
+root=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from tools.workspace_paths import EVIDENCE
 from tools.package import runtime_manifest
 
 
@@ -21,7 +23,7 @@ def verification_manifest():
 
 
 def main():
-    evidence=root/'evidence/integration-ready'; evidence.mkdir(parents=True,exist_ok=True)
+    evidence=EVIDENCE/'integration-ready'; evidence.mkdir(parents=True,exist_ok=True)
     before=verification_manifest()
     for name in before:
         if name.endswith('.py'):

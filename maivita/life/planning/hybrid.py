@@ -71,15 +71,15 @@ def candidate(candidate):
 def decision_task_kind(triggers):
     for trigger in triggers:
         ids=trigger[6:].split(',') if trigger.startswith('batch:') else (trigger,)
-        if any(key.startswith('daily-planning:') for key in ids): return 'planning'
+        if any(key.startswith(('daily-planning:','manual-planning:')) for key in ids): return 'planning'
     return 'segment' if any(t.startswith('segment:') for t in triggers) else 'present'
 
 
 def validate_task_candidate(proposal, task_kind):
     proposal=candidate(proposal)
     if task_kind=='planning':
-        require(proposal['kind'] in ('apply_plan_patch','update_direction'),
-                'daily planning may only change plans or direction')
+        require(proposal['kind']=='apply_plan_patch',
+                'daily planning may only change the reference plan')
     elif task_kind=='segment':
         require(proposal['kind']=='advance_segment', 'segment task may only advance a segment')
     else:

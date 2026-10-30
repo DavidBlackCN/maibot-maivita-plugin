@@ -32,7 +32,7 @@ class Store:
             self.conn.execute('PRAGMA synchronous=FULL')
             schema=self.conn.execute('PRAGMA user_version').fetchone()[0]
             tables=self.conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-            if schema not in (0,1) or schema==0 and tables: raise ValueError('UNSUPPORTED_DATABASE')
+            if schema not in (0,1,2) or schema==0 and tables: raise ValueError('UNSUPPORTED_DATABASE')
             if schema==0:
                 self.conn.executescript('''BEGIN;
                     CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -41,6 +41,14 @@ class Store:
                         PRIMARY KEY(producer,event_id,route));
                     CREATE TABLE cooldown(route TEXT PRIMARY KEY,until_at REAL);
                     PRAGMA user_version=1; COMMIT;''')
+            if schema<2:
+                self.conn.executescript('''BEGIN;
+                    CREATE TABLE IF NOT EXISTS space_actions(operation_id TEXT PRIMARY KEY,kind TEXT NOT NULL,
+                        day TEXT NOT NULL,started REAL NOT NULL,status TEXT NOT NULL,reason TEXT NOT NULL,
+                        basis TEXT NOT NULL,result TEXT NOT NULL);
+                    PRAGMA user_version=2; COMMIT;''')
+            with self.conn:
+                self.conn.execute("UPDATE space_actions SET status='unknown',reason='RESTART_DURING_RPC' WHERE status='submitted'")
             binding=canonical([r.model_dump() for r in settings.routes])
             saved=self.get('binding',None)
             if saved is not None and saved!=binding: raise ValueError('OFFLINE_ROUTE_MIGRATION_REQUIRED')

@@ -1,0 +1,371 @@
+diff --git a/handlers/actions.py b/handlers/actions.py
+index ae0e37c..85a4e85 100644
+--- a/handlers/actions.py
++++ b/handlers/actions.py
+@@ -191,6 +191,14 @@ def _parse_enable_comment(value: Any, default: bool = True) -> bool:
+ 
+ 
+ async def execute_read_feed(plugin, **kwargs: Any) -> Dict[str, Any]:
++    from ..services.space_contract import browse_lock
++    lock=browse_lock(plugin)
++    if lock.locked(): return _tool_failure('BROWSE_BUSY')
++    async with lock:
++        return await _execute_read_feed(plugin,**kwargs)
++
++
++async def _execute_read_feed(plugin, **kwargs: Any) -> Dict[str, Any]:
+     """read_feed Tool 入口。"""
+     target_name = (kwargs.get("target_name") or "").strip()
+     stream_id = kwargs.get("stream_id") or kwargs.get("chat_id") or ""
+@@ -210,7 +218,9 @@ async def execute_read_feed(plugin, **kwargs: Any) -> Dict[str, Any]:
+         await _send_text(plugin, f"找不到{target_name}的 QQ", stream_id)
+         return _tool_failure("未找到目标 user_id")
+ 
+-    num = plugin.config.read.read_number
++    if plugin.config.monitor.read_list_type!='whitelist' or str(target_qq) not in plugin.config.monitor.read_list:
++        return _tool_failure('目标不在明确互动白名单内')
++    num = min(5,plugin.config.read.read_number)
+     processed_list = await plugin.persistence.load_processed_list()
+     cache_size = plugin.config.monitor.processed_feeds_cache_size
+     success, result = await read_and_engage(
+diff --git a/handlers/apis.py b/handlers/apis.py
+index e1b06b2..a1a491c 100644
+--- a/handlers/apis.py
++++ b/handlers/apis.py
+@@ -41,6 +41,8 @@ async def send_feed_api(
+     plugin,
+     message: str = "",
+     images: Optional[List[str]] = None,
++    life_basis: Optional[dict] = None,
++    expected_account: str = "",
+ ) -> Dict[str, Any]:
+     """发送说说。供其他插件 ctx.api.call('Rabbit-Jia-Er.MaiTrace.send_feed_api', ...) 调用。
+ 
+@@ -62,17 +64,26 @@ async def send_feed_api(
+         qzone = await create_qzone_publisher(plugin)
+         if qzone is None:
+             return {"result": False, "message": "无法连接 QQ 空间，Cookie 可能不存在"}
++        if life_basis is not None:
++            from ..services.space_contract import validate_basis
++            valid,reason,_=await validate_basis(plugin,life_basis)
++            if not valid: return {'result':False,'status':'deferred','message':reason}
++        if expected_account and str(qzone.uin)!=str(expected_account):
++            return {'result':False,'status':'failed','message':'ACCOUNT_MISMATCH'}
+         tid = await qzone.publish_emotion(message, decoded_images, publication=state)
+     except PublicationUncertainError as exc:
+         logger.error("send_feed_api 结果待核对: %s", exc)
+-        return {"result": False, "uncertain": True, "message": str(exc)}
++        return {"result": False, "status":"unknown", "uncertain": True, "message": str(exc)}
+     except Exception as exc:
+         logger.error("send_feed_api 发布异常: %s", exc, exc_info=True)
+-        return {"result": False, "uncertain": state.uncertain, "message": f"发送说说失败: {exc}"}
++        return {"result": False, "status":"unknown" if state.uncertain else "failed", "uncertain": state.uncertain, "message": f"发送说说失败: {exc}"}
+     if not tid:
+         return {"result": False, "message": "QQ 空间未返回发布成功的动态 ID"}
+-    await record_activity(plugin, "publish", fid=tid, text=message)
+-    return {"result": True, "message": f"说说发送成功，tid={tid}"}
++    try:
++        await record_activity(plugin, "publish", fid=tid, text=message)
++    except Exception:
++        logger.exception("Published tid=%s; local activity recording failed", tid)
++    return {"result": True, "status":"success", "tid":tid, "message": f"说说发送成功，tid={tid}"}
+ 
+ 
+ async def get_feeds_list_api(
+@@ -104,6 +115,8 @@ async def publish_topic_api(
+     current_activity: str = "",
+     activity_type: str = "",
+     outfit: str = "",
++    life_basis: Optional[dict] = None,
++    expected_account: str = "",
+ ) -> Dict[str, Any]:
+     """完整发说说流程（其它插件调）：LLM 按 topic 生成正文 → 自动配图 → 发布。
+ 
+@@ -130,6 +143,20 @@ async def publish_topic_api(
+                 "message": str,       # 人类可读的状态描述（成功/失败原因）
+             }
+     """
++    guard=None
++    instruction=''
++    if life_basis is not None:
++        from ..services.space_contract import validate_basis,contract
++        import json
++        if not contract(plugin)['ready']: return {'result':False,'status':'deferred','message':'CONFIGURATION_NOT_READY'}
++        valid,reason,actual=await validate_basis(plugin,life_basis)
++        if not valid: return {'result':False,'status':'deferred','message':reason}
++        async def guard():
++            ok,why,_=await validate_basis(plugin,life_basis)
++            return ok,why
++        current_activity=actual['name']
++        topic='分享一段公开生活'
++        instruction='仅依据以下公开活动写作。不得捏造经历、人物或目标完成；活动段结束不代表任务完成。'+json.dumps(actual,ensure_ascii=False)
+     normalized_topic = (topic or "").strip() or "随机"
+     publication = PublicationState()
+     success, story = await send_feed(
+@@ -139,6 +166,8 @@ async def publish_topic_api(
+         activity_type=activity_type,
+         outfit=outfit,
+         publication=publication,
++        before_submit=guard, optional_images=life_basis is not None, expected_account=expected_account,
++        material_instruction=instruction, interpret_custom=life_basis is None,
+     )
+     if not success:
+         return {
+@@ -146,9 +175,12 @@ async def publish_topic_api(
+             "story": "",
+             "message": f"发说说失败: {story}",
+             "uncertain": publication.uncertain,
++            "status": "unknown" if publication.uncertain else "deferred" if publication.stage=="deferred" else "failed",
++            "tid": publication.tid,
+         }
+     return {
+         "result": True,
+         "story": story,
++        "status": "success", "tid": publication.tid,
+         "message": f"说说发送成功（topic={normalized_topic}）",
+     }
+diff --git a/plugin.py b/plugin.py
+index ad6a114..7dbc32d 100644
+--- a/plugin.py
++++ b/plugin.py
+@@ -151,6 +151,9 @@ class MaiTracePlugin(MaiBotPlugin):
+                     publish_seconds,
+                     schedule_seconds,
+                 ) * 1000)
++            elif component["name"] == "browse_once_api":
++                from .services.space_contract import contract
++                component["metadata"]["timeout_ms"]=int(contract(self)["budgets"]["browse"]*1000)
+             elif component["name"] == "read_feed":
+                 component["metadata"]["timeout_ms"] = int(read_seconds * 1000)
+             elif component["name"].removesuffix("_v6") in (
+@@ -304,6 +307,16 @@ class MaiTracePlugin(MaiBotPlugin):
+         from .handlers.actions import execute_recall_qzone_activity
+         return await execute_recall_qzone_activity(self, **kwargs)
+ 
++    @API('get_space_contract',public=True,version='1')
++    async def handle_space_contract(self,**kwargs):
++        from .services.space_contract import contract
++        return contract(self)
++
++    @API('browse_once_api',public=True,version='1')
++    async def handle_browse_once(self,max_feeds=5,interaction_whitelist=None,**kwargs):
++        from .services.space_contract import browse_api
++        return await browse_api(self,max_feeds,interaction_whitelist)
++
+     @API(
+         "send_feed_api",
+         description="发送一条说说到 QQ 空间。参数：message(str, 必填)、images(list[str] base64, 可选)。",
+@@ -317,9 +330,9 @@ class MaiTracePlugin(MaiBotPlugin):
+         images: Optional[list[str]] = None,
+         **kwargs: Any,
+     ) -> dict:
+-        del kwargs
++        life_basis=kwargs.get("life_basis")
+         from .handlers.apis import send_feed_api
+-        return await send_feed_api(self, message=message, images=images)
++        return await send_feed_api(self, message=message, images=images, life_basis=life_basis, expected_account=kwargs.get("expected_account",""))
+ 
+     @API(
+         "get_feeds_list_api",
+@@ -356,7 +369,7 @@ class MaiTracePlugin(MaiBotPlugin):
+         outfit: str = "",
+         **kwargs: Any,
+     ) -> dict:
+-        del kwargs
++        life_basis=kwargs.get("life_basis")
+         from .handlers.apis import publish_topic_api
+         return await publish_topic_api(
+             self,
+@@ -364,6 +377,8 @@ class MaiTracePlugin(MaiBotPlugin):
+             current_activity=current_activity,
+             activity_type=activity_type,
+             outfit=outfit,
++            life_basis=life_basis,
++            expected_account=kwargs.get("expected_account",""),
+         )
+ 
+     @Tool(
+diff --git a/services/feed_publish.py b/services/feed_publish.py
+index 0639751..f3079de 100644
+--- a/services/feed_publish.py
++++ b/services/feed_publish.py
+@@ -94,6 +94,9 @@ async def send_feed(
+     publication: Optional[PublicationState] = None,
+     material_instruction: str = "",
+     interpret_custom: bool = True,
++    before_submit=None,
++    optional_images: bool = False,
++    expected_account: str = "",
+ ) -> Tuple[bool, str]:
+     """主入口：根据 topic 生成内容并发到 QQ 空间。
+ 
+@@ -138,6 +141,8 @@ async def send_feed(
+     if qzone is None:
+         return False, "连接 QQ 空间失败，更新 cookies 失败或本地 Cookie 不存在"
+ 
++    if expected_account and str(qzone.uin)!=str(expected_account):
++        return False,'ACCOUNT_MISMATCH'
+     # 3. 决定说说内容
+     if topic == "custom" and interpret_custom:
+         if material_instruction:
+@@ -189,15 +194,25 @@ async def send_feed(
+     except ImageGenerationError as exc:
+         # 配图约束仅在自产正文的链路生效；send_feed_api 始终纯直发。
+         logger.error("配图生成失败，未发送说说: %s", exc)
+-        return False, f"配图生成失败，未发送: {exc}"
+-
++        if not optional_images: return False, f"配图生成失败，未发送: {exc}"
++        images=[]
++
++    # Final check after generation and before the platform submission boundary.
++    if before_submit is not None:
++        allowed, reason = await before_submit()
++        if not allowed:
++            if publication is not None: publication.stage='deferred'
++            return False,reason
+     # 5. 发布
+     try:
+         tid = await qzone.publish_emotion(story, images, publication=publication)
+         if not tid:
+             return False, "QQ 空间未返回发布成功的动态 ID"
+         logger.info("成功发送说说, tid=%s", tid)
+-        await record_activity(plugin, "publish", fid=tid, text=story)
++        try:
++            await record_activity(plugin, "publish", fid=tid, text=story)
++        except Exception:
++            logger.exception("Published tid=%s; local activity recording failed", tid)
+         return True, story
+     except PublicationUncertainError as exc:
+         logger.error("说说发布结果不明，不会自动重发: %s", exc)
+diff --git a/services/monitor.py b/services/monitor.py
+index f3a7399..0daf524 100644
+--- a/services/monitor.py
++++ b/services/monitor.py
+@@ -52,8 +52,10 @@ def _passes_read_list(target_qq: str, read_list: list[str], list_type: str) -> b
+ class FeedMonitor:
+     """刷空间 + 评论/点赞 + 回复评论（含多层链式回复）。"""
+ 
+-    def __init__(self, plugin):
++    def __init__(self, plugin, *, max_feeds=5, interaction_whitelist=None):
+         self.plugin = plugin
++        self.max_feeds=max_feeds
++        self.whitelist=set(plugin.config.monitor.read_list if interaction_whitelist is None else interaction_whitelist)
+ 
+     async def check_feeds(
+         self,
+@@ -103,6 +105,7 @@ class FeedMonitor:
+         show_prompt = self.plugin.config.llm.show_prompt
+ 
+         # 逐条处理
++        feeds_list=[f for f in feeds_list if isinstance(f,dict) and str(f.get('target_qq','')) in self.whitelist | {str(qq_account)}][:self.max_feeds]
+         for feed in feeds_list:
+             if not isinstance(feed, dict) or feed.get("error"):
+                 continue
+@@ -115,11 +118,11 @@ class FeedMonitor:
+             fid = feed["tid"]
+             target_qq = str(feed.get("target_qq", ""))
+             rt_con = feed.get("rt_con", "")
+-            comments_list = feed.get("comments") or []
++            comments_list = [c for c in (feed.get("comments") or []) if str(c.get('qq_account','')) in self.whitelist | {str(qq_account)}][:5]
+             created_time = feed.get("created_time", "未知时间")
+ 
+             # 名单过滤
+-            if not _passes_read_list(target_qq, list(cfg_monitor.read_list), cfg_monitor.read_list_type):
++            if target_qq != str(qq_account) and target_qq not in self.whitelist:
+                 logger.info("跳过名单策略外的 QQ: %s", target_qq)
+                 continue
+ 
+@@ -375,11 +378,19 @@ class FeedMonitor:
+             await asyncio.sleep(5 + random.random() * 5)
+ 
+ 
+-async def run_browse_once(plugin) -> tuple[bool, str]:
++async def run_browse_once(plugin, *, max_feeds=5, interaction_whitelist=None) -> tuple[bool, str]:
++    from .space_contract import browse_lock
++    lock=browse_lock(plugin)
++    if lock.locked(): return False,'BROWSE_BUSY'
++    async with lock:
++        return await _run_browse_once(plugin,max_feeds=max_feeds,interaction_whitelist=interaction_whitelist)
++
++
++async def _run_browse_once(plugin, *, max_feeds=5, interaction_whitelist=None) -> tuple[bool, str]:
+     """便捷入口：加载 processed_* → check_feeds → 保存。RoutineRunner 调用此。"""
+     processed_list = await plugin.persistence.load_processed_list()
+     processed_comments = await plugin.persistence.load_processed_comments()
+-    monitor = FeedMonitor(plugin)
++    monitor = FeedMonitor(plugin,max_feeds=max_feeds,interaction_whitelist=interaction_whitelist)
+     try:
+         success, msg = await monitor.check_feeds(processed_list, processed_comments)
+     finally:
+diff --git a/services/space_contract.py b/services/space_contract.py
+new file mode 100644
+index 0000000..ee96e88
+--- /dev/null
++++ b/services/space_contract.py
+@@ -0,0 +1,66 @@
++"""Small pinned adaptation: public Vita evidence, bounds and shared browse lock."""
++import asyncio
++from datetime import datetime, timezone
++from .limits import publication_budget_seconds
++
++ADAPTATION='vita-coordinate-1'
++UPSTREAM='712c777aab869c68808f186c24dddf4cab3e36d1'
++VITA='davidblackcn.maibot-maivita-plugin'
++
++
++def browse_lock(plugin):
++    if not hasattr(plugin,'_space_browse_lock'): plugin._space_browse_lock=asyncio.Lock()
++    return plugin._space_browse_lock
++
++
++def contract(plugin):
++    c=plugin.config
++    checks={'life_disabled':not c.life.enabled,'schedule_disabled':not c.schedule.enabled,
++        'messaging_disabled':not c.messaging.enabled,'native_post_disabled':not c.routine.post_enabled,
++        'native_browse_disabled':not c.routine.browse_enabled,'chat_material_disabled':not c.send.enable_chat_memory,
++        'whitelist_mode':c.monitor.read_list_type=='whitelist'}
++    # At most 5 feeds and 5 comment replies per feed, plus one comment/like.
++    browse=600+5*(4+6*(c.llm.llm_timeout_seconds+10+60)+5*10)
++    return {'api_version':1,'adaptation':ADAPTATION,'upstream':UPSTREAM,'ready':all(checks.values()),
++        'configuration':checks,'interaction_whitelist':list(c.monitor.read_list),
++        'budgets':{'post':publication_budget_seconds(c),'browse':browse},
++        'round_result_only':True,'max_feeds':5}
++
++
++async def validate_basis(plugin,basis):
++    """Always reread public evidence; a caller's text cannot become private material."""
++    try:
++        response=await plugin.ctx.call_host_method('cap.call',payload={'capability':'api.call',
++            'args':{'api_name':VITA+'.get_public_life_context','version':'1','args':{}}},timeout_ms=3000)
++        value=response.get('result') if response.get('success') is True else None
++        if not value or value.get('ok') is not True: return False,'LIFE_UNAVAILABLE',None
++        data=value['data']
++        age=(datetime.now(timezone.utc)-datetime.fromisoformat(data['as_of'])).total_seconds()
++        if not -5<=age<=30: return False,'LIFE_STALE',None
++        if not data.get('awake'): return False,'SLEEPING',None
++        if data.get('availability',{}).get('state')!='free': return False,'NOT_FREE',None
++        requested=basis['activity']; aid=requested['activity_id']
++        candidates=[data.get('activity')] if basis.get('current') else data.get('history',[])
++        actual=next((a for a in candidates if a and a.get('activity_id')==aid),None)
++        if not actual or actual.get('visibility')!='public_summary' or actual.get('continuity_unknown'):
++            return False,'MATERIAL_INVALIDATED',None
++        if not actual.get('ended_at') and (actual.get('duration_minutes') or 0)<15:
++            return False,'MATERIAL_TOO_RECENT',None
++        return True,'OK',actual
++    except asyncio.CancelledError: raise
++    except Exception: return False,'LIFE_UNAVAILABLE',None
++
++
++async def browse_api(plugin,max_feeds=5,interaction_whitelist=None):
++    if type(max_feeds) is not int or not 1<=max_feeds<=5:
++        return {'result':False,'status':'failed','message':'INVALID_FEED_LIMIT'}
++    if not contract(plugin)['ready']:
++        return {'result':False,'status':'deferred','message':'CONFIGURATION_NOT_READY'}
++    allowed=set(str(q) for q in plugin.config.monitor.read_list)
++    requested=set(interaction_whitelist or [])
++    if not requested or not requested<=allowed:
++        return {'result':False,'status':'deferred','message':'EXPLICIT_WHITELIST_REQUIRED'}
++    from .monitor import run_browse_once
++    success,message=await run_browse_once(plugin,max_feeds=max_feeds,interaction_whitelist=sorted(requested))
++    return {'result':success,'status':'success' if success else 'deferred' if message=='BROWSE_BUSY' else 'failed',
++            'message':message,'round_result_only':True,'max_feeds':max_feeds}

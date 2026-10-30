@@ -21,7 +21,26 @@ class Strict(PluginConfigBase):
 
 class PluginSettings(Strict):
     enabled: bool=True
-    config_version: Literal['1']='1'
+    config_version: Literal['2']='2'
+
+
+class SpaceSettings(Strict):
+    mode: Literal['disabled','shadow','controlled']=Field(default='shadow',description='空间独立模式：关闭、只读观察、自动执行；与群模式分开。')
+    timezone: str=Field(default='Asia/Shanghai',description='空间发布和浏览额度的自然日时区。建议与 Vita 相同。')
+    post_daily_limit: int=Field(default=2,ge=0,le=2,description='每日发布尝试上限，失败和未知结果也计数。')
+    post_interval_seconds: int=Field(default=14400,ge=14400,description='两次发布尝试最小间隔秒数，至少 4 小时。')
+    browse_daily_limit: int=Field(default=6,ge=0,le=6,description='每日浏览轮次上限，不是内部模型调用数。')
+    browse_interval_seconds: int=Field(default=3600,ge=3600,description='两轮浏览最小间隔秒数，至少 1 小时。')
+    max_feeds: int=Field(default=5,ge=1,le=5,description='每轮最多处理的动态条数。')
+    interaction_whitelist: list[str]=Field(default_factory=list,max_length=100,description='明确 QQ 号；空名单不互动，须包含在 MaiTrace 的白名单中。')
+
+    @model_validator(mode='after')
+    def validate_space(self):
+        from zoneinfo import ZoneInfo
+        ZoneInfo(self.timezone)
+        if any(not q.isascii() or not q.isdigit() or not 5<=len(q)<=20 for q in self.interaction_whitelist):
+            raise ValueError('Space whitelist requires explicit QQ accounts')
+        return self
 
 
 class Route(Strict):
@@ -43,6 +62,7 @@ class Route(Strict):
 
 class Settings(Strict):
     plugin: PluginSettings=Field(default_factory=PluginSettings)
+    space: SpaceSettings=Field(default_factory=SpaceSettings)
     mode: Literal['shadow','controlled']='shadow'
     acknowledgement: Literal['','isolated-test-instance']=''
     routes: list[Route]=Field(default_factory=list,max_length=4)
@@ -58,6 +78,16 @@ class Settings(Strict):
     max_records: int=Field(default=10000,ge=256,le=100000)
     payload_retention_days: int=Field(default=7,ge=1,le=90)
     privileged_writes: Literal[False]=False
+
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_space(cls,data):
+        if isinstance(data,dict) and str(data.get('plugin',{}).get('config_version','2'))=='1':
+            from copy import deepcopy
+            data=deepcopy(data)
+            data.setdefault('plugin',{})['config_version']='2'
+            data['space']={'mode':'disabled'}
+        return data
 
     @model_validator(mode='after')
     def scope(self):

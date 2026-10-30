@@ -2,6 +2,8 @@ name: MaiVita checks
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+env:
+  MAIBOT_EVIDENCE_DIR: ../docs/reports/maibot-maivita-plugin
 jobs:
   isolated:
     runs-on: windows-latest
@@ -28,9 +30,9 @@ jobs:
         with:
           name: maivita-checks-${{ github.sha }}
           path: |
-            evidence/ci-regression.json
-            evidence/i0/results.json
-            evidence/i0/environment-tests.json
+            ../docs/reports/maibot-maivita-plugin/ci-regression.json
+            ../docs/reports/maibot-maivita-plugin/i0/results.json
+            ../docs/reports/maibot-maivita-plugin/i0/environment-tests.json
       # Full Host + real model is a separately recorded local gate; no keys,
       # external accounts or production configuration are available to this job.
 

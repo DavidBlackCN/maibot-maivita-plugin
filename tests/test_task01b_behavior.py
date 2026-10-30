@@ -176,7 +176,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             u.commit()
         data=snapshot(self.runtime,'Asia/Shanghai','test-stream')
         self.assertEqual(data['counts'],Counter(planned=1,done=1,started=1))
-        self.assertIn('3 项（1 完成 / 1 进行中 / 1 待开始）',render_status(data))
+        self.assertIn('3 项（不作为实际经历或完成证明）',render_status(data))
 
 
 class ConfigAndPromptTests(unittest.IsolatedAsyncioTestCase):
@@ -203,7 +203,7 @@ class ConfigAndPromptTests(unittest.IsolatedAsyncioTestCase):
         port=await self.make_port(plan())
         await port(self.state,('daily-planning:2026-10-29',),task_kind='planning')
         prompt=json.loads(self.ctx.llm.generate.call_args.args[0])
-        self.assertEqual(set(prompt['contract']['commands']),{'apply_plan_patch','update_direction'})
+        self.assertEqual(set(prompt['contract']['commands']),{'apply_plan_patch'})
         self.assertEqual(prompt['contract']['example']['kind'],'apply_plan_patch')
         self.assertEqual(prompt['contract']['example']['payload']['local_date'],'2026-10-29')
         self.assertIn('不要直接开始活动',prompt['contract']['instruction'])
@@ -248,7 +248,7 @@ class HushAndRenderingTests(unittest.IsolatedAsyncioTestCase):
             ('waking','正在醒来',None,'无')]:
             text=render_status({**data,'phase':phase},hush)
             self.assertIn('MaiVita：'+label,text); self.assertIn('不回复原因：'+reasons,text)
-            self.assertEqual(len(text.splitlines()),4)
+            self.assertEqual(len(text.splitlines()),6)
 
 
 class CommandIsolationTests(unittest.IsolatedAsyncioTestCase):
@@ -370,5 +370,5 @@ class StatusDatabaseExamplesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('睡眠静默（MaiVita）、硬静音（MaiHush，剩余 2 分 5 秒）',outputs['temporarily_awake'])
         self.assertIn('degraded',outputs['waking']); self.assertIn('不回复原因：无',outputs['waking'])
         for text in outputs.values():
-            self.assertIn('3 项（1 完成 / 1 进行中 / 1 待开始）',text)
+            self.assertIn('3 项（不作为实际经历或完成证明）',text)
             self.assertIn('模型调用：2/16 次 | 上次规划：10-29 08:00',text)

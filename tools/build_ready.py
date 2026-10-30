@@ -9,13 +9,15 @@ import tempfile
 import zipfile
 import subprocess
 
-root=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(root))
+root=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from tools.workspace_paths import EVIDENCE
 from tools.package import runtime_manifest,file_manifest,entries,build_zip,HOST_COMMIT,SDK_VERSION
 from verify_ready import verification_manifest
 
 
 def evaluate():
-    directory=root/'evidence/integration-ready'
+    directory=EVIDENCE/'integration-ready'
     read=lambda name:json.loads((directory/name).read_text(encoding='utf-8'))
     offline,smoke,components,restore,audit=[read(name) for name in
         ('offline-checks.json','full-host-smoke.json','components.json','restore.json','source-audit.json')]
@@ -46,8 +48,8 @@ def evaluate():
         'contract_version':'1.0.0','long_observation':'deferred_to_joint_core_plugin_testing',
         'real_ecosystem':'not_run_deferred_to_joint_testing','production_switch':False,'independent_feature_development':'frozen'}
     (directory/'acceptance.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
-    public={'status':'integration_ready' if ready else 'not_ready','plugin_version':'0.8.2',
-        'host_commit':HOST_COMMIT,'sdk':SDK_VERSION,'config_version':'3','schema_version':6,'contract_version':'1.0.0',
+    public={'status':'integration_ready' if ready else 'not_ready','plugin_version':'0.9.0',
+        'host_commit':HOST_COMMIT,'sdk':SDK_VERSION,'config_version':'4','schema_version':7,'contract_version':'1.0.0',
         'checks':checks,'source_fingerprints_match':fingerprint,
         'runtime_manifest_sha256':hashlib.sha256(json.dumps(runtime,sort_keys=True).encode()).hexdigest(),
         'static_unit_runner':result['static_unit_runner'],'public_source_and_export_audit':result['public_source_and_export_audit'],
@@ -55,7 +57,7 @@ def evaluate():
         'long_observation':'joint_core_plugin_testing','real_ecosystem':'not_run_joint_testing',
         'h01':result['h01'],'h02':result['h02'],'h03':result['h03'],
         'production_switch':False,'independent_feature_development':'frozen'}
-    (root/'docs/integration-ready.json').write_text(json.dumps(public,indent=2),encoding='utf-8')
+    (EVIDENCE/'integration-ready-summary.json').write_text(json.dumps(public,indent=2),encoding='utf-8')
     print(json.dumps({key:value for key,value in result.items() if key!='runtime_files'},indent=2))
     return result
 
@@ -76,12 +78,12 @@ def main():
                 for name,data in actual.items():
                     path=destination/name; assert path.resolve().is_relative_to(destination)
                     path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(data)
-                code="import importlib.util,sys,pathlib; p=pathlib.Path(sys.argv[1]);s=importlib.util.spec_from_file_location('ready_pkg',p/'__init__.py',submodule_search_locations=[str(p)]);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);from ready_pkg.plugin import create_plugin;q=create_plugin();assert q.get_components();assert q.config.plugin.config_version=='3' and q.config.plugin.enabled;assert m.__version__=='0.8.2'"
+                code="import importlib.util,sys,pathlib; p=pathlib.Path(sys.argv[1]);s=importlib.util.spec_from_file_location('ready_pkg',p/'__init__.py',submodule_search_locations=[str(p)]);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);from ready_pkg.plugin import create_plugin;q=create_plugin();assert q.get_components();assert q.config.plugin.config_version=='4' and q.config.plugin.enabled;assert m.__version__=='0.9.0'"
                 subprocess.run([sys.executable,'-I','-c',code,str(destination)],cwd=destination,check=True,timeout=20)
         verification={'passed':True,'artifact':args.output.name,'sha256':checksum,'files':len(actual),
             'bytes':args.output.stat().st_size,'exact_source_match':True,'fresh_process_import':True,'default_enabled':True,
             'runtime_data_or_credentials':False}
-        (root/'evidence/integration-ready/package.json').write_text(json.dumps(verification,indent=2),encoding='utf-8')
+        (EVIDENCE/'integration-ready/package.json').write_text(json.dumps(verification,indent=2),encoding='utf-8')
         print(json.dumps(verification,indent=2))
 
 

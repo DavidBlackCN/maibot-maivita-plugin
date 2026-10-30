@@ -98,6 +98,8 @@ class DecisionCoordinator:
             u.commit()
         self.last_monotonic[char] = mono
         task_kind=decision_task_kind(triggers)
+        if task_kind=='present' and self.engine.scheduler.enabled:
+            task_kind='segment'
         for attempt in range(2):
             if attempt:
                 current=self.engine.state(char)

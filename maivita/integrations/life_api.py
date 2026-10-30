@@ -24,8 +24,18 @@ class LifeAPI:
         if method=='get_current_activity':
             return LegacyLifeBridge(self.runtime.engine,timezone=self.runtime.config.timezone).get_current_activity(scope)
         try:
-            if method in ('get_life_state','get_plan','get_availability','get_diagnostics','get_goals'):
+            if method in ('get_life_state','get_plan','get_availability','get_diagnostics','get_goals','get_public_life_context'):
                 data=getattr(self.runtime.queries,method)(scope)
+                if method=='get_diagnostics':
+                    from ..life.domain.clock import local_day_bounds,to_epoch_ms
+                    now=self.runtime.engine.clock.now_utc()
+                    start,end=local_day_bounds(self.runtime.engine.clock.to_local(now,self.runtime.config.timezone).date(),self.runtime.config.timezone)
+                    with self.runtime.database.read_view() as u:
+                        used=u.connection.execute('SELECT count(*) FROM decision_runs WHERE started_at_ms>=? AND started_at_ms<?',
+                            (to_epoch_ms(start),to_epoch_ms(end))).fetchone()[0]
+                    data.update(life_budget={'used':used,'limit':self.runtime.decision_budget,'timezone':self.runtime.config.timezone},
+                        body_rule='fixed-categories-v4',reference_plan_only=True,
+                        check_interval_minutes=self.runtime.config.scheduler.decision_interval_minutes)
             else:
                 require(self.authorize is not None and await self.authorize(trusted_context,method,scope) is True,'permission denied')
                 if method=='request_replan':

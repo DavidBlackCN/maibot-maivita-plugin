@@ -27,6 +27,9 @@ def main():
     parser.add_argument('--source-lock',type=Path,default=ROOT/'maibot-maihush-plugin/tests/fixtures/source-lock.json')
     parser.add_argument('--auto-routes',action='store_true')
     parser.add_argument('--trusted-management',action='store_true')
+    parser.add_argument('--space',action='store_true')
+    parser.add_argument('--maitrace-source',type=Path)
+    parser.add_argument('--server-probe-source',type=Path)
     args=parser.parse_args()
     host=args.host_source.resolve()
     verification={name:digest(ROOT/'tools'/name) for name in ('run_joint_native.py','joint_native_scenario.py')}
@@ -37,7 +40,7 @@ def main():
         if digest(host/name)!=sha: raise ValueError('Host source mismatch: '+name)
     site=Path(maibot_sdk.__file__).parent.parent
     sdk=importlib.metadata.version('maibot-plugin-sdk')
-    host_version={'2.15.0':'1.3.12','2.16.0':'1.3.15'}[sdk]
+    host_version={'2.15.0':'1.3.12','2.16.0':'1.3.15','2.19.0':'1.3.18'}[sdk]
     for name,sha in lock['sdk_files'].items():
         if digest(site/name)!=sha: raise ValueError('SDK source mismatch: '+name)
     work.mkdir(parents=True)
@@ -48,7 +51,8 @@ def main():
     for folder,package in [('maibot-maivita-plugin','maivita'),('maibot-maiIdentity-plugin','maiidentity'),
                            ('maibot-maihush-plugin','maihush'),('maibot-maicoordinate-plugin','maicoordinate')]:
         source=ROOT/folder; target=work/'plugins'/folder; target.mkdir(parents=True)
-        if args.bundle:
+        packaged=folder in bundles
+        if packaged:
             entry=bundles[folder]; archive=args.bundle/entry['archive']
             if digest(archive)!=entry['sha256']: raise ValueError('archive hash mismatch')
             with zipfile.ZipFile(archive) as package_zip:
@@ -57,18 +61,45 @@ def main():
                     if not dest.is_relative_to(target.resolve()): raise ValueError('unsafe archive member')
                 package_zip.extractall(work/'plugins')
         for name in ('plugin.py','_manifest.json'):
-            if not args.bundle: shutil.copyfile(source/name,target/name)
+            if not packaged: shutil.copyfile(source/name,target/name)
             if digest(target/name)!=digest(source/name): raise ValueError('packaged source mismatch')
             hashes[folder+'/'+name]=digest(source/name)
         for path in (source/package).rglob('*'):
             if path.is_file() and path.suffix in ('.py','.sql','.json') and '__pycache__' not in path.parts:
                 relative=path.relative_to(source); dest=target/relative; dest.parent.mkdir(parents=True,exist_ok=True)
-                if not args.bundle: shutil.copyfile(path,dest)
+                if not packaged: shutil.copyfile(path,dest)
                 if digest(dest)!=digest(path): raise ValueError('packaged source mismatch')
                 hashes[folder+'/'+relative.as_posix()]=digest(path)
-        if not args.bundle:
+        if not packaged:
             (target/'_locales').mkdir(exist_ok=True); (target/'_locales/zh-CN.json').write_text('{}')
     shutil.copyfile(host/'pyproject.toml',work/'pyproject.toml')
+    if args.space:
+        if not args.maitrace_source: raise ValueError('--maitrace-source required for space acceptance')
+        trace=work/'plugins/MaiTrace'
+        if 'MaiTrace' in bundles:
+            entry=bundles['MaiTrace'];archive=args.bundle/entry['archive']
+            if digest(archive)!=entry['sha256']:raise ValueError('MaiTrace archive hash mismatch')
+            with zipfile.ZipFile(archive) as package_zip:
+                for name in package_zip.namelist():
+                    dest=(work/'plugins'/name).resolve()
+                    if not dest.is_relative_to(trace.resolve()):raise ValueError('unsafe MaiTrace archive member')
+                    if hashlib.sha256(package_zip.read(name)).hexdigest()!=entry['files'][name]:raise ValueError('MaiTrace entry hash mismatch')
+                package_zip.extractall(work/'plugins')
+        else:
+            shutil.copytree(args.maitrace_source,trace,ignore=shutil.ignore_patterns('.git','__pycache__','config.toml','data'))
+        fixture=ROOT/'maibot-maivita-plugin/ecosystem/maitrace/tests/native_fixture.py'
+        shutil.copyfile(fixture,trace/'native_fixture.py')
+        # Explicit test-only IO replacement in the staged copy, never release source.
+        with (trace/'plugin.py').open('a',encoding='utf-8') as f:
+            f.write('\nfrom .native_fixture import install as _install_native_fixture\n_install_native_fixture()\n')
+    if args.server_probe_source:
+        probe=work/'plugins/phase1-server-probe'
+        shutil.copytree(args.server_probe_source,probe)
+        import tomllib,tomli_w
+        cfg=tomllib.loads((probe/'config.toml').read_text('utf-8'))
+        assert cfg['execute'] is False
+        cfg['plugin']['enabled']=False
+        (probe/'config.toml').write_text(tomli_w.dumps(cfg),encoding='utf-8')
     safety=work/'safety'; safety.mkdir()
     socket_dir=tempfile.TemporaryDirectory(prefix='joint-rpc-')
     socket_path=str(Path(socket_dir.name)/'rpc.sock')
@@ -78,6 +109,8 @@ def main():
         PYTHONPATH=os.pathsep.join((str(safety),str(ROOT/'tools'),str(host))),
         MAIBOT_HOST_VERSION=host_version,JOINT_AUTO_ROUTES=str(int(args.auto_routes)),
         JOINT_TRUSTED_MANAGEMENT=str(int(args.trusted_management)),
+        JOINT_SPACE=str(int(args.space)),
+        JOINT_SERVER_PROBE=str(int(bool(args.server_probe_source))),
         MAIBOT_INSTANCE_DIR=str(work),TEMP=str(work),TMP=str(work),USERPROFILE=str(work))
     if os.name!='nt': env['MAIHUSH_TEST_SOCKET_PATH']=socket_path
     process=subprocess.Popen([sys.executable,'-m','joint_native_scenario'],cwd=work,env=env,stdout=subprocess.PIPE,

@@ -17,16 +17,10 @@ def entries():
             if path.is_file() and path.suffix in ('.py','.sql'):
                 files[path.relative_to(ROOT).as_posix()]=path.read_bytes()
     for name in READMES: files[name]=(ROOT/name).read_bytes()
-    for name in ('LIMITATIONS.md','ROLLBACK.md','CONTRACTS.md','SOURCES.md','SOURCE_LAYOUT.md','DIAGNOSTICS.md'):
+    for name in ('LIMITATIONS.md','ROLLBACK.md','CONTRACTS.md','SOURCES.md','DIAGNOSTICS.md'):
         files['docs/'+name]=(ROOT/'docs'/name).read_bytes()
     schema=ROOT/'docs/contracts-v1.schema.json'
     if schema.exists(): files['docs/contracts-v1.schema.json']=schema.read_bytes()
-    layout=ROOT/'docs/source-layout-map.json'
-    if layout.exists(): files['docs/source-layout-map.json']=layout.read_bytes()
-    public_proof=ROOT/'docs/integration-ready.json'
-    if public_proof.exists(): files['docs/integration-ready.json']=public_proof.read_bytes()
-    default_proof=ROOT/'docs/default-install.json'
-    if default_proof.exists(): files['docs/default-install.json']=default_proof.read_bytes()
     files['LICENSE']=(ROOT/'LICENSE').read_bytes()
     files['SOURCES.md']=(ROOT/'docs/SOURCES.md').read_bytes()
     for name in ('plugin.py','README.md','logo.jpg'):

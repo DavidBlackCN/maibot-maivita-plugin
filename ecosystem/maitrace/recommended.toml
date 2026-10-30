@@ -1,0 +1,35 @@
+[plugin]
+enabled = true
+config_version = "6.3.0"
+
+[life]
+enabled = false
+private_proactive_enabled = false
+
+[schedule]
+enabled = false
+auto_schedule_enabled = false
+activity_proactive_enabled = false
+
+[messaging]
+enabled = false
+
+[routine]
+post_enabled = false
+browse_enabled = false
+
+[send]
+enable_chat_memory = false
+include_private_chat_memory = false
+
+[image]
+enable_image = false
+require_image = false
+
+[monitor]
+read_list_type = "whitelist"
+read_list = []
+enable_auto_reply = true
+# 社区已有赞评概率仍生效；模型也可能选择不评论。
+like_probability = 0.8
+comment_probability = 0.5

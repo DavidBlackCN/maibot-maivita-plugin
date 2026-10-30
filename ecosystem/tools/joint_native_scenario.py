@@ -18,6 +18,7 @@ COORD='davidblackcn.maibot-maicoordinate-plugin'
 
 async def run(work):
     automatic=os.environ.get('JOINT_AUTO_ROUTES')=='1'
+    space=os.environ.get('JOINT_SPACE')=='1'
     trusted=os.environ.get('JOINT_TRUSTED_MANAGEMENT')=='1'
     scope=None if automatic else 'synthetic-test-scope'
     from src.config.config import config_manager
@@ -43,6 +44,14 @@ async def run(work):
         configs['maibot-maihush-plugin']['routes'][0]['route_scope']=''
     route_id=stream if automatic else 'test'
     if trusted: configs['maibot-maiIdentity-plugin']['management']={'vita_admin_accounts':['10001']}
+    if space:
+        configs['maibot-maicoordinate-plugin']['routes']=[]
+        configs['maibot-maicoordinate-plugin']['plugin']['config_version']='2'
+        configs['maibot-maicoordinate-plugin']['space']={'mode':'controlled','interaction_whitelist':[]}
+        configs['MaiTrace']={'plugin':{'config_version':'6.3.0'},'life':{'enabled':False},'schedule':{'enabled':False},'messaging':{'enabled':False},
+            'routine':{'post_enabled':False,'browse_enabled':False},'send':{'enable_chat_memory':False},
+            'image':{'enable_image':False},'monitor':{'read_list_type':'whitelist','read_list':['10001'],
+                'enable_auto_reply':True,'like_probability':1.0,'comment_probability':1.0,'silent_hours':''}}
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf8')
     # Seed a real life database while no Runner owns it; startup will perform
@@ -54,9 +63,14 @@ async def run(work):
     from maivita.life.storage.life_database import LifeDatabase
     vita_path=work/'data/plugins'/VITA/'life/maivita.db'
     vita_path.parent.mkdir(parents=True)
-    clock=ManualClock(datetime.now(timezone.utc)-timedelta(minutes=6))
+    clock=ManualClock(datetime.now(timezone.utc)-timedelta(minutes=21 if space else 6))
     db=LifeDatabase.create(vita_path,clock=clock); life=LifeStateEngine(db); life.initialize()
-    life.execute(Command(kind='start_sleep',payload={'duration_minutes':5},source='legacy_observed',idempotency_key='sleep-fixture',expected_state_version=0))
+    if space:
+        life.execute(Command(kind='start_activity',payload={'name':'安静阅读','category':'rest','visibility':'public_summary'},source='legacy_observed',idempotency_key='space-fixture',expected_state_version=0))
+        clock.advance(timedelta(minutes=21))
+        life.execute(Command(kind='advance',payload={'initialize_neutral':True},idempotency_key='space-observed-until-now',expected_state_version=1))
+    else:
+        life.execute(Command(kind='start_sleep',payload={'duration_minutes':5},source='legacy_observed',idempotency_key='sleep-fixture',expected_state_version=0))
     from src.plugin_runtime.integration import get_plugin_runtime_manager
     from src.plugin_runtime.host.supervisor import PluginSupervisor
     manager=get_plugin_runtime_manager(); manager.ensure_builtin_hook_specs_registered()
@@ -68,6 +82,7 @@ async def run(work):
     async def model(plugin_id,capability,args):
         model_calls.append(plugin_id)
         if plugin_id==COORD: return {'success':True,'response':'隔离测试：我醒啦。','model_name':'synthetic'}
+        if plugin_id=='Rabbit-Jia-Er.MaiTrace': return {'success':True,'response':'隔离测试：安静地读了一会儿书。','model_name':'synthetic'}
         return {'success':False,'response':'','model_name':'synthetic-unavailable'}
     supervisor.capability_service.register_capability('llm.get_available_models',models)
     supervisor.capability_service.register_capability('llm.generate',model)
@@ -106,6 +121,9 @@ async def run(work):
     cases=[]
     try:
         await supervisor.start()
+        if space:
+            from phase1_native_space import space_cases
+            return await space_cases(work,supervisor,call,configs,model_calls,vita_path)
         assert {VITA,HUSH,IDENTITY,COORD}<=set(supervisor._registered_plugins),supervisor._registered_plugins
         cases.append('four_real_plugins_loaded_on_pinned_host_sdk')
         # The actual Runner endpoint used by WebUI must return a renderable

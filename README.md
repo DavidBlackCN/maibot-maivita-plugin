@@ -2,20 +2,20 @@
 
 为 MaiBot 提供持久的生活状态、活动、计划、目标与睡眠，让日常回复感知角色正在做什么。
 
-- 当前版本：`0.8.2`
-- MaiBot 版本范围：`1.3.12–1.3.15`
-- Plugin SDK 版本范围：`2.15.0–2.16.0`
+- 当前版本：`0.9.0`
+- MaiBot 版本范围：`1.3.12–1.3.18`
+- Plugin SDK 版本范围：`2.15.0–2.19.0`
 - 项目地址：[MaiVita](https://github.com/DavidBlackCN/maibot-maivita-plugin)
 
-仅支持精确配对 **Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**，不支持中间版本或交叉配对。无需私有 Host 补丁。
+仅支持精确配对 **Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**，不支持中间版本或交叉配对。无需私有 Host 补丁。
 
 ## 功能
 
 ### 日程规划与生活状态
 
-根据 Host 的昵称、人设、行为和回复风格生成每日计划，向 Planner 和 Replyer 提供公开生活上下文。计划代表打算做的事，活动历史代表实际发生的事；完成目标需要引用已结束活动，不能把计划直接当成经历。
+根据 Host 的昵称、人设、行为和回复风格生成每日计划，向 Planner 和 Replyer 提供公开生活上下文。计划代表打算做的事，活动历史代表实际发生的事；活动段结束不证明目标完成；不能把计划直接当成经历。长期目标自动经营、习惯学习和承诺自动协商暂未启用。
 
-每日规划默认开启，使用 Host 的 `planner` 模型任务，**会产生模型调用费用**。按角色时区每天 08:00 触发，晚启动会补触发当天规划；重启不会重复已调用的规划。每次模型调用尝试均计入滚动 24 小时预算，包括失败重试。
+每日规划默认开启，使用 Host 的 `planner` 模型任务，**会产生模型调用费用**。按角色时区每天 08:00 触发，晚启动会补触发当天规划；重启不会重复已调用的规划。参考规划与滚动生活共用角色时区自然日预算，新安装默认 20 次，包含失败重试。实际活动只有滚动决策一条推进路径。
 
 ### 可确认的生活管理
 
@@ -27,11 +27,30 @@
 
 忙闲三态功能默认关闭，可通过 `[availability] enabled = true` 开启。`/maivita status` 显示三态、原因及开关状态：学习、工作、出行、创作为 slow；其他活动能耗率 `energy_rate <= -0.05` 也为 slow；其余为 free。slow 与 free 均正常回复。活跃睡眠会话或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 busy，启用后出站守卫返回 abort。类别与身体阈值可配置。
 
-本阶段采用方案 B：不延迟、不缓存、不补发消息，`followup_after_busy` 仅支持 `false`。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
+忙碌期间不延迟、不缓存、不补发消息，`followup_after_busy` 仅支持 `false`。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
 
 ### 可选主动表达
 
 **MaiCoordinate 是可选扩展**：不安装也能使用 MaiVita、MaiIdentity、MaiHush 三核心功能。需要根据公开生活事件主动发言时，可另行安装 MaiCoordinate；其默认 shadow 模式不调用模型、不发送消息，主动表达须显式选择 controlled。
+
+### 身体变化
+
+身体数值是角色模拟估计。按实际睡眠会话或活动类别计算每小时变化，新活动不由模型填写精力速率。
+
+| 状态／类别 | 精力 | 疲劳 | 压力 |
+| --- | ---: | ---: | ---: |
+| 实际睡眠 | +8 | −5 | −3 |
+| 清醒休息 | +3 | −2 | −1 |
+| 学习、工作、创作、出行 | −3 | +2 | +0.8 |
+| 其他清醒活动 | −1 | +1 | −1 |
+
+默认每 15 分钟检查一次，检查不一定调用模型。模型失败或预算用完时，无活动或过度疲劳者进入中性休息，其他情况有界延续；睡眠按截止时间或可信管理员唤醒结束。停机未知区间不补编经历，升级不追溯重算旧身体值。
+
+### QQ 空间组合
+
+Vita 提供公开生活，MaiCoordinate 判断时机，固定适配的 MaiTrace 6.3.0 执行发布与浏览互动。空间独立于群路由；新配置先观察，旧配置迁移后关闭。默认每天最多尝试发布 2 次、间隔至少 4 小时；最多浏览 6 轮、间隔至少 1 小时，每轮最多 5 条。互动须设置显式白名单。
+
+适配补丁、推荐配置与离线构建方法见 [MaiTrace 适配说明](ecosystem/maitrace/README.md)；协调层配置见 [MaiCoordinate](ecosystem/coordinator/README.md)。QQ 登录、模型和图片服务仍由 MaiTrace 配置，不能同时启用它自身的自动生活与空间调度。
 
 ## 安装
 
@@ -52,7 +71,7 @@ MaiBot/
 
 ### 2. 检查模型与管理员
 
-确认 Host 的 `model_config.toml` 已配置 `planner` 任务。若暂不需要自动规划，在首次加载前按示例准备配置，将 `daily_planning_enabled` 设为 `false`，并保持 `generate_on_start = false`。
+确认 Host 的 `model_config.toml` 已配置 `planner` 任务。若不需要每日参考计划，可关闭 `daily_planning_enabled`；滚动生活仍会调用模型。完全停用需关闭插件总开关。
 
 生活管理权限唯一来自 **MaiIdentity 的 config.toml**：
 
@@ -70,9 +89,9 @@ vita_admin_accounts = ["你的真实QQ号"]
 
 ### 从旧版本更新
 
-停机备份代码、`config.toml` 和完整插件数据目录，再替换代码。保留现有数据与写锁设置；配置版本为 `"3"`，使用 `plugin`、`instance`、`model`、`routine`、`scheduler`、`availability` 六段。旧 `owner_auth_enabled` / `privileged_writes_enabled` 无论真假均被忽略，不产生权限；其他未知字段仍会报错。
+停机备份代码、`config.toml` 和完整插件数据目录，再替换代码。保留现有数据与写锁设置；配置版本为 `"4"`，使用 `plugin`、`instance`、`model`、`routine`、`scheduler`、`availability` 六段。旧 `owner_auth_enabled` / `privileged_writes_enabled` 无论真假均被忽略，不产生权限；其他未知字段仍会报错。
 
-不自动导入旧规划库或降级数据库。数据中的非 life 权威记录、未知 schema 和损坏库会阻止启动。备份应包含 `life/maivita.db`、`life/management.sqlite3` 与 `engine-authority.json`；恢复须使用匹配的代码、配置和完整数据，不能覆盖正在运行的数据库。详见[回滚指南](docs/ROLLBACK.md)。
+不自动导入旧规划库或降级数据库。数据中的非 life 权威记录、未知 schema 和损坏库会阻止启动。备份应包含 `life/maivita.db`、`life/management.sqlite3` 与 `engine-authority.json`；恢复须使用匹配的代码、配置和完整数据，不能覆盖正在运行的数据库。详见[回滚指南](docs/ROLLBACK.md)。配置与数据转换工具分别为 `tools/phase1_config.py`、`tools/phase1_data.py`；它们输出新文件或副本，不直接覆盖运行实例。
 
 ## 命令
 
@@ -93,7 +112,8 @@ vita_admin_accounts = ["你的真实QQ号"]
 | `/maivita goal complete 目标ID 已结束活动ID` | 引用活动证据完成目标 |
 | `/maivita confirm 请求ID` | 确认预览，重新检查权限与状态 |
 | `/maivita cancel 请求ID`、`/maivita result 请求ID` | 取消请求、查看持久化结果 |
-| `/maivita wake`、`/maivita replan` | 管理员直接唤醒、请求重新规划 |
+| `/maivita wake`、`/maivita replan` | 管理员唤醒、重新决定当前活动 |
+| `/maivita plan regenerate` | 重新生成今日参考计划；沿用 replan 权限 |
 
 日期支持今天、明天或 `YYYY-MM-DD`，时间按角色时区。中文管理仅识别 `麦麦管理` 前缀后的有限语法，不执行普通闲聊里的指令。新目标和活动公开可见；公开命令不能编辑私密计划与目标。睡眠有时长、承诺冲突及冷却约束，唤醒后五分钟内不能开启新的睡眠会话。回执被静音拦截时，恢复后用 `result` 查询，不要重复提交。
 
@@ -121,8 +141,8 @@ timezone = "Asia/Shanghai"
 mode = "task"
 task = "planner"
 model = ""
-# 滚动 24 小时最多 16 次调用尝试；失败也计入
-daily_budget = 16
+# 角色时区自然日最多 20 次生活调用尝试；失败也计入
+daily_budget = 20
 # 默认每日规划开启，会产生费用；启动时即时规划单独控制
 daily_planning_enabled = true
 daily_planning_time = "08:00"
@@ -140,13 +160,7 @@ preferred_sleep_time = "01:00"
 preferred_wake_time = "08:00"
 ```
 
-## 自 v0.5.0 以来的修改
-
-- v0.6.1：生活管理权限统一来自 MaiIdentity，移除 Vita 无效权限开关。
-- v0.6.0：退役旧规划引擎，入口只运行 life，保留兼容查询和离线导入工具。
-- v0.5.x：提供默认每日规划、模型任务路由、管理预览确认、中文命令及配置界面兼容修复。
-
-完整历史见 [UPDATE_NOTES.md](UPDATE_NOTES.md)。
+版本变化见 [UPDATE_NOTES.md](UPDATE_NOTES.md)。
 
 ## 已知限制
 

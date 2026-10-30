@@ -29,7 +29,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(tables, {"schema_migrations", "life_state", "activities", "plans", "schedule_items", "schedule_revisions",
                                       "sleep_sessions", "sleep_segments", "commitments", "life_goals", "life_preferences", "life_events",
                                       "event_deliveries", "command_receipts", "migration_runs", "legacy_import_records", "legacy_id_map", "decision_runs", "integration_settings", "event_subscriptions",
-                                      "habits", "life_summaries", "retention_audit", "memory_deliveries", "activity_checkpoints", "decision_triggers", "plan_item_checks", "observation_gaps"})
+                                      "habits", "life_summaries", "retention_audit", "memory_deliveries", "activity_checkpoints", "decision_triggers", "plan_item_checks", "observation_gaps", "body_rule_cutovers"})
             self.assertIn("decision_runs", tables)
             self.assertIn("habits", tables)
             self.assertNotIn("goals", tables)

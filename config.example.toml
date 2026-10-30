@@ -2,8 +2,8 @@
 [plugin]
 # 是否启用插件；布尔值，默认 true，可选。
 enabled = true
-# 配置格式版本，固定为 "3"（不是发布版本）；默认 "3"，可选，请勿改写。
-config_version = "3"
+# 配置格式版本，固定为 "4"（不是发布版本）；默认 "4"，可选，请勿改写。
+config_version = "4"
 
 # 会话范围、时区与部署选项。
 [instance]
@@ -30,8 +30,8 @@ model = ""
 timeout_seconds = 90
 # 单次最大输出 token 数；整数 128–16384，可选，默认 8192。
 max_tokens = 8192
-# 滚动 24 小时调用尝试预算（失败及重试也计入）；整数 1–200，可选，默认 16。
-daily_budget = 16
+# 角色时区自然日的生活调用尝试预算（规划、滚动、失败及重试共用）；整数 1–1000，默认 20。
+daily_budget = 20
 # 每次加载是否请求一次规划；布尔值，可选，默认 false，开启会消耗模型预算。
 generate_on_start = false
 # 是否每日自动规划；布尔值，可选，默认 true，会产生模型调用费用。
@@ -52,7 +52,7 @@ preferred_sleep_time = "01:00"
 preferred_wake_time = "08:00"
 
 # 周表：一周的稳定节奏。留空则不使用。
-# 每项是一句话描述，将作为 prompt 参考，不强制覆盖 24 小时；阶段一仅保存配置。
+# 第一阶段冻结：仅保存兼容配置，不进入模型提示，不产生行为。
 [routine.weekly_pattern]
 monday = ""
 tuesday = ""
@@ -64,13 +64,13 @@ sunday = ""
 
 # 滚动分段：启用后角色每个决策窗检查当前活动，仍保留每日整表规划。
 [scheduler]
-# 默认关闭；需显式开启。关闭后沿用阶段一行为。
-enabled = false
+# 唯一实际活动推进路径；升级后固定开启。
+enabled = true
 # 决策窗间隔，单位分钟；须在分段最短与最长时长之间。
 decision_interval_minutes = 15
-# 未到期且身体未越线时，换事决策概率，整数 0–100（百分比）。
-change_chance_percent = 15
-# 启用滚动分段时取代 model.daily_budget，按角色时区自然日计数。
+# 兼容字段；第一阶段固定为 0，不进行随机模型检查。
+change_chance_percent = 0
+# 兼容旧配置的字段；升级后由 model.daily_budget 统一覆盖，不是第二份预算。
 # 规划、即时决策、分段共用硬上限，失败和重试同样计入；整数 1–1000。
 daily_decision_budget = 20
 # 模型单次提出的最短与最长段时长，单位分钟，正整数。

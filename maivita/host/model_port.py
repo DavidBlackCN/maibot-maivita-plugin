@@ -31,7 +31,7 @@ PRESENT_CONTRACT={
 PLANNING_CONTRACT = {
     'instruction': (
         '这是每日规划。请为角色生成今天的一整天日程，共 6-12 个活动。'
-        '只允许 apply_plan_patch 或 update_direction；日程使用角色时区的今天日期。'
+        '只允许 apply_plan_patch；日程使用角色时区的今天日期。'
         '禁止 start_activity、winding_down、start_sleep、extend_sleep——这是规划，不是执行，不要直接开始活动。'
         '\n\n'
         '【时间模式】每个活动必须选择一种 time_mode：'
@@ -63,7 +63,7 @@ PLANNING_CONTRACT = {
         'Private visibility must not be widened. No markdown or reasoning text. '
         '作息偏好只是参考，可以根据实际情况偏离，但偏离时在 payload.reason 字段说明原因。'
     ),
-    'commands': {key: PRESENT_CONTRACT['commands'][key] for key in ('apply_plan_patch', 'update_direction')},
+    'commands': {key: PRESENT_CONTRACT['commands'][key] for key in ('apply_plan_patch',)},
     'example': {
         'kind': 'apply_plan_patch',
         'payload': {
@@ -132,12 +132,12 @@ SEGMENT_CONTRACT = {
         '\n\n'
         '【输出】只输出一个 JSON 对象：'
         '\n{"event": "在做什么", "location": "在哪", "emotion": "心情", '
-        '"minutes": 45, "continue": false, "energy_rate": -0.08}'
+        '"minutes": 45, "continue": false, "category": "rest"}'
         '\n- event 要具体到能说出口（不要"翻个身"这种微动作；睡眠直接写"睡眠"）'
         '\n- continue=true 时 event/location/emotion 可留空'
-        '\n- energy_rate：睡眠/休息为正（0.05~0.2），工作/外出/社交为负（-0.05~-0.15）'
+        '\n- category：rest|study|work|entertainment|daily_life|social|travel|creative|other。身体变化由固定类别规则计算，不输出变化速率。'
     ),
-    'example': {'event': '在家读小说', 'location': '家里的沙发', 'emotion': '放松', 'minutes': 45, 'continue': False, 'energy_rate': -0.05}
+    'example': {'event': '在家读小说', 'location': '家里的沙发', 'emotion': '放松', 'minutes': 45, 'continue': False, 'category': 'rest'}
 }
 
 def parse_candidate(text, *, task_kind='present'):

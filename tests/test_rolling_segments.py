@@ -86,7 +86,7 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
         self.apply(event='休息',energy_rate=0.1)
         with self.db.read_view() as u:
             old=u.activities.get(first)
-            self.assertEqual(old.status,'completed')
+            self.assertEqual(old.status,'interrupted')
             self.assertEqual(old.ended_at,self.clock.now_utc())
         self.clock.advance(timedelta(minutes=15))
         self.apply(resumes_activity_id=first)
@@ -112,8 +112,8 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
         self.apply(); before=self.deadline()
         with patch(MODULE+'.random.random',return_value=0.99):
             result=await self.runtime.segments.tick()
-            self.assertEqual(result['status'],'continued')
-            self.assertEqual(self.deadline(),before+15*60000)
+            self.assertEqual(result['status'],'continuing')
+            self.assertEqual(self.deadline(),before)
             self.assertEqual(self.calls,[])
             await self.runtime.close()
             self.runtime=DevelopmentRuntime(self.db,self.model,config=self.cfg,lock_path=self.root/'lock').start()
@@ -126,7 +126,7 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
         for values in ({'fatigue':95,'energy':50},{'fatigue':0,'energy':5}):
             self.body(**values)
             with self.assertRaisesRegex(DomainError,'forbids'):
-                self.apply(event='出门跑步',energy_rate=-0.1)
+                self.apply(event='出门跑步',category='travel')
             self.assertEqual(self.current(),first)
         self.apply(event='休息',energy_rate=0.1)
         self.assertEqual(self.current().name,'休息')
@@ -158,7 +158,9 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_sleep_change_closes_session_and_actual_sleep(self):
         self.apply(event='睡眠',minutes=60,energy_rate=0.1)
         self.clock.advance(timedelta(minutes=15))
-        self.apply(event='吃早餐',energy_rate=-0.05)
+        with self.assertRaisesRegex(DomainError,'sleep changes'):
+            self.apply(event='吃早餐',category='daily_life')
+        self.engine.execute(Command(kind='wake',source='authorized',payload={},idempotency_key='trusted-wake',expected_state_version=self.engine.state().state_version))
         self.assertEqual(self.engine.state().sleep_phase,'awake')
         self.assertIsNone(self.engine.state().active_sleep_session_id)
         with self.db.read_view() as u:
@@ -168,15 +170,15 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
         self.body(energy=50,fatigue=20)
         self.apply(); self.clock.advance(timedelta(minutes=15))
         with patch(MODULE+'.random.random',return_value=0.99): await self.runtime.segments.tick()
-        self.assertAlmostEqual(self.engine.state().energy,48.8)
+        self.assertAlmostEqual(self.engine.state().energy,49.75)
         await self.runtime.segments.tick()
-        self.assertAlmostEqual(self.engine.state().energy,48.8)
+        self.assertAlmostEqual(self.engine.state().energy,49.75)
         text=render_status(snapshot(self.runtime,'Asia/Shanghai',None))
-        for expected in ('读小说','家里','已进行 15 分钟','预计还剩 45 分钟','0/20'):
+        for expected in ('读小说','家里','已进行 15 分钟','预计还剩 30 分钟','0/20'):
             self.assertIn(expected,text)
         context=self.runtime.segments.context()
         self.assertEqual(context['current']['elapsed_minutes'],15)
-        self.assertEqual(context['body']['energy'],48.8)
+        self.assertEqual(context['body']['energy'],49.75)
 
     async def test_24_hours_share_budget_across_planning_present_segments_and_restart(self):
         # Planning, immediate request and all 96 due windows compete for 20.
@@ -193,7 +195,7 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
             await self.runtime.process_triggers()
             self.clock.advance(timedelta(minutes=15))
         self.assertEqual(len(self.calls),20)
-        self.assertEqual([kind for _,kind in self.calls[:2]],['planning','present'])
+        self.assertEqual([kind for _,kind in self.calls[:2]],['planning','segment'])
         with self.db.read_view() as u:
             self.assertEqual(u.connection.execute('SELECT count(*) FROM decision_runs').fetchone()[0],20)
             self.assertEqual(u.connection.execute("SELECT count(*) FROM decision_runs WHERE status='applied'").fetchone()[0],20)
@@ -267,7 +269,7 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
         self.apply(energy_rate=0)
         self.clock.advance(timedelta(minutes=15))
         with patch(MODULE+'.random.random',return_value=0.99): await self.runtime.segments.tick()
-        self.assertEqual(self.engine.state().energy,50.5)
+        self.assertEqual(self.engine.state().energy,50.25)
 
     async def test_scheduler_disabled_does_not_invoke_segments(self):
         self.runtime.switch_modes(replace(self.cfg,scheduler=SchedulerConfig()))
@@ -305,7 +307,7 @@ class SegmentMigrationTests(unittest.TestCase):
                     self.assertEqual(columns[field][4],default)
                 self.assertFalse(conn.execute("SELECT 1 FROM sqlite_master WHERE name='life_segments'").fetchone())
                 self.assertEqual(migrate(conn,clock,migrations()[:5]),5)
-                self.assertEqual(migrate(conn,clock),6)
+                self.assertEqual(migrate(conn,clock),7)
             database=LifeDatabase(path,clock=clock)
             with database.read_view() as u:
                 old=u.activities.get('old-activity')

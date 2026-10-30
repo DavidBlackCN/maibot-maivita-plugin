@@ -17,6 +17,8 @@ import urllib.request
 import tomlkit
 
 ROOT=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(ROOT))
+sys.path.insert(0, str(ROOT))
+from tools.workspace_paths import EVIDENCE
 from integration_tests.process_job import ProcessJob
 from tools.package import runtime_manifest as file_manifest,HOST_COMMIT,SDK_VERSION
 
@@ -41,7 +43,7 @@ def main():
             raise ValueError('Host marker differs from reviewed source lock')
     if source['host_commit']!=HOST_COMMIT or any(hashlib.sha256((HOST/name).read_bytes()).hexdigest()!=sha for name,sha in source['files'].items()):
         raise ValueError('complete Host source does not match selected baseline')
-    (ROOT/'evidence/integration-ready').mkdir(parents=True,exist_ok=True)
+    (EVIDENCE/'integration-ready').mkdir(parents=True,exist_ok=True)
     marker=json.loads((INSTANCE/'.maivita-i1-test-instance.json').read_text(encoding='utf-8'))
     if marker.get('production_data') is not False: raise ValueError('test-instance marker missing')
     if marker.get('host_commit')!=HOST_COMMIT: raise ValueError('instance belongs to a different Host baseline')
@@ -180,7 +182,7 @@ def main():
         report['real_model_acceptance']='passed_candidate_commit' if 'model' in report['passed_cases'] else 'not_passed'
         report['smoke_passed']=(not report.get('error') and {'startup','api','permission_denial','reload'}<=set(report['passed_cases']) and
             (not args.exercise_model or 'model' in report['passed_cases']) and report.get('host_exit_code')==0)
-        (ROOT/'evidence/integration-ready/full-host-smoke.json').write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
+        (EVIDENCE/'integration-ready/full-host-smoke.json').write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
         print(json.dumps({key:value for key,value in report.items() if key not in ('candidate_files','sanitized_log_tail')},indent=2))
     return not report['smoke_passed']
 

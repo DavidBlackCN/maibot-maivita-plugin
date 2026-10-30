@@ -21,6 +21,7 @@ class MaiCoordinatePlugin(MaiBotPlugin):
         super().__init__()
         self.service=None; self.store=None; self.worker=None; self.active=None
         self.observed={}; self.automatic=False
+        self.space=None; self.space_worker=None
 
     def normalize_plugin_config(self,config_data):
         Settings.model_validate(config_data or {})
@@ -43,6 +44,9 @@ class MaiCoordinatePlugin(MaiBotPlugin):
                 if len(saved)>4: raise ValueError('TOO_MANY_STORED_ROUTES')
                 self.active=self.active.model_copy(update={'routes':saved})
             self.service=Coordinator(SDKPorts(self.ctx),self.active,self.store)
+            from .space import SpaceCoordinator
+            self.space=SpaceCoordinator(SDKPorts(self.ctx),self.active,self.store)
+            self.space_worker=asyncio.create_task(self.space.run(self.active.poll_seconds))
             self.worker=asyncio.create_task(self.run())
         except BaseException:
             await self.on_unload(); raise
@@ -99,10 +103,16 @@ class MaiCoordinatePlugin(MaiBotPlugin):
             text=('MaiCoordinate：'+(self.active.mode if self.active else '未启用')+
                   '；'+(self.service.health if self.service else 'NOT_READY')+
                   '；已核对群数 '+str(len(self.active.routes) if self.active else 0))
+            if self.space:
+                from .space import render_status
+                text+='\n'+render_status(self.space.status())
             await self.ctx.send.text(text,stream_id)
         return True,'status handled through normal send',2
 
     async def on_unload(self):
+        if self.space_worker:
+            self.space_worker.cancel(); await asyncio.gather(self.space_worker,return_exceptions=True); self.space_worker=None
+        self.space=None
         if self.worker:
             self.worker.cancel(); await asyncio.gather(self.worker,return_exceptions=True); self.worker=None
         if self.store: self.store.close(); self.store=None
@@ -121,6 +131,7 @@ class MaiCoordinatePlugin(MaiBotPlugin):
         return {'api_version':1,'ok':True,'data':{'mode':self.active.mode if self.active else 'disabled',
             'health':self.service.health if self.service else 'NOT_READY','counts':counts,
             'last_error':self.service.last_error if self.service else None,
+            'space':self.space.status() if self.space else {'mode':'disabled','reason':'NOT_READY'},
             'storage_limit':self.active.max_records if self.active else None,
             'payload_retention_days':self.active.payload_retention_days if self.active else None,
             'host':HOST,'sdk':SDK,'H01':False,'H02':False,'H03':False,

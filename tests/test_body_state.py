@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import timedelta
 import json
 import sqlite3
+from contextlib import closing
 import unittest
 from unittest.mock import patch
 
@@ -22,7 +23,7 @@ class BodyEstimatesTests(EngineFixture, unittest.TestCase):
         for category, expected in (
             ('sleeping', (58,45,47)), ('study', (47,52,50.8)),
             ('work', (47,52,50.8)), ('travel', (47,52,50.8)),
-            ('entertainment', (49,51,49)), ('rest', (49,51,49)),
+            ('entertainment', (49,51,49)), ('rest', (53,48,49)),
         ):
             with self.subTest(category=category):
                 # Separate characters avoid introducing transition intervals.
@@ -42,12 +43,12 @@ class BodyEstimatesTests(EngineFixture, unittest.TestCase):
                     expected_state_version=state.state_version))
                 state=self.engine.state(category)
                 self.assertEqual((state.energy,state.fatigue,state.stress),expected)
-                self.assertEqual(state.provenance,'estimates-v3')
+                self.assertEqual(state.provenance,'fixed-categories-v4')
 
     def test_sql_high_stress_warns_and_recovers_at_normal_rate(self):
         self.apply('advance', {'initialize_neutral':True})
         self.apply('start_activity', {'name':'rest','category':'entertainment'})
-        with sqlite3.connect(self.db.path) as conn:
+        with closing(sqlite3.connect(self.db.path)) as conn, conn:
             conn.execute("UPDATE life_state SET stress=10000,state_version=state_version+1 WHERE character_id='default'")
         self.clock.advance(timedelta(hours=1))
         with self.assertLogs(subjective.logger,level='WARNING') as logs:
@@ -58,12 +59,12 @@ class BodyEstimatesTests(EngineFixture, unittest.TestCase):
 
     def test_sql_out_of_range_still_fails_existing_integrity_check_without_repair(self):
         command=self.command('advance')
-        with sqlite3.connect(self.db.path) as conn:
+        with closing(sqlite3.connect(self.db.path)) as conn, conn:
             conn.execute('PRAGMA ignore_check_constraints=ON')
             conn.execute("UPDATE life_state SET stress=10001,state_version=state_version+1 WHERE character_id='default'")
         with self.assertRaisesRegex(SchemaError,'integrity check failed'):
             self.engine.execute(command)
-        with sqlite3.connect(self.db.path) as conn:
+        with closing(sqlite3.connect(self.db.path)) as conn, conn:
             self.assertEqual(conn.execute('SELECT stress FROM life_state').fetchone()[0],10001)
 
     def test_advance_invalid_current_logs_without_repairing(self):
@@ -85,15 +86,15 @@ class BodyEstimatesTests(EngineFixture, unittest.TestCase):
         state=replace(self.engine.state(),updated_at=self.clock.now_utc())
         with self.db.read_view() as u:
             actual=u.activities.get(state.primary_activity_id)
-            for rate, expected in ((0.2,100),(-0.15,0)):
+            for category, rate, expected in (("rest",3,100),("work",-3,0)):
                 with self.subTest(rate=rate):
                     # Bad duplicate observations can inflate a bounded rate.
-                    with patch.object(u.activities,'for_character',return_value=[replace(actual,energy_rate=rate)]*6):
+                    with patch.object(u.activities,'for_character',return_value=[replace(actual,category=category)]*20):
                         with self.assertLogs(subjective.logger,level='WARNING') as logs:
                             after=subjective.advance(u,state,self.clock.now_utc(),{})
                     self.assertEqual(after.energy,expected)
                     self.assertIn('reason=abnormal_delta',logs.output[0])
-                    self.assertIn('delta='+str(rate*60*6),logs.output[0])
+                    self.assertIn('delta='+str(float(rate*20)),logs.output[0])
 
     def test_unknowns_and_warning_boundaries(self):
         self.apply('advance')
@@ -166,7 +167,7 @@ class BodyInitializationTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.on_load()
         await self.plugin.command(text='/maivita status',stream_id='test-stream')
         self.assertNotIn('身体数值异常',json.dumps(self.calls[-1],ensure_ascii=False))
-        with sqlite3.connect(self.plugin.runtime.database.path) as conn:
+        with closing(sqlite3.connect(self.plugin.runtime.database.path)) as conn, conn:
             conn.execute("UPDATE life_state SET stress=10000,state_version=state_version+1 WHERE character_id='default'")
         before=self.plugin.runtime.engine.state()
         await self.plugin.command(text='/maivita status',stream_id='test-stream')

@@ -9,7 +9,7 @@ import argparse,hashlib,json,shutil,subprocess
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True);a=p.parse_args()
     root=a.workspace.resolve();target=root/'maibot-maivita-plugin/ecosystem';target.mkdir(exist_ok=True)
-    source=root/'maibot-maicoordinate-plugin';names={'plugin.py','_manifest.json','README.md','UPDATE_NOTES.md','LICENSE','config.example.toml'}
+    source=root/'maibot-maicoordinate-plugin';names={'.gitignore','plugin.py','_manifest.json','README.md','UPDATE_NOTES.md','LICENSE','config.example.toml'}
     for directory in ('maicoordinate','tests','_locales'):
         names.update(f.relative_to(source).as_posix() for f in (source/directory).rglob('*') if f.is_file() and f.suffix in ('.py','.json') and '__pycache__' not in f.parts)
     hashes={}
@@ -20,7 +20,7 @@ def main():
         hashes[name]=hashlib.sha256(f.read_bytes()).hexdigest()
     (target/'coordinator-source.json').write_text(json.dumps(hashes,indent=2)+'\n',encoding='utf8',newline='\n')
     (target/'tools').mkdir(exist_ok=True)
-    for name in ('run_joint_native.py','joint_native_scenario.py'):shutil.copyfile(root/'tools'/name,target/'tools'/name)
+    for name in ('run_joint_native.py','joint_native_scenario.py','phase1_native_space.py','product_bundle.py'):shutil.copyfile(root/'tools'/name,target/'tools'/name)
     pins={}
     for key,folder in (('identity','maibot-maiIdentity-plugin'),('hush','maibot-maihush-plugin')):
         repo=root/folder

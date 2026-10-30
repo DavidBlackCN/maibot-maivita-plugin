@@ -1,8 +1,8 @@
 # MaiVita 跨插件接口契约 1.0.0
 
-状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 4 和配置 3 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
+状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 7 和配置 4 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
 
-修复构建仅支持 Host 1.3.12 / SDK 2.15.0 与 Host 1.3.15 / SDK 2.16.0 两组配对；接口 host/sdk 返回实际运行版本，混搭及中间版本拒绝加载。source_stream 投影要求非空匹配来源；活动、计划条目、目标的新命令不再接受 source_stream，因为 schema 4 无可信来源字段。已有行仍可加载并被公开读取过滤；没有批量改公开或数据库迁移。
+支持 Host 1.3.12 / SDK 2.15.0、Host 1.3.15 / SDK 2.16.0 和 Host 1.3.18 / SDK 2.19.0 三组配对；接口 host/sdk 返回实际运行版本，混搭及中间版本拒绝加载。source_stream 投影要求非空匹配来源；活动、计划条目、目标的新命令不再接受 source_stream，因为 schema 4 无可信来源字段。已有行仍可加载并被公开读取过滤；没有批量改公开或数据库迁移。
 
 get_public_events@1 是无副作用的公开拉取接口，参数 after_version / after_index 为游标，limit 为 1..100。返回事件数组、扫描游标和 as_of；即使遇到过滤或过期事件也推进扫描游标。事件摘要由固定白名单产生，绝不透传内部 payload。消费者应将接收记录与游标放在自己的同一事务中。它不创建订阅、不确认 Vita 的内部 outbox、不授权事件参数中的生产者；协调层从固定全名 API 读取以绑定来源。
 
@@ -31,4 +31,6 @@ get_availability@1 保留原有字段，新增 `state`（free/slow/busy）、`re
 官方有限管理命令读取 MaiIdentity 的 get_vita_policy@1，状态展示读取 MaiHush 的 get_public_constraints@1；这些查询不依赖 MaiCoordinate。通用特权传输不绑定授权令牌或回调注册入口，不通过公开查询获得执行权限。错误包括 PERMISSION_DENIED、POLICY_UNAVAILABLE、NOT_READY、RELOAD_REQUIRED、STALE_STATE、IDEMPOTENCY_CONFLICT，默认不允许自动权限回退。
 
 
-2026-10-27 默认安装修订：Vita 的空 allowed_streams 表示所有 Host 接入会话，非空仍精确限制；Identity 的空 route_scope 仅匹配消息 scope=None。自动实例标识、自动锁和默认启用均不建立可信调用者身份，不开放 H01/H02/H03 或跨插件特权。
+默认会话范围：Vita 的空 allowed_streams 表示所有 Host 接入会话，非空仍精确限制；Identity 的空 route_scope 仅匹配消息 scope=None。自动实例标识、自动锁和默认启用均不建立可信调用者身份，不开放 H01/H02/H03 或跨插件特权。
+
+`get_public_life_context@1` 在同一读取视图返回当前公开活动、地点、情绪、睡眠、忙闲、身体估计、查询时间，以及最近 24 小时最多 20 条公开活动。私有活动与聊天不进入素材；连续性未知区间保留标记。活动结束不是目标完成证明。继续活动和身体积分不会重复生成公开活动开始事件。

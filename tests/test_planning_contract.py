@@ -49,7 +49,7 @@ class PlanningContractTests(unittest.TestCase):
         self.assertIn('6-12', PLANNING_CONTRACT['instruction'])
         self.assertIn('fixed', PLANNING_CONTRACT['instruction'])
         self.assertIn('不要照抄', PLANNING_CONTRACT['instruction'])
-        self.assertEqual(set(PLANNING_CONTRACT['commands']), {'apply_plan_patch', 'update_direction'})
+        self.assertEqual(set(PLANNING_CONTRACT['commands']), {'apply_plan_patch'})
 
     def test_all_unscheduled_is_degraded_but_schema_valid(self):
         value = proposal(unscheduled(6))
@@ -174,6 +174,6 @@ class PlanningQualityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(data['degraded'], degraded)
                     self.assertEqual(result.get('degraded', False), degraded)
                     self.assertEqual(sum(data['counts'].values()), len(items))
-                    self.assertIn(f'今日计划：{len(items)} 项', render_status(data))
+                    self.assertIn(f'今日参考计划：{len(items)} 项', render_status(data))
                 finally:
                     await runtime.close()

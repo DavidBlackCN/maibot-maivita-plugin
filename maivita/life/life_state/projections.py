@@ -25,6 +25,37 @@ class LifeQueries:
         self.engine = engine
         self.availability = availability if availability is not None else AvailabilityConfig()
 
+    def get_public_life_context(self, scope=QueryScope(), character_id='default'):
+        """One read transaction, public observations only; plans are never evidence."""
+        from datetime import timedelta
+        now=self.engine.clock.now_utc()
+        cutoff=now-timedelta(hours=24)
+        with self.engine.database.read_view() as u:
+            state=u.states.get(character_id)
+            current=u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
+            gaps=list(u.connection.execute('SELECT start_at_ms,end_at_ms FROM observation_gaps WHERE character_id=? AND end_at_ms>?',
+                (character_id,to_epoch_ms(cutoff))))
+            def unknown(a):
+                return any(to_epoch_ms(a.started_at)<right and to_epoch_ms(a.ended_at or now)>left for left,right in gaps)
+            def public(a):
+                return {'activity_id':a.activity_id,'name':a.name,'category':a.category,
+                    'location':a.location,'emotion':a.emotion,'started_at':iso_instant(a.started_at),
+                    'ended_at':iso_instant(a.ended_at) if a.ended_at else None,
+                    'end_status':a.status.value if hasattr(a.status,'value') else a.status,
+                    'continuity_unknown':unknown(a),'visibility':'public_summary',
+                    'duration_minutes':None if unknown(a) else max(0,(a.ended_at or now).__sub__(a.started_at).total_seconds()/60)}
+            availability=derive_availability(state,current,self.availability,
+                activity_visible=current is not None and current.visibility=='public_summary')
+            history=sorted((a for a in u.activities.for_character(character_id)
+                if a.visibility=='public_summary' and a.role=='primary' and (a.ended_at or now)>cutoff),
+                key=lambda a:a.started_at,reverse=True)[:20]
+            return {'api_version':1,'as_of':iso_instant(now),'state_version':state.state_version,
+                'sleep_phase':state.sleep_phase.value,'awake':state.sleep_phase in ('awake','winding_down') and not state.active_sleep_session_id,
+                'availability':{'state':availability.state,'reason':availability.reason},
+                'body':{key:getattr(state,key) for key in ('energy','fatigue','stress','confidence')},
+                'body_rule':'fixed-categories-v4','activity':public(current) if current and current.visibility=='public_summary' else None,
+                'history':[public(a) for a in history], 'continuity_unknown':bool(gaps)}
+
     def get_life_state(self, scope=QueryScope(), character_id='default'):
         with self.engine.database.read_view() as u:
             state = u.states.get(character_id)

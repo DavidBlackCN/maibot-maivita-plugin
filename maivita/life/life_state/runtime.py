@@ -27,7 +27,7 @@ class LifeRuntimeConfig:
     sleep_mode: str = 'autonomous'
     timezone: str = 'Asia/Shanghai'
     model_timeout_seconds: int = 90
-    daily_budget: int = 24
+    daily_budget: int = 20
     fallback_check_minutes: int = 45
     habits_enabled: bool = False
     cleanup_enabled: bool = False
@@ -80,7 +80,7 @@ class DevelopmentRuntime:
             return proposal
         self.coordinator=DecisionCoordinator(self.engine,guarded_model,daily_budget=self.decision_budget,
             timeout_seconds=self.config.model_timeout_seconds,
-            budget_timezone=self.config.timezone if self.config.scheduler.enabled else None)
+            budget_timezone=self.config.timezone)
         self.queries=LifeQueries(self.engine, availability=self.config.availability)
         self.recovery=RecoveryService(self.engine)
         self.recovery.rolling_segments = self.config.scheduler.enabled
@@ -96,12 +96,18 @@ class DevelopmentRuntime:
 
     @property
     def decision_budget(self):
-        return self.config.scheduler.daily_decision_budget if self.config.scheduler.enabled else self.config.daily_budget
+        return self.config.daily_budget
 
     def start(self):
         self.lease.acquire()
         try:
             self.engine.initialize()
+            from .subjective import RULE_VERSION
+            from ..domain.clock import to_epoch_ms
+            with self.database.unit_of_work() as u:
+                u.connection.execute('INSERT OR IGNORE INTO body_rule_cutovers VALUES(?,?)',
+                    (RULE_VERSION,to_epoch_ms(self.engine.clock.now_utc())))
+                u.commit()
             if self.config.planning_mode=='autonomous':
                 with self.database.read_view() as u:
                     pending=u.connection.execute("SELECT count(*) FROM legacy_import_records WHERE review_reason IS NOT NULL").fetchone()[0]
@@ -178,12 +184,28 @@ class DevelopmentRuntime:
                 self.segment_due=False
                 return await self.segments.tick()
             return {'status':'no_triggers'}
-        # Coalesce all durable triggers into one model call. Coordinator still
-        # enforces daily budget/cooldown; pending rows survive deferral.
+        # Reference planning never consumes activity triggers. One RPC path per
+        # turn; all actual activity triggers are coalesced into a rolling decision.
+        planning=[key for key in ids if key.startswith(('daily-planning:','manual-planning:'))]
+        if planning:
+            result=await self.coordinator.request('batch:'+','.join(planning))
+            if result['status']=='budget_exhausted':
+                with self.database.unit_of_work() as u:
+                    u.connection.executemany('UPDATE decision_triggers SET consumed=1 WHERE trigger_id=?',[(key,) for key in planning])
+                    u.commit()
+                self.coordinator.pending.clear()
+            return result
+        if self.engine.state().active_sleep_session_id:
+            return {'status':'sleeping'}
+        self.segment_due=False
         result=await self.coordinator.request('batch:'+','.join(ids))
-        if self.segment_due:
-            self.segment_due=False
-            result={**result, 'segment': await self.segments.tick()}
+        if self.config.scheduler.enabled and result['status'] in ('budget_exhausted','invalid','uncertain','rejected'):
+            # Budget deferral must not become a once-per-second fallback loop.
+            with self.database.unit_of_work() as u:
+                u.connection.executemany('UPDATE decision_triggers SET consumed=1 WHERE trigger_id=?',[(key,) for key in ids])
+                u.commit()
+            self.coordinator.pending.clear()
+            return self.segments._continue(result['status'])
         # Coordinator durably claims the batch before RPC. Post-await claiming
         # would replay a cancelled/unknown model request after restart.
         return result
@@ -225,7 +247,7 @@ class DevelopmentRuntime:
         self.config=config
         self.queries.availability=config.availability
         self.coordinator.daily_budget=self.decision_budget
-        self.coordinator.budget_timezone=config.timezone if config.scheduler.enabled else None
+        self.coordinator.budget_timezone=config.timezone
         self.engine.scheduler=config.scheduler
         self.segments.config=config.scheduler
         self.recovery.rolling_segments=config.scheduler.enabled

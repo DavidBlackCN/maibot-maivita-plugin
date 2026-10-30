@@ -13,6 +13,8 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
+from tools.workspace_paths import EVIDENCE
+sys.path.insert(0, str(root))
 from tools.package import runtime_manifest
 from maivita.life.storage.safety import WriterLease
 
@@ -81,7 +83,7 @@ def main():
     result = rehearse_restore(instance / 'data/plugins/davidblackcn.maibot-maivita-plugin', instance)
     result.update(passed=True, native_life_and_restore=True, single_writer=True,
                   runtime_files=runtime_manifest(), production_data=False, automatic_data_downgrade=False)
-    path = root / 'evidence/integration-ready/restore.json'
+    path = EVIDENCE/'integration-ready/restore.json'
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps({k: v for k, v in result.items() if k != 'runtime_files'}, indent=2))

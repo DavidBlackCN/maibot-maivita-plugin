@@ -7,7 +7,7 @@ import math
 from ..domain.clock import local_day_bounds, to_local
 from ..domain.models import number, require
 
-RULE_VERSION = 'estimates-v3'
+RULE_VERSION = 'fixed-categories-v4'
 logger = logging.getLogger(__name__)
 
 
@@ -64,6 +64,10 @@ def advance(u, state, now, payload):
     # Large unknown gaps are not physiological observations. Bound the rate
     # integration and preserve uncertainty instead of fabricating full days.
     start=max(state.last_advanced_at,now-timedelta(hours=1))
+    cutover=u.connection.execute('SELECT applied_at_ms FROM body_rule_cutovers WHERE rule_version=?',(RULE_VERSION,)).fetchone()
+    if cutover:
+        from ..domain.clock import from_epoch_ms
+        start=max(start,from_epoch_ms(cutover[0]))
     delta=[0.0,0.0,0.0]
     activities=[a for a in u.activities.for_character(state.character_id) if a.role=='primary']
     segments=u.segments.for_character(state.character_id)
@@ -76,10 +80,8 @@ def advance(u, state, now, payload):
             hours-=max(0,(min(actual.ended_at or now,now,right)-max(actual.started_at,start,left)).total_seconds()/3600)
         hours=max(0,hours)
         sleeping=(actual.sleep_session_id,actual.started_at) in sleeping_starts
-        demanding=actual.category in ('study','work','travel')
-        rates=(8,-5,-3) if sleeping else (-3 if demanding else -1,2 if demanding else 1,0.8 if demanding else -1.0)
-        if actual.energy_rate != 0 or payload.get('segment_energy_rates'):
-            rates=(actual.energy_rate*60, rates[1], rates[2])
+        demanding=actual.category in ('study','work','travel','creative')
+        rates=(8,-5,-3) if sleeping else (3,-2,-1) if actual.category=='rest' else (-3,2,0.8) if demanding else (-1,1,-1)
         for index,rate in enumerate(rates): delta[index]+=hours*rate
     values = {}
     for field, change in zip(('energy','fatigue','stress'), delta):

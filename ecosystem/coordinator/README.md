@@ -6,12 +6,20 @@
 
 根据公开生活事件协调受控主动表达；需要这项功能时再安装，并显式开启 controlled 模式。
 
-- 当前版本：`0.3.1`
-- MaiBot 版本范围：`1.3.12–1.3.15`
-- Plugin SDK 版本范围：`2.15.0–2.16.0`
+- 当前版本：`0.4.0`
+- MaiBot 版本范围：`1.3.12–1.3.18`
+- Plugin SDK 版本范围：`2.15.0–2.19.0`
 - 项目地址：[MaiVita / ecosystem/coordinator](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator)
 
-仅支持精确配对 **Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**，不支持中间版本或交叉配对。配合 MaiVita 0.6.2、MaiIdentity 3.2.2、MaiHush 0.2.2 使用，无需私有 Host 补丁。
+仅支持精确配对 **Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**，不支持中间版本或交叉配对。配合 MaiVita 0.9.0、原样保留的 MaiIdentity 3.2.3、MaiHush 0.2.3 使用，无需私有 Host 补丁。
+
+## 空间（0.4.0）
+
+新增独立 `[space] mode`，与根级群 `mode` 分开。新安装空间为 shadow，旧配置迁移后关闭；无群路由也可运行，空间不查询 Hush。Vita 提供公开经历，固定适配的 MaiTrace 6.3.0 执行发布与浏览。
+
+每天最多发布 2 次尝试、间隔 4 小时；浏览 6 轮、间隔 1 小时、每轮最多 5 条。空互动白名单不互动。只分享公开且持续 15 分钟或已经结束的活动；醒来、启用、重启不补发积压。失败、延后、未知结果分别显示，已提交或未知操作不重发。
+
+`[space] interaction_whitelist` 必须是 MaiTrace `monitor.read_list` 的子集；后者须为 whitelist。MaiTrace 自身生活、日程、自动空间和聊天素材必须关闭。shadow 只读生活，不调用文案或平台。所有额度按 `space.timezone` 的自然日计算。
 
 ## 功能
 
@@ -72,7 +80,7 @@ Vita 睡眠、Hush 静默及冷却仍会阻止表达，不提供唤醒、解除�
 
 ## 配置
 
-完整说明见 [config.example.toml](config.example.toml)。除 `[plugin]` 外，以下选项都位于 TOML 根级，须写在 `[plugin]` 前。
+完整说明见 [config.example.toml](config.example.toml)。除 `[plugin]` 与 `[space]` 外，以下群选项都位于 TOML 根级，须写在 `[plugin]` 前。
 
 ### 运行模式与模型
 
@@ -115,7 +123,7 @@ privileged_writes = false
 [plugin]
 # 插件开关与固定配置格式版本
 enabled = true
-config_version = "1"
+config_version = "2"
 ```
 
 终态正文到期清理，去重摘要、状态和结果仍保留；pending/preparing/executing 不清理。达到 `max_records` 后停止接收新事件并报告 STORAGE_FULL，仍处理已持久化的 pending。应停机备份并在上限内提高容量，不删除账本“恢复运行”；SQLite 不保证立即缩小磁盘文件。
@@ -130,12 +138,7 @@ config_version = "1"
 
 读取结果不构成发送或管理授权，不提供外部事件推送或特权写接口。
 
-## 自 v0.3.0 以来的修改
-
-- v0.3.1：支持活动与计划事件表达、共享 Host 人设和当前群公开关系摘要，修复配置界面兼容性。
-- 文档明确 opt-in 定位，三核心不依赖协调层；保留既有 shadow 默认配置。
-
-完整记录见 [UPDATE_NOTES.md](UPDATE_NOTES.md)。
+版本变化见 [UPDATE_NOTES.md](UPDATE_NOTES.md)。
 
 ## 已知限制
 

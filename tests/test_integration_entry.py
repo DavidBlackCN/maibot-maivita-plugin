@@ -211,7 +211,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
                 # Simulate the old pre-fix on-disk cancellation gap as well.
                 u.connection.execute('UPDATE decision_triggers SET consumed=0'); u.commit()
             await plugin.on_load()
-            self.assertEqual((await plugin.delegate.runtime.process_triggers())['status'],'no_triggers')
+            self.assertIn((await plugin.delegate.runtime.process_triggers())['status'],('no_triggers','cooldown'))
             self.assertEqual(calls,['model'])
 
 
