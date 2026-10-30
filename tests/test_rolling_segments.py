@@ -89,18 +89,15 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(old.status,'interrupted')
             self.assertEqual(old.ended_at,self.clock.now_utc())
         self.clock.advance(timedelta(minutes=15))
-        self.apply(resumes_activity_id=first)
-        self.assertEqual(self.current().resumes_activity_id,first)
+        with self.assertRaisesRegex(DomainError, 'retained interrupted'):
+            self.apply(resumes_activity_id=first)
         with self.db.read_view() as u:
             self.assertEqual(sum(a.status=='active' for a in u.activities.all()),1)
 
     async def test_four_trigger_paths_and_initial_empty(self):
         self.assertEqual(await self.runtime.segments._should_decide(),(True,'no_current_segment'))
         self.apply()
-        with patch(MODULE+'.random.random',return_value=0.99):
-            self.assertEqual(await self.runtime.segments._should_decide(),(False,'continue'))
-        with patch(MODULE+'.random.random',return_value=0.01):
-            self.assertEqual(await self.runtime.segments._should_decide(),(True,'chance'))
+        self.assertEqual(await self.runtime.segments._should_decide(),(False,'continue'))
         for values in ({'fatigue':80,'energy':50},{'fatigue':10,'energy':20}):
             self.body(**values)
             self.assertEqual(await self.runtime.segments._should_decide(),(True,'body_threshold'))
@@ -110,15 +107,14 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_probability_miss_extends_without_rpc_and_window_survives_restart(self):
         self.apply(); before=self.deadline()
-        with patch(MODULE+'.random.random',return_value=0.99):
-            result=await self.runtime.segments.tick()
-            self.assertEqual(result['status'],'continuing')
-            self.assertEqual(self.deadline(),before)
-            self.assertEqual(self.calls,[])
-            await self.runtime.close()
-            self.runtime=DevelopmentRuntime(self.db,self.model,config=self.cfg,lock_path=self.root/'lock').start()
-            self.engine=self.runtime.engine
-            self.assertEqual((await self.runtime.segments.tick())['status'],'not_due')
+        result=await self.runtime.segments.tick()
+        self.assertEqual(result['status'],'continuing')
+        self.assertEqual(self.deadline(),before)
+        self.assertEqual(self.calls,[])
+        await self.runtime.close()
+        self.runtime=DevelopmentRuntime(self.db,self.model,config=self.cfg,lock_path=self.root/'lock').start()
+        self.engine=self.runtime.engine
+        self.assertEqual((await self.runtime.segments.tick())['status'],'not_due')
 
     async def test_extreme_body_readings_reject_demanding_activity_atomically(self):
         self.apply(); first=self.current()
@@ -169,7 +165,7 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_energy_rate_is_integrated_once_and_status_has_expected_end(self):
         self.body(energy=50,fatigue=20)
         self.apply(); self.clock.advance(timedelta(minutes=15))
-        with patch(MODULE+'.random.random',return_value=0.99): await self.runtime.segments.tick()
+        await self.runtime.segments.tick()
         self.assertAlmostEqual(self.engine.state().energy,49.75)
         await self.runtime.segments.tick()
         self.assertAlmostEqual(self.engine.state().energy,49.75)
@@ -268,7 +264,7 @@ class SegmentTests(unittest.IsolatedAsyncioTestCase):
         self.body(energy=50.5)
         self.apply(energy_rate=0)
         self.clock.advance(timedelta(minutes=15))
-        with patch(MODULE+'.random.random',return_value=0.99): await self.runtime.segments.tick()
+        await self.runtime.segments.tick()
         self.assertEqual(self.engine.state().energy,50.25)
 
     async def test_scheduler_disabled_does_not_invoke_segments(self):
@@ -297,7 +293,7 @@ class SegmentMigrationTests(unittest.TestCase):
                      None,'active',None,None,None,None,None,'public_summary'))
                 conn.commit()
                 conn.execute("INSERT INTO migration_runs VALUES('old','test','hash','discovered',1,NULL,'{}')")
-                sql=Path('maivita/life/storage/migrations/005_activity_context.sql').read_text()
+                sql=(Path(__file__).resolve().parents[1]/'maivita/life/storage/migrations/005_activity_context.sql').read_text()
                 self.assertNotIn('CREATE TABLE',sql)
                 self.assertEqual(migrate(conn,clock,migrations()[:5]),5)
                 self.assertEqual(validate_schema(conn,migrations()[:5]),5)
@@ -307,7 +303,7 @@ class SegmentMigrationTests(unittest.TestCase):
                     self.assertEqual(columns[field][4],default)
                 self.assertFalse(conn.execute("SELECT 1 FROM sqlite_master WHERE name='life_segments'").fetchone())
                 self.assertEqual(migrate(conn,clock,migrations()[:5]),5)
-                self.assertEqual(migrate(conn,clock),7)
+                self.assertEqual(migrate(conn,clock),8)
             database=LifeDatabase(path,clock=clock)
             with database.read_view() as u:
                 old=u.activities.get('old-activity')
@@ -322,7 +318,7 @@ class SegmentMigrationTests(unittest.TestCase):
             with self.assertRaises(DomainError): parse_candidate(text,task_kind='segment')
 
     def test_invalid_scheduler_configuration(self):
-        for values in ({'decision_interval_minutes':0},{'change_chance_percent':101},
-                       {'segment_min_minutes':181},{'daily_decision_budget':0},
+        for values in ({'decision_interval_minutes':0},
+                       {'segment_min_minutes':181},
                        {'segment_sleep_max_minutes':1440}):
             with self.subTest(values=values), self.assertRaises(DomainError): SchedulerConfig(**values)

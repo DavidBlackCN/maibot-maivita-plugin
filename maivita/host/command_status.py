@@ -44,7 +44,9 @@ def snapshot(runtime, timezone, stream_id):
     planning=next((r for r in runs if decision_task_kind(json.loads(r['trigger_ids_json']))=='planning'),None)
     latest=runs[0] if runs else None
     degraded=bool(latest and (latest['diagnostic'] or '').startswith('degraded:'))
-    return {'phase':state.sleep_phase,
+    from ..life.planning.conversation import context as conversation_context
+    resume=conversation_context(runtime.engine)['resume']
+    return {'resume':clean(resume['event']) if resume else None, 'phase':state.sleep_phase,
             'body':{key:getattr(state,key) for key in ('energy','fatigue','stress')},
             'next_check_seconds':max(0,int(runtime.config.scheduler.decision_interval_minutes*60-
                 (runtime.engine.clock.monotonic()-runtime.last_segment_check))) if runtime.last_segment_check is not None else 0,
@@ -115,6 +117,8 @@ def render_status(data, hush=None):
         labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}
         lines.append('身体估计：'+' / '.join(labels[k]+' '+('未知' if v is None else f'{v:.1f}') for k,v in data['body'].items())+
             f'；下次检查约 {data.get("next_check_seconds",0)} 秒后')
+    if data.get('resume'):
+        lines.append('稍后可继续：'+data['resume']+'（可放下，不是待办；中断后最多保留4小时）')
     return '\n'.join(lines)
 
 

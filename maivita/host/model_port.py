@@ -159,6 +159,8 @@ SEGMENT_CONTRACT = {
         '\n5. 可以临时起意，但没有依据就不编造朋友来访、快递通知或真实平台互动；观察缺口不能补编成经历'
         '\n6. 别把一天排成流程模板；午睡不是每天必须有'
         '\n7. 允许无所事事、发呆、刷手机——这也是她的一天'
+        '\n8. conversation.invitation 是明确聊天邀请，可拒绝或边做边聊（continue=true）；仅确实想暂停当前活动时输出 pause_for_chat=邀请id，名称、地点和心情由系统保守记录，不编造聊天内容或结果。'
+        '\n9. conversation.resume 是唯一暂存的中断活动；想接着做时输出 resumes_activity_id=其activity_id，event 保持原名。可以先休息，也可以不再继续；不要从历史列表任意恢复活动。'
         '\n\n'
         '【输出】只输出一个 JSON 对象：'
         '\n{"event": "在做什么", "location": "在哪", "emotion": "心情", '
@@ -197,8 +199,13 @@ class SDKModelPort:
     async def __call__(self,state,triggers,*,task_kind='present'):
         if task_kind not in ('planning','present','segment'): raise DomainError('unknown model task')
         started=time.monotonic()
-        # Weekly patterns are configuration-only until the next planning stage.
-        context={**self.context(),'routine':self.routine.model_dump(exclude={'weekly_pattern','initialize_body_state'})}
+        context={**self.context(),'routine':self.routine.model_dump(exclude={'initialize_body_state'})}
+        if task_kind == 'segment' and context.get('segment'):
+            conversation = context['segment']['conversation']
+            invitation = conversation.get('invitation')
+            claimed = {key for batch in triggers for key in batch.removeprefix('batch:').split(',')}
+            if invitation and invitation['id'] not in claimed:
+                conversation['invitation'] = None
         contract=SEGMENT_CONTRACT if task_kind=='segment' else PLANNING_CONTRACT if task_kind=='planning' else PRESENT_CONTRACT
         if task_kind=='planning':
             from ..life.domain.clock import to_local

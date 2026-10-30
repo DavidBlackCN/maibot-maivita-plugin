@@ -29,6 +29,8 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         super().__init__()
         self.runtime=None; self.worker=None; self.startup=None; self.deployment_lease=None
         self.api=None; self.model_port=None; self.active_config=None; self.management=None
+        from .conversation import ConversationObserver
+        self.conversation = ConversationObserver(self)
         self.ready=False; self.failure_code=None
         self.startup_result={'status':'not_requested'}; self.guarded_streams=()
 
@@ -61,7 +63,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
                     'character_timezone':cfg.instance.timezone,
                     'local_time':db.clock.to_local(db.clock.now_utc(),cfg.instance.timezone).isoformat(),
                     'plan':self.runtime.queries.get_plan(),'goals':self.runtime.queries.get_goals(),
-                    'segment':self.runtime.segments.context() if cfg.scheduler.enabled else None}
+                    'segment':self.runtime.segments.context()}
             self.model_port=SDKModelPort(self.ctx,cfg.model,context=context,routine=cfg.routine)
             self.runtime=DevelopmentRuntime(db,self.model_port,config=LifeRuntimeConfig(timezone=cfg.instance.timezone,
                 model_timeout_seconds=cfg.model.timeout_seconds,daily_planning_time=cfg.model.daily_planning_time,
@@ -105,6 +107,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
 
     async def on_unload(self):
         self.ready=False
+        self.conversation.pending.clear()
         try:
             if self.startup is not None:
                 self.startup.cancel(); await asyncio.gather(self.startup,return_exceptions=True)
@@ -229,10 +232,18 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         return chat_background(self.runtime.queries.get_public_life_context(),
             self.runtime.queries.get_plan(), self.active_config.instance.timezone)
 
+    @HookHandler('chat.receive.after_process', name='maivita_conversation_observer')
+    async def conversation_hook(self, message=None, **kwargs):
+        self.conversation.observe(message)
+        return {'action': 'continue'}
+
     @HookHandler('maisaka.replyer.before_request',name='maivita_life_replyer')
-    async def replyer_hook(self,**kwargs): return self.inject(kwargs)
+    async def replyer_hook(self,**kwargs):
+        await self.conversation.confirm(kwargs.get('session_id'))
+        return self.inject(kwargs)
     @HookHandler('maisaka.planner.before_request',name='maivita_life_planner')
     async def planner_hook(self,**kwargs):
+        await self.conversation.confirm(kwargs.get('session_id'))
         if 'extra_prompt' in kwargs:return self.inject(kwargs)
         if not self.ready or not stream_allowed(kwargs.get('session_id'),self.active_config.instance.allowed_streams):return {'action':'continue'}
         from .typed_prompt import inject

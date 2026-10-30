@@ -35,8 +35,8 @@ async def run(work):
         'maibot-maihush-plugin':{'plugin':{'enabled':True,'config_version':'1'},'routes':[{'enabled':True,'stream_id':stream,'owner_accounts':['10002'],'admin_accounts':['10001']} ]},
         'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'3','acknowledgement':'local-operator-reviewed','instance_id':'joint-test','writer_lock':str(work/'identity.lock')},
             'identity':{'adapter_namespace':'synthetic-test-adapter','route_scope':'synthetic-test-scope','accounts':[]}},
-        'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'3'},'engine':{'mode':'life'},
-            'instance':{'acknowledgement':'isolated-test-instance','writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
+        'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'4'},
+            'instance':{'writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
         'maibot-maicoordinate-plugin':{'plugin':{'enabled':True,'config_version':'1'},'mode':'shadow','acknowledgement':'isolated-test-instance','model_task':'joint-test','poll_seconds':1,
             'routes':[{'route_id':'test','instance_id':'joint-test','adapter_namespace':'synthetic-test-adapter','bot_account_id':'123456789','route_scope':'synthetic-test-scope','group_id':'987654321','stream_id':stream}]}}
     if automatic:

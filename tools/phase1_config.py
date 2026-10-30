@@ -1,4 +1,4 @@
-"""Offline config conversion. Writes a new file and explanation, never input config."""
+"""Write a validated Vita configuration or convert Coordinate configuration offline."""
 from pathlib import Path
 import argparse,json,sys,tomllib
 import tomli_w
@@ -11,13 +11,13 @@ sys.path.insert(0,str(ROOT/'sources/maibot-maivita-plugin'));sys.path.insert(0,s
 def convert(kind,data,*,fresh=False):
     from copy import deepcopy
     data=deepcopy(data)
-    if not fresh:data.setdefault('plugin',{}).setdefault('config_version','3' if kind=='vita' else '1')
+    if kind=='coordinate' and not fresh:data.setdefault('plugin',{}).setdefault('config_version','1')
     if kind=='vita':
         from maivita.host.integration_config import IntegrationConfig
         result=IntegrationConfig.model_validate(data).model_dump(mode='json')
-        notes=['每日规划仅为参考；实际活动由滚动决策推进。','保留时区、模型路由、作息和受管会话。',
+        notes=['每日规划仅为参考；实际活动由滚动决策推进。','从当前配置示例开始配置。',
             '共享生活预算：'+str(result['model']['daily_budget'])+' 次/角色时区自然日。',
-            '周表及高级机制冻结；历史字段保留。','数据库须停机备份后离线升级到 schema 7。']
+            '使用当前版本新建测试实例。']
     else:
         from maicoordinate.config import Settings
         result=Settings.model_validate(data).model_dump(mode='json')

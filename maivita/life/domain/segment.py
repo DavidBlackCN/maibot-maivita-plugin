@@ -9,19 +9,15 @@ from .models import number, require
 class SchedulerConfig:
     enabled: bool = False
     decision_interval_minutes: int = 15
-    change_chance_percent: int = 15
-    daily_decision_budget: int = 20
     segment_min_minutes: int = 15
     segment_max_minutes: int = 180
     segment_sleep_max_minutes: int = 720
 
     def __post_init__(self):
         require(type(self.enabled) is bool, 'invalid scheduler switch')
-        for name in ('decision_interval_minutes', 'daily_decision_budget',
+        for name in ('decision_interval_minutes',
                      'segment_min_minutes', 'segment_max_minutes', 'segment_sleep_max_minutes'):
             require(type(getattr(self, name)) is int and getattr(self, name) > 0, 'invalid '+name)
-        require(type(self.change_chance_percent) is int and 0 <= self.change_chance_percent <= 100, 'invalid change chance')
-        require(self.daily_decision_budget <= 1000, 'invalid decision budget')
         require(self.segment_min_minutes <= self.decision_interval_minutes <= self.segment_max_minutes,
                 'decision interval must fit segment limits')
         require(self.segment_min_minutes <= self.segment_max_minutes <= self.segment_sleep_max_minutes <= 1080,
@@ -31,7 +27,7 @@ class SchedulerConfig:
 def validate_segment(payload, config=None, *, current=None):
     require(isinstance(payload, Mapping), 'segment must be an object')
     required = {'event', 'location', 'emotion', 'minutes', 'continue'}
-    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate', 'sleep'}, 'invalid segment fields')
+    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate', 'sleep', 'pause_for_chat'}, 'invalid segment fields')
     # Old saved candidates remain readable. New candidates use categories only.
     category = payload.get('category', 'rest' if payload.get('energy_rate', 0) > 0 else 'other')
     require(category in ('rest','study','work','entertainment','daily_life','social','travel','creative','other'), 'invalid activity category')
@@ -43,6 +39,9 @@ def validate_segment(payload, config=None, *, current=None):
     require(payload['continue'] or payload['event'].strip(), 'segment event required')
     if 'energy_rate' in payload: number(payload['energy_rate'], -0.15, 0.2)
     require(type(payload['minutes']) is int and payload['minutes'] > 0, 'invalid segment minutes')
+    pause = payload.get('pause_for_chat')
+    require(pause is None or isinstance(pause, str) and bool(pause), 'invalid invitation ID')
+    require(not pause or not payload['continue'] and not payload.get('resumes_activity_id') and not payload.get('sleep', False), 'chat pause must be a new awake activity')
     resume = payload.get('resumes_activity_id')
     require(resume is None or isinstance(resume, str) and bool(resume.strip()), 'invalid resume ID')
     require(not (payload['continue'] and resume), 'continue cannot resume another activity')
@@ -54,6 +53,7 @@ def validate_segment(payload, config=None, *, current=None):
         require('sleep' not in payload or payload['sleep'] == sleeping,
                 'continue cannot change sleep state')
     require(not (resume and sleeping), 'sleep cannot resume an awake activity')
+    require(not (pause and sleeping), 'chat pause cannot start sleep')
     if config:
         maximum = config.segment_sleep_max_minutes if sleeping else config.segment_max_minutes
         require(config.segment_min_minutes <= payload['minutes'] <= maximum, 'segment duration outside bounds')

@@ -43,7 +43,7 @@ class PhaseOneLife(EngineFixture,unittest.IsolatedAsyncioTestCase):
             calls.append(task_kind)
             raise ConnectionError('isolated failure')
         runtime=DevelopmentRuntime(self.db,model,config=LifeRuntimeConfig(daily_budget=1,
-            scheduler=SchedulerConfig(enabled=True,change_chance_percent=0)),lock_path=self.db.path.with_suffix('.lock')).start()
+            scheduler=SchedulerConfig(enabled=True)),lock_path=self.db.path.with_suffix('.lock')).start()
         try:
             runtime.tick(); await runtime.process_triggers()
             self.assertEqual(calls,['segment'])

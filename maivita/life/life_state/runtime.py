@@ -55,13 +55,6 @@ class LifeRuntimeConfig:
         require(isinstance(self.availability, AvailabilityConfig), 'invalid availability config')
         require(not self.scheduler.enabled or self.planning_mode == 'autonomous', 'rolling segments need autonomous planning')
 
-    @classmethod
-    def from_r0(cls, config, *, autonomous=False):
-        require(not autonomous or not config.compatibility.legacy_empty_admin_all,
-            'resolve legacy empty-admin semantics before autonomous mode')
-        return cls(planning_mode='autonomous' if autonomous else 'legacy',
-            sleep_mode='disabled' if config.sleep.mode=='disabled' else 'autonomous' if autonomous else 'legacy_fixed',
-            timezone=config.character.timezone)
 
 
 class DevelopmentRuntime:
@@ -112,6 +105,8 @@ class DevelopmentRuntime:
                 with self.database.read_view() as u:
                     pending=u.connection.execute("SELECT count(*) FROM legacy_import_records WHERE review_reason IS NOT NULL").fetchone()[0]
                 require(pending==0, 'migration review unresolved: autonomous staging blocked')
+            from ..planning.conversation import expire
+            expire(self, restart=True)
             self.coordinator.recover()
             self.recovery.startup()
             self.opened=True
@@ -177,6 +172,8 @@ class DevelopmentRuntime:
         require(self.opened, 'runtime not started')
         if self.config.planning_mode!='autonomous': return {'status':'not_eligible'}
         if self.engine.state().sleep_phase=='sleeping' and not self.config.scheduler.enabled: return {'status':'not_eligible'}
+        from ..planning.conversation import expire
+        expire(self)
         with self.database.read_view() as u:
             ids=[row[0] for row in u.connection.execute('SELECT trigger_id FROM decision_triggers WHERE consumed=0 ORDER BY created_at_ms,trigger_id LIMIT 100')]
         if not ids:

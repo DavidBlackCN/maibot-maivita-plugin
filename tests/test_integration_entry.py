@@ -25,8 +25,8 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
             raise AssertionError('unexpected SDK side effect '+cap)
         self.ctx=PluginContext('davidblackcn.maibot-maivita-plugin',rpc_call=rpc,
                                paths=PluginPaths(self.work/'data',self.work/'runtime'))
-        self.config={'plugin':{'enabled':True,'config_version':'3'},
-            'instance':{'acknowledgement':'isolated-test-instance','writer_lock':str(self.work/'writer.lock'),
+        self.config={'plugin':{'enabled':True,'config_version':'4'},
+            'instance':{'writer_lock':str(self.work/'writer.lock'),
                         'allowed_streams':['test-stream']}}
 
     def plugin(self,config=None):
@@ -50,7 +50,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(descriptor['owner_auth']['enabled'])
 
     async def test_default_install_lock_scope_sleep_and_reload(self):
-        plugin=self.plugin({'plugin':{'config_version':'3'}})
+        plugin=self.plugin({'plugin':{'config_version':'4'}})
         await plugin.on_load()
         self.assertTrue(plugin.ready)
         self.assertEqual(plugin.config.instance.writer_lock,'')
@@ -61,7 +61,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         from types import SimpleNamespace
         with patch.object(plugin.delegate.runtime.engine,'state',return_value=SimpleNamespace(sleep_phase='sleeping')):
             self.assertEqual((await plugin.delegate.silence_hook(message={'session_id':'another-session'}))['action'],'abort')
-        second=self.plugin({'plugin':{'config_version':'3'}})
+        second=self.plugin({'plugin':{'config_version':'4'}})
         with self.assertRaisesRegex(RuntimeError,'another life writer'): await second.on_load()
         await plugin.on_config_update('self',plugin.config.model_dump(),2)
         self.assertTrue(plugin.ready)
@@ -89,18 +89,6 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((await plugin.get_life_state())['ok'])
         self.assertIsNotNone(plugin.delegate.deployment_lease.file)
 
-    async def test_retired_engine_hot_update_requires_reload_then_starts_life(self):
-        first=self.plugin(); await first.on_load()
-        changed=first.config.model_dump(); changed['engine']={'mode':'legacy'}
-        with self.assertRaisesRegex(RuntimeError, 'reload'):
-            await first.on_config_update('self',changed,'3')
-        self.assertFalse(first.ready); self.assertFalse(first.delegate.runtime)
-        with WriterLease(self.work/'writer.lock'): pass
-        second=self.plugin(changed); await second.on_load()
-        self.assertTrue(second.ready)
-        self.assertEqual(second.authority['engine'], 'life')
-        self.assertNotIn('engine', second.config.model_dump())
-        self.assertFalse((self.work/'data/legacy/goals.db').exists())
 
     async def test_life_config_change_requires_reload_and_reuses_authority(self):
         first=self.plugin(); await first.on_load()

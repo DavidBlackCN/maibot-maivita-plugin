@@ -1,12 +1,11 @@
-"""Explicit opt-in test-instance configuration, never an R0 config upgrade."""
-from collections.abc import Mapping
+"""Current clean-install configuration."""
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from maibot_sdk import PluginConfigBase
 from pydantic import Field,model_validator
 
-VERSION='3'
+VERSION='4'
 
 ClockTime = Annotated[str, Field(pattern=r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$')]
 
@@ -17,24 +16,14 @@ class Strict(PluginConfigBase):
 
 class PluginSettings(Strict):
     enabled: bool=True
-    config_version: Literal['3']='3'
+    config_version: Literal['4']='4'
 
 
 class InstanceSettings(Strict):
-    acknowledgement: Literal['','isolated-test-instance']=''
     writer_lock: str=''
     allowed_streams: list[str]=Field(default_factory=list)
     timezone: str='Asia/Shanghai'
-    frequency_enabled: Literal[False]=False
 
-    @model_validator(mode='before')
-    @classmethod
-    def discard_retired_permission_flags(cls, data):
-        if isinstance(data, Mapping):
-            # Ignore historical no-op flags without mutating the caller's input.
-            return {key: value for key, value in data.items()
-                    if key not in ('owner_auth_enabled', 'privileged_writes_enabled')}
-        return data
 
 
 def stream_allowed(stream, allowed):
@@ -63,28 +52,14 @@ class ModelSettings(Strict):
         return self
 
 
-class WeeklyPattern(Strict):
-    monday: str=''
-    tuesday: str=''
-    wednesday: str=''
-    thursday: str=''
-    friday: str=''
-    saturday: str=''
-    sunday: str=''
-
-
 class RoutineSettings(Strict):
     initialize_body_state: bool=Field(default=True,strict=True)
     preferred_sleep_time: ClockTime='01:00'
     preferred_wake_time: ClockTime='08:00'
-    weekly_pattern: WeeklyPattern=Field(default_factory=WeeklyPattern)
 
 
 class SchedulerSettings(Strict):
-    enabled: bool=False  # Internal legacy fixture compatibility; deployment forces rolling.
     decision_interval_minutes: int=Field(default=15,ge=1,le=1080,strict=True)
-    change_chance_percent: int=Field(default=0,ge=0,le=100,strict=True)
-    daily_decision_budget: int=Field(default=20,ge=1,le=1000,strict=True)
     segment_min_minutes: int=Field(default=15,ge=1,le=1080,strict=True)
     segment_max_minutes: int=Field(default=180,ge=1,le=1080,strict=True)
     segment_sleep_max_minutes: int=Field(default=720,ge=1,le=1080,strict=True)
@@ -96,7 +71,7 @@ class SchedulerSettings(Strict):
 
     def runtime_config(self):
         from ..life.domain.segment import SchedulerConfig
-        return SchedulerConfig(**self.model_dump())
+        return SchedulerConfig(enabled=True, **self.model_dump())
 
 
 class AvailabilitySettings(Strict):
@@ -107,7 +82,6 @@ class AvailabilitySettings(Strict):
     busy_when_sleeping: bool=Field(default=True, strict=True)
     busy_fatigue_threshold: int=Field(default=90,ge=0,le=100,strict=True)
     busy_energy_threshold: int=Field(default=10,ge=0,le=100,strict=True)
-    followup_after_busy: Literal[False]=False
 
     @model_validator(mode='after')
     def validate_availability(self):
@@ -126,15 +100,6 @@ class DevelopmentConfig(Strict):
     routine: RoutineSettings=Field(default_factory=RoutineSettings)
     scheduler: SchedulerSettings=Field(default_factory=SchedulerSettings)
     availability: AvailabilitySettings=Field(default_factory=AvailabilitySettings)
-
-    @model_validator(mode='before')
-    @classmethod
-    def migrate_internal_config(cls,data):
-        if isinstance(data,Mapping) and str(data.get('plugin',{}).get('config_version','3'))=='2':
-            from copy import deepcopy
-            data=deepcopy(dict(data))
-            data['plugin']['config_version']='3'
-        return data
 
     @model_validator(mode='after')
     def validate_instance(self):

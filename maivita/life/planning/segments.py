@@ -5,7 +5,6 @@ continuing changes only that expectation, never previously observed context.
 """
 from dataclasses import replace
 from datetime import timedelta
-import random
 from uuid import uuid4
 
 from ..domain.clock import from_epoch_ms, to_epoch_ms
@@ -50,7 +49,12 @@ def apply_segment(engine, u, state, command, now):
             if commitment.status in ('confirmed', 'needs_review'):
                 left, right = bounds(commitment)
                 require(deadline <= left or now >= right, 'segment conflicts with protected commitment')
-        engine._close_activity(u, state, now, 'segment_changed', status='interrupted')
+        from .conversation import apply as apply_conversation
+        apply_conversation(u, state, command, current, p, now)
+        if p.get('pause_for_chat'):
+            name = '专心聊天'
+            p.update(category='social', location=current.location, emotion=current.emotion)
+        engine._close_activity(u, state, now, 'conversation_pause' if p.get('pause_for_chat') else 'segment_changed', status='interrupted')
         activity_id = uuid4().hex
         session_id = None
         if sleeping:
@@ -93,8 +97,6 @@ class SegmentService:
             return True, 'segment_due'
         if current.category!='rest' and ((state.fatigue is not None and state.fatigue >= 80) or (state.energy is not None and state.energy <= 20)):
             return True, 'body_threshold'
-        if random.random()*100 < self.config.change_chance_percent:
-            return True, 'chance'
         return False, 'continue'
 
     def context(self):
@@ -111,7 +113,8 @@ class SegmentService:
         with engine.database.read_view() as u:
             row = u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=?',
                                        (current['activity_id'] if current else None,)).fetchone()
-        return {'as_of': facts['as_of'],
+        from .conversation import context as conversation_context
+        return {'conversation': conversation_context(engine), 'as_of': facts['as_of'],
                 'current': ({'event': current['name'], 'location': current['location'], 'emotion': current['emotion'],
                     'elapsed_minutes': current['duration_minutes'],
                     'remaining_minutes': max(0, (from_epoch_ms(row[0])-engine.clock.now_utc()).total_seconds()/60) if row else None}
@@ -159,7 +162,7 @@ class SegmentService:
         if now < engine.state().updated_at:
             return {'status': 'clock_rollback'}
         # Claim the decision window before awaiting; restarts/concurrent ticks
-        # cannot roll the probability again or issue duplicate window calls.
+        # cannot issue duplicate window calls.
         with engine.database.unit_of_work() as u:
             last = u.connection.execute("SELECT max(created_at_ms) FROM decision_triggers WHERE character_id='default' AND kind='segment_window'").fetchone()[0]
             if last is not None and to_epoch_ms(now)-last < self.config.decision_interval_minutes*60000:

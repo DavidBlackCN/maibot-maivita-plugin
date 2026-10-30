@@ -43,14 +43,6 @@ class DecisionCoordinator:
         # outcomes count toward budget and are never retried automatically.
         with self.engine.database.unit_of_work() as u:
             u.connection.execute("UPDATE decision_runs SET status='abandoned',diagnostic='process_restart_unknown_outcome' WHERE status='running'")
-            # Compatibility with earlier runtimes which acknowledged a durable
-            # trigger only AFTER awaiting the model. Any persisted attempt has
-            # already spent its opportunity, including uncertain/cancelled ones.
-            for row in u.connection.execute('SELECT character_id,trigger_ids_json FROM decision_runs'):
-                for trigger in json.loads(row[1]):
-                    if isinstance(trigger,str) and trigger.startswith('batch:'):
-                        u.connection.executemany('UPDATE decision_triggers SET consumed=1 WHERE trigger_id=? AND character_id=?',
-                                                 [(key,row[0]) for key in trigger[6:].split(',') if key])
             u.commit()
 
     async def request(self, trigger_id, *, character_id='default'):

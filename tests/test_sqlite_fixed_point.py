@@ -58,14 +58,14 @@ class FixedPointMigrationTests(unittest.TestCase):
     def test_populated_5_to_6_preserves_graph_nulls_history_and_guards(self):
         with closing(connect(self.path)) as conn:
             self.seed(conn)
-            guards = [tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') AND tbl_name!='body_rule_cutovers' ORDER BY type,name")]
+            guards = [tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') AND tbl_name NOT IN ('body_rule_cutovers','conversation_state') ORDER BY type,name")]
             counts = {row[0]: conn.execute(f'SELECT count(*) FROM {row[0]}').fetchone()[0]
                       for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name!='schema_migrations'")}
             old_ledger = [tuple(row) for row in conn.execute('SELECT * FROM schema_migrations')]
-            self.assertEqual(migrate(conn, self.clock), 7)
-            self.assertEqual(validate_schema(conn), 7)
+            self.assertEqual(migrate(conn, self.clock), 8)
+            self.assertEqual(validate_schema(conn), 8)
             self.assertEqual([tuple(row) for row in conn.execute('SELECT * FROM schema_migrations WHERE version<=5')], old_ledger)
-            self.assertEqual([tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') AND tbl_name!='body_rule_cutovers' ORDER BY type,name")], guards)
+            self.assertEqual([tuple(row) for row in conn.execute("SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','index') AND tbl_name NOT IN ('body_rule_cutovers','conversation_state') ORDER BY type,name")], guards)
             for table, count in counts.items():
                 self.assertEqual(conn.execute(f'SELECT count(*) FROM {table}').fetchone()[0], count, table)
             self.assertEqual(tuple(conn.execute("SELECT energy,fatigue,stress,sleep_debt_minutes FROM life_state WHERE character_id='default'").fetchone()), (conn.execute("SELECT CAST(ROUND(ROUND(1.005,2)*100) AS INTEGER)").fetchone()[0],1235,10000,21))
@@ -82,7 +82,7 @@ class FixedPointMigrationTests(unittest.TestCase):
             self.assertEqual(conn.execute('PRAGMA foreign_keys').fetchone()[0], 1)
             # Re-running must not scale a second time or add a second ledger entry.
             before = '\n'.join(conn.iterdump())
-            self.assertEqual(migrate(conn,self.clock), 7)
+            self.assertEqual(migrate(conn,self.clock), 8)
             self.assertEqual('\n'.join(conn.iterdump()), before)
             migrated_energy=conn.execute("SELECT energy FROM life_state WHERE character_id='default'").fetchone()[0]/100
         db = LifeDatabase(self.path, clock=self.clock)

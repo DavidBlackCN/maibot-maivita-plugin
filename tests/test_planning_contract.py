@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 import r0_support
 from maibot_autonomous_planning_plugin.maivita.host.command_status import render_status, snapshot
-from maibot_autonomous_planning_plugin.maivita.host.config import ModelSettings, RoutineSettings, WeeklyPattern
+from maibot_autonomous_planning_plugin.maivita.host.config import ModelSettings, RoutineSettings
 from maibot_autonomous_planning_plugin.maivita.host.integration_config import IntegrationConfig
 from maibot_autonomous_planning_plugin.maivita.host.model_port import PLANNING_CONTRACT, PRESENT_CONTRACT, SDKModelPort
 from maibot_autonomous_planning_plugin.maivita.life.domain.clock import ManualClock
@@ -74,22 +74,6 @@ class PlanningContractTests(unittest.TestCase):
             self.assertIsNone(validate_plan_quality(proposal(items)))
         self.assertIsNone(validate_plan_quality({'kind': 'update_direction', 'payload': {'goals': [], 'reason': '休息'}}))
 
-    def test_weekly_defaults_and_single_day_toml_roundtrip(self):
-        days = ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')
-        self.assertEqual(WeeklyPattern().model_dump(), dict.fromkeys(days, ''))
-        self.assertEqual(RoutineSettings().weekly_pattern, WeeklyPattern())
-        data = tomllib.loads('[routine.weekly_pattern]\nmonday = "上午上课，下午自由安排"\n')
-        config = IntegrationConfig.model_validate(data)
-        self.assertEqual(config.routine.weekly_pattern.monday, '上午上课，下午自由安排')
-        self.assertTrue(all(getattr(config.routine.weekly_pattern, day) == '' for day in days[1:]))
-        self.assertEqual(config.selected_config().routine, config.routine)
-        self.assertEqual(IntegrationConfig.model_validate(config.model_dump()), config)
-        self.assertEqual(RoutineSettings().weekly_pattern.monday, '')
-        example = tomllib.loads((Path(__file__).resolve().parents[1] / 'config.example.toml').read_text())
-        self.assertNotIn('weekly_pattern', example['routine'])
-        self.assertEqual(IntegrationConfig.model_validate(example).routine.weekly_pattern, WeeklyPattern())
-        with self.assertRaises(ValueError): WeeklyPattern(monday=123)
-        with self.assertRaises(ValueError): WeeklyPattern(monday_typo='上课')
 
 
 class PlanningPromptTests(unittest.IsolatedAsyncioTestCase):
@@ -108,7 +92,7 @@ class PlanningPromptTests(unittest.IsolatedAsyncioTestCase):
                         config=SimpleNamespace(get=AsyncMock(return_value='')))
                     port = SDKModelPort(ctx, ModelSettings(),
                         context=lambda: {'now': now, 'character_timezone': zone},
-                        routine=RoutineSettings(weekly_pattern={'monday': 'WEEKLY_NOT_IN_PROMPT'}))
+                        routine=RoutineSettings())
                     await port(state, (), task_kind=task_kind)
                     prompt_text = ctx.llm.generate.call_args.args[0]
                     prompt = json.loads(prompt_text)

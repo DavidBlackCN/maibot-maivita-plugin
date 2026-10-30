@@ -17,8 +17,8 @@ from maibot_autonomous_planning_plugin.maivita.life.storage.safety import Writer
 
 
 def settings(work,**model):
-    return {'plugin':{'enabled':True,'config_version':'2'},
-        'instance':{'acknowledgement':'isolated-test-instance','writer_lock':str(work/'instance-writer.lock'),
+    return {'plugin':{'enabled':True,'config_version':'4'},
+        'instance':{'writer_lock':str(work/'instance-writer.lock'),
                     'allowed_streams':['test-stream']},'model':{'daily_planning_enabled':False,**model}}
 
 
@@ -26,7 +26,7 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp=tempfile.TemporaryDirectory(prefix='maivita-i1-unit-')
         self.work=Path(self.temp.name).resolve(); self.calls=[]; self.plugins=[]
-        self.response={'success':True,'response':json.dumps({'kind':'winding_down','payload':{'reason':'test candidate'}}),'model_name':'test-provider-double'}
+        self.response={'success':True,'response':json.dumps({'event':'阅读','location':'家','emotion':'平静','minutes':60,'category':'entertainment','sleep':False,'continue':False}),'model_name':'test-provider-double'}
         async def rpc(method,plugin_id,payload,**kwargs):
             self.calls.append((method,payload))
             cap=payload['capability']
@@ -46,11 +46,11 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.on_load()
         result=await self.plugin.runtime.request_replan('unit-explicit')
         self.assertEqual(result['status'],'applied')
-        self.assertEqual((await self.plugin.get_life_state())['data']['sleep_phase'],'winding_down')
+        self.assertEqual((await self.plugin.get_life_state())['data']['sleep_phase'],'awake')
         runtime=self.plugin.runtime
         await self.plugin.on_unload(); self.assertFalse(runtime.opened)
         await self.plugin.on_load()
-        self.assertEqual((await self.plugin.get_life_state())['data']['sleep_phase'],'winding_down')
+        self.assertEqual((await self.plugin.get_life_state())['data']['sleep_phase'],'awake')
         self.assertEqual([p.name for p in self.work.rglob('*.db')],['maivita.db'])
 
     async def test_failure_after_runtime_start_cleans_worker_and_both_leases(self):
@@ -79,7 +79,11 @@ class DevelopmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.plugin.ready); await other.on_unload()
 
     async def test_model_timeout_and_invalid_result_do_not_fabricate_facts(self):
-        await self.plugin.on_load()
+        from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import DevelopmentRuntime
+        async def idle(runtime): await asyncio.Event().wait()
+        with patch.object(DevelopmentRuntime,'run',idle):
+            await self.plugin.on_load()
+        self.plugin.worker.cancel(); await asyncio.gather(self.plugin.worker,return_exceptions=True)
         before=self.plugin.runtime.engine.state()
         self.response={'success':True,'response':'not JSON'}
         result=await self.plugin.runtime.request_replan('bad')
@@ -198,7 +202,7 @@ class ModelRoutingTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(runtime.config.model_timeout_seconds,timeout)
                 self.assertEqual(runtime.coordinator.timeout,timeout)
                 # A real SDK call verifies payload serialization, not just Python kwargs.
-                await self.plugin.model_port(runtime.engine.state(),('route-test',))
+                await self.plugin.model_port(runtime.engine.state(),('route-test',),task_kind='segment')
                 args=[p['args'] for m,p in self.calls if p['capability']=='llm.generate'][-1]
                 self.assertEqual(args['max_tokens'],16384)
                 self.assertEqual(args['rpc_timeout_ms'],timeout*1000)

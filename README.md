@@ -29,9 +29,9 @@
 
 睡眠时普通出站消息会被守卫拦截，包括命令回执。MaiHush 的硬静音独立生效：唤醒不会解除硬静音，解除硬静音也不会唤醒。作息配置是模型偏好，不是强制睡眠时刻。
 
-身体极值拦截默认关闭，可通过 `[availability] enabled = true` 开启。学习、工作、出行、创作显示为“正在专注”（API 值 `slow`），聊天背景提示自然简短回应，仍由 MaiBot 正常回复，不保证延迟或限长。普通空闲为 `free`；睡眠或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 `busy`。启用极值拦截后 busy 会暂停出站消息。旧活动的能耗字段仍保留读取兼容，新活动按类别判断。
+身体极值拦截默认关闭，可通过 `[availability] enabled = true` 开启。学习、工作、出行、创作显示为“正在专注”（API 值 `slow`），聊天背景提示自然简短回应，仍由 MaiBot 正常回复，不保证延迟或限长。普通空闲为 `free`；睡眠或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 `busy`。启用极值拦截后 busy 会暂停出站消息。活动按类别判断身体变化。
 
-忙碌期间不延迟、不缓存、不补发消息，`followup_after_busy` 仅支持 `false`。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
+忙碌期间不延迟、不缓存、不补发消息。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
 
 ### 可选主动表达
 
@@ -91,11 +91,15 @@ vita_admin_accounts = ["你的真实QQ号"]
 
 首次加载由 Host 生成配置；无需填写确认串、写锁路径或会话 ID。发送 `/maivita help` 或 `/maivita status` 查看状态。状态包含今日计划、模型调用和不回复原因；睡眠或硬静音期间可能无法收到回执。
 
-### 从旧版本更新
+### 测试实例
 
-停机备份代码、`config.toml` 和完整插件数据目录，再替换代码。保留现有数据与写锁设置；配置版本为 `"4"`，使用 `plugin`、`instance`、`model`、`routine`、`scheduler`、`availability` 六段。旧 `owner_auth_enabled` / `privileged_writes_enabled` 无论真假均被忽略，不产生权限；其他未知字段仍会报错。
+当前为开发中的版本，按全新实例安装，从 [config.example.toml](config.example.toml) 配置即可。测试前备份需要保留的数据；回滚时使用匹配的代码、配置和完整数据，不能覆盖运行中的数据库，见[回滚指南](docs/ROLLBACK.md)。
 
-不自动导入旧规划库或降级数据库。数据中的非 life 权威记录、未知 schema 和损坏库会阻止启动。备份应包含 `life/maivita.db`、`life/management.sqlite3` 与 `engine-authority.json`；恢复须使用匹配的代码、配置和完整数据，不能覆盖正在运行的数据库。详见[回滚指南](docs/ROLLBACK.md)。配置与数据转换工具分别为 `tools/phase1_config.py`、`tools/phase1_data.py`；它们输出新文件或副本，不直接覆盖运行实例。
+### 聊天邀请与继续活动
+
+在私聊中说“陪我聊会儿”“能和我聊会儿吗”这类简短明确的邀请，会给生活决策一次调整机会。角色可以继续手头的事、边做边聊，也可以暂停活动专心聊天。普通问候、群消息、引用和转发不会触发；这不是管理命令，不能唤醒角色。
+
+邀请最多每半小时考虑一次，五分钟内有效，与其他生活决策共用每日额度。只保留一件明确被打断的活动，最多四小时；后续决策可选择继续，也可放下。普通活动切换不会增加待办。重启不补处理邀请；聊天正文、参与者身份不进入生活记录或空间素材。状态中的“稍后可继续”仅表示一个选择，不代表承诺。
 
 ## 命令
 
@@ -135,7 +139,7 @@ allowed_streams = []
 timezone = "Asia/Shanghai"
 ```
 
-`writer_lock` 留空使用授权数据目录或原权威记录的锁路径，正常安装无需填写；`acknowledgement` 是历史兼容项，留空即可。`frequency_enabled` 只能为 `false`，不修改 Host 全局频率。
+`writer_lock` 为部署写锁路径，正常安装留空即可；不修改 Host 全局回复频率。
 
 ### 模型与每日规划
 
@@ -183,7 +187,7 @@ preferred_wake_time = "08:00"
 | `availability.busy_fatigue_threshold / busy_energy_threshold` | `90 / 10`；0–100 的模拟身体阈值 |
 | `routine.initialize_body_state` | `true`；只把首次未知的身体读数初始化为中性值，已有读数不重置 |
 
-`routine.weekly_pattern` 仅保存旧配置，尚不影响生活；可将工作日与周末偏好写入 `model.life_context`。`scheduler.enabled` 固定开启，`change_chance_percent` 固定为 0，`daily_decision_budget` 由 `model.daily_budget` 统一覆盖。`availability.followup_after_busy` 和 `instance.frequency_enabled` 只支持 false。`availability.busy_when_sleeping` 默认 true，仅影响三态推导，不解除睡眠静默。`acknowledgement`、`writer_lock` 属于兼容与部署字段，普通用户无需填写。
+工作日与周末偏好可直接写入 `model.life_context`。`availability.busy_when_sleeping` 默认 true，仅影响忙闲状态推导，不解除睡眠静默。
 
 ## 已知限制
 

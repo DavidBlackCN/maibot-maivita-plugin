@@ -21,23 +21,21 @@ from maicoordinate.config import Settings
 
 class PhaseOneUpgrade(EngineFixture,unittest.TestCase):
     def test_old_config_budget_and_space_modes(self):
-        for enabled,expected in ((True,33),(False,17)):
-            source={'plugin':{'config_version':'3'},'model':{'daily_budget':17,'task':'custom'},
-                'scheduler':{'enabled':enabled,'daily_decision_budget':33},'instance':{'timezone':'UTC','allowed_streams':['stream']}}
-            before=json.dumps(source)
-            migrated,_=convert('vita',source)
-            self.assertEqual(migrated['model']['daily_budget'],expected)
-            self.assertEqual(migrated['instance']['allowed_streams'],['stream'])
-            self.assertEqual(migrated['model']['task'],'custom')
-            self.assertEqual(json.dumps(source),before)
-            self.assertEqual(convert('vita',migrated)[0],migrated)
+        source={'model':{'daily_budget':17,'task':'custom'},'instance':{'timezone':'UTC','allowed_streams':['stream']}}
+        before=json.dumps(source)
+        current,_=convert('vita',source)
+        self.assertEqual(current['model']['daily_budget'],17)
+        self.assertEqual(current['instance']['allowed_streams'],['stream'])
+        self.assertEqual(current['model']['task'],'custom')
+        self.assertEqual(json.dumps(source),before)
+        self.assertEqual(convert('vita',current)[0],current)
         self.assertEqual(convert('coordinate',{'mode':'controlled'})[0]['space']['mode'],'disabled')
         self.assertEqual(convert('coordinate',{},fresh=True)[0]['space']['mode'],'shadow')
 
     def test_schema6_and_coordinate1_copies_upgrade_and_restore(self):
         self.apply('advance',{'initialize_neutral':True})
         with closing(sqlite3.connect(self.db.path)) as c,c:
-            c.execute('DROP TABLE body_rule_cutovers');c.execute('DELETE FROM schema_migrations WHERE version=7')
+            c.execute('DROP TABLE body_rule_cutovers');c.execute('DROP TABLE conversation_state');c.execute('DELETE FROM schema_migrations WHERE version>=7')
             before=c.execute('SELECT energy,fatigue,stress FROM life_state').fetchone()
         vita=self.db.path.parent
         coordinate=vita/'coordinate';coordinate.mkdir()
@@ -52,7 +50,7 @@ class PhaseOneUpgrade(EngineFixture,unittest.TestCase):
             self.assertTrue(report['source_unchanged']);self.assertTrue(report['rollback_copy_verified'])
             with closing(sqlite3.connect(output/'upgraded/vita/maivita.db')) as c:
                 self.assertEqual(c.execute('SELECT energy,fatigue,stress FROM life_state').fetchone(),before)
-                snapshot=list(c.iterdump());self.assertEqual(migrate(c,self.clock),7);self.assertEqual(list(c.iterdump()),snapshot)
+                snapshot=list(c.iterdump());self.assertEqual(migrate(c,self.clock),8);self.assertEqual(list(c.iterdump()),snapshot)
             with closing(sqlite3.connect(output/'upgraded/coordinate/coordinate.sqlite3')) as c:
                 self.assertEqual(c.execute("SELECT status FROM actions WHERE event_id='old-id'").fetchone()[0],'unknown')
                 self.assertEqual(c.execute('PRAGMA user_version').fetchone()[0],2)

@@ -12,7 +12,7 @@ def test_host_webui_schema_has_no_empty_select_and_roundtrips_defaults():
     assert 'legacy' not in schema['sections']
     fields = [f for s in schema['sections'].values() for f in s['fields'].values()]
     assert all('' not in (f.get('choices') or []) for f in fields if f['ui_type'] == 'select')
-    assert schema['sections']['instance']['fields']['acknowledgement']['hidden']
+    assert 'acknowledgement' not in schema['sections']['instance']['fields']
     assert not {'owner_auth_enabled', 'privileged_writes_enabled'} & schema['sections']['instance']['fields'].keys()
     assert schema['sections']['plugin']['fields']['config_version']['disabled']
     assert schema['sections']['model']['fields']['timeout_seconds']['hidden']
@@ -33,18 +33,13 @@ def test_webui_presentation_does_not_relax_runtime(patch):
         IntegrationConfig.model_validate(patch)
 
 
-@pytest.mark.parametrize('owner', [False, True])
-@pytest.mark.parametrize('writes', [False, True])
-def test_retired_permission_flags_are_discarded(owner, writes):
-    from maibot_autonomous_planning_plugin.maivita.host.config import InstanceSettings
-    source = {'owner_auth_enabled': owner, 'privileged_writes_enabled': writes}
-    original = source.copy()
-    MaiVitaPlugin.build_config_schema()
-    assert InstanceSettings.model_validate(source) == InstanceSettings()
-    assert IntegrationConfig.model_validate({'instance': source}) == IntegrationConfig()
-    assert source == original
-    for key in source:
-        assert key not in InstanceSettings.model_fields
-        assert key not in InstanceSettings.model_validate(source).model_dump()
-    with pytest.raises(ValueError, match='extra_forbidden'):
-        InstanceSettings.model_validate({**source, 'unknown_key': 1})
+@pytest.mark.parametrize('patch', [
+    {'instance': {'owner_auth_enabled': True}}, {'instance': {'privileged_writes_enabled': False}},
+    {'routine': {'weekly_pattern': {}}}, {'scheduler': {'daily_decision_budget': 20}},
+    {'scheduler': {'change_chance_percent': 0}}, {'scheduler': {'enabled': True}},
+    {'availability': {'followup_after_busy': False}}, {'plugin': {'config_version': '3'}},
+    {'engine': {}}, {'legacy': {}},
+])
+def test_only_current_configuration_is_accepted(patch):
+    with pytest.raises(ValueError):
+        IntegrationConfig.model_validate(patch)

@@ -11,12 +11,10 @@ class AvailabilityConfig:
     busy_when_sleeping: bool = True
     busy_fatigue_threshold: int = 90
     busy_energy_threshold: int = 10
-    followup_after_busy: bool = False
 
     def __post_init__(self):
-        for key in ('enabled', 'busy_when_sleeping', 'followup_after_busy'):
+        for key in ('enabled', 'busy_when_sleeping'):
             require(type(getattr(self, key)) is bool, 'invalid availability switch: '+key)
-        require(self.followup_after_busy is False, 'busy followup is not supported in scheme B')
         require(isinstance(self.slow_categories, (tuple, list)) and
                 all(c in tuple(Category) for c in self.slow_categories), 'invalid slow categories')
         object.__setattr__(self, 'slow_categories', tuple(self.slow_categories))

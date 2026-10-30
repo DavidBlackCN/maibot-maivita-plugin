@@ -5,11 +5,10 @@ from .integration_config import IntegrationConfig
 
 HIDDEN = {
     'plugin': {'config_version'},
-    'instance': {'acknowledgement', 'writer_lock', 'frequency_enabled'},
+    'instance': {'writer_lock'},
     'model': {'mode', 'task', 'model', 'timeout_seconds', 'max_tokens', 'generate_on_start'},
-    'routine': {'initialize_body_state', 'weekly_pattern'},
-    'scheduler': {'enabled', 'daily_decision_budget', 'change_chance_percent'},
-    'availability': {'followup_after_busy', 'busy_when_sleeping'},
+    'routine': {'initialize_body_state'},
+    'availability': {'busy_when_sleeping'},
 }
 SECTIONS = {'plugin': '插件', 'instance': '会话与时区', 'model': '生活背景与调用额度',
             'routine': '作息偏好', 'scheduler': '高级：活动检查', 'availability': '高级：专注与休息'}
@@ -29,7 +28,7 @@ def build_schema(**metadata):
     for section_name,section in schema['sections'].items():
         section['title'] = SECTIONS[section_name]
         section['collapsed'] = section_name in ('scheduler', 'availability')
-        section['description'] = ('默认值即可使用；隐藏的路由与兼容参数可在原始 TOML 中维护，详见 README。'
+        section['description'] = ('默认值即可使用；隐藏的模型路由参数可在原始 TOML 中维护，详见 README。'
                                   if section_name == 'model' else section.get('description', ''))
         for field in section['fields'].values():
             field['label'] = LABELS.get(field['name'], field.get('label', field['name']))
@@ -37,19 +36,6 @@ def build_schema(**metadata):
                 field['label'] = '身体极度疲劳时暂停回复（默认关闭，睡眠静默独立生效）'
             if field['name'] in HIDDEN.get(section_name, set()):
                 field['hidden'] = True
-            choices = field.get('choices')
-            if choices and '' in choices:
-                # Radix Select.Item reserves the empty value for clearing.
-                # This historical acknowledgement is optional, not an operator task.
-                field.update(type='string', ui_type='text', choices=None,
-                             hidden=True, disabled=True)
-            elif choices == [False]:
-                # Select serializes its value to a string, which is not False.
-                field.update(type='boolean', ui_type='switch', choices=None, disabled=True)
-            if field['name'] in ('weekly_pattern','daily_decision_budget','change_chance_percent'):
-                field.update(hidden=True,disabled=True)
-            if section_name=='scheduler' and field['name']=='enabled':
-                field.update(hidden=True,disabled=True)
             if field['name'] == 'config_version':
                 field['disabled'] = True
             if field['type'] == 'object':

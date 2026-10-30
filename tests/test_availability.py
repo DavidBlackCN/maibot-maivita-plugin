@@ -74,7 +74,7 @@ class ConfigTests(unittest.TestCase):
     def test_defaults_and_entrypoint_conversion_preserve_settings(self):
         config = IntegrationConfig()
         self.assertFalse(config.availability.enabled)
-        self.assertFalse(config.availability.followup_after_busy)
+        self.assertNotIn('followup_after_busy',type(config.availability).model_fields)
         self.assertEqual(config.selected_config().availability.runtime_config(), AvailabilityConfig())
         config = IntegrationConfig.model_validate({'availability':{'enabled':True,
             'slow_categories':['social'], 'busy_when_sleeping':False,

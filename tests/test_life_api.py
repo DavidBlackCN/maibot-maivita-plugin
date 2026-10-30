@@ -112,16 +112,6 @@ class LifeAPITests(EngineFixture,unittest.IsolatedAsyncioTestCase):
             with self.db.read_view() as u: self.assertEqual(u.habits.all(),[])
         finally: await runtime.close()
 
-    async def test_config_projection_preserves_disabled_and_rejects_old_allow_all(self):
-        from types import SimpleNamespace as NS
-        from maibot_autonomous_planning_plugin.maivita.life.life_state.runtime import LifeRuntimeConfig
-        config=NS(sleep=NS(mode='legacy_fixed'), character=NS(timezone='Asia/Shanghai'),
-                  compatibility=NS(legacy_empty_admin_all=False))
-        self.assertEqual(LifeRuntimeConfig.from_r0(config).sleep_mode,'legacy_fixed')
-        config.sleep.mode='disabled'
-        self.assertEqual(LifeRuntimeConfig.from_r0(config,autonomous=True).sleep_mode,'disabled')
-        config.compatibility.legacy_empty_admin_all=True
-        with self.assertRaisesRegex(DomainError,'empty-admin'): LifeRuntimeConfig.from_r0(config,autonomous=True)
 
     async def test_read_envelope_legacy_shape_and_forged_private_scope(self):
         async def model(*args): self.fail('read must not call model')
