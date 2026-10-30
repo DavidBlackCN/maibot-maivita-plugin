@@ -36,7 +36,7 @@ CATEGORY_REASONS = {
     'study': '正在学习', 'work': '正在工作', 'social': '正在社交',
     'travel': '正在路上', 'creative': '正在创作', 'other': '当前活动',
 }
-LABELS = {'free': '空闲', 'slow': '半忙', 'busy': '忙碌'}
+LABELS = {'free': '空闲', 'slow': '正在专注', 'busy': '需要休息'}
 
 
 def derive_availability(state, activity, config, *, activity_visible=True):

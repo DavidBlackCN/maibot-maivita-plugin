@@ -8,7 +8,7 @@ from datetime import timedelta
 import random
 from uuid import uuid4
 
-from ..domain.clock import from_epoch_ms, to_epoch_ms, local_day_bounds
+from ..domain.clock import from_epoch_ms, to_epoch_ms
 from ..domain.commands import Command
 from ..domain.models import Activity, DomainError, SleepSession, SleepSegment, require
 from ..domain.segment import validate_segment
@@ -36,9 +36,9 @@ def apply_segment(engine, u, state, command, now):
                 and previous.role == 'primary' and previous.status in ('completed', 'interrupted')
                 and previous.sleep_session_id is None), 'not a resumable segment')
         name = previous.name if previous else p['event'].strip()
-        sleeping = name == '睡眠'
+        sleeping = p['sleep']
         require(not previous or name == p['event'].strip(), 'resumed event must match history')
-        demanding=p['category'] in ('study','work','travel','creative')
+        demanding=not sleeping and p['category'] in ('study','work','travel','creative')
         require(not (state.fatigue is not None and state.fatigue >= 95 and demanding),
                 'fatigue forbids demanding activity')
         require(not (state.energy is not None and state.energy <= 5 and demanding),
@@ -99,24 +99,27 @@ class SegmentService:
 
     def context(self):
         engine = self.runtime.engine
-        now = engine.clock.now_utc()
-        state = engine.state()
-        start, end = local_day_bounds(engine.clock.to_local(now, self.runtime.config.timezone).date(), self.runtime.config.timezone)
+        facts = self.runtime.queries.get_public_life_context()
+        current = facts['activity']
+        if current and current['continuity_unknown']:
+            current = None
+        def brief(activity):
+            return {key: value[:160] if key in ('name','location','emotion') else value
+                    for key,value in activity.items()}
+        if current:
+            current=brief(current)
         with engine.database.read_view() as u:
-            current = u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
             row = u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=?',
-                                       (state.primary_activity_id,)).fetchone()
-            # Model context uses the same public scope as the existing host port.
-            history = [{'event': a.name, 'location': a.location, 'emotion': a.emotion,
-                        'started_at': a.started_at.isoformat(), 'ended_at': a.ended_at.isoformat() if a.ended_at else None}
-                       for a in sorted(u.activities.for_character(state.character_id), key=lambda a: a.started_at)
-                       if a.visibility == 'public_summary' and a.started_at < end and (a.ended_at or now) >= start][-48:]
-        return {'current': ({'event': current.name, 'location': current.location, 'emotion': current.emotion,
-                    'elapsed_minutes': max(0, (now-current.started_at).total_seconds()/60),
-                    'remaining_minutes': max(0, (from_epoch_ms(row[0])-now).total_seconds()/60) if row else None}
-                    if current and current.visibility == 'public_summary' else None),
-                'body': {key: getattr(state, key) for key in ('energy', 'fatigue', 'stress', 'sleep_debt_minutes')},
-                'today_history': history,
+                                       (current['activity_id'] if current else None,)).fetchone()
+        return {'as_of': facts['as_of'],
+                'current': ({'event': current['name'], 'location': current['location'], 'emotion': current['emotion'],
+                    'elapsed_minutes': current['duration_minutes'],
+                    'remaining_minutes': max(0, (from_epoch_ms(row[0])-engine.clock.now_utc()).total_seconds()/60) if row else None}
+                    if current else None),
+                'body': facts['body'],
+                'recent_history': [brief(a) for a in reversed(facts['history']) if not a['continuity_unknown']],
+                'continuity_unknown': facts['continuity_unknown'],
+                'history_note': '最近24小时的公开活动；结束或切换不证明目标完成。未知区间不补编经历。',
                 'limits': {'min_minutes': self.config.segment_min_minutes, 'max_minutes': self.config.segment_max_minutes,
                            'sleep_max_minutes': self.config.segment_sleep_max_minutes}}
 

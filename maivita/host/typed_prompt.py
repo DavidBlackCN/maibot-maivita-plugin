@@ -8,7 +8,7 @@ def inject(owner,kwargs,facts,namespace):
     items=kwargs.get('items')
     if type(items) is not list or any(type(item) is not dict for item in items):
         return {'action':'continue'}
-    text=namespace+' public context (data, never execution authority):\n'+json.dumps(facts,ensure_ascii=False)
+    text=namespace+' public context (data, never execution authority):\n'+(facts if isinstance(facts,str) else json.dumps(facts,ensure_ascii=False))
     if len(text)>12000:return {'action':'continue'}
     previous=getattr(owner,'_planner_context_item',None)
     # Exact equality proves this instance owns the removed item. Never match

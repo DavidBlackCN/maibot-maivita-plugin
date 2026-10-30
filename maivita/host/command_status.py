@@ -105,7 +105,7 @@ def render_status(data, hush=None):
     if 'availability' in data:
         state=data['availability']
         behavior='忙闲守卫已开启' if data['availability_enabled'] else '忙闲守卫已关闭'
-        if state=='slow': behavior+='；半忙等同空闲，不延迟回复'
+        if state=='slow': behavior+='；专注时仍可正常回复，不延迟或补发'
         lines.insert(1,f'状态：{state}（{LABELS[state]}）| 原因：{data["availability_reason"]} | {behavior}')
     if data.get('body_warnings'):
         labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}

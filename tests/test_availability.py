@@ -153,7 +153,7 @@ class GuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data['state'], 'busy')
         self.assertTrue(data['can_reply_recommendation'])
         text = render_status(snapshot(self.plugin.runtime,'Asia/Shanghai','test-stream'))
-        self.assertIn('busy（忙碌）', text)
+        self.assertIn('busy（需要休息）', text)
         self.assertIn('忙闲守卫已关闭', text)
         self.assertIn('不回复原因：无', text)
 
@@ -187,14 +187,14 @@ class GuardTests(unittest.IsolatedAsyncioTestCase):
         self.execute('start_activity',name='私密研究',category='study',check_after_minutes=30)
         data = self.plugin.runtime.queries.get_availability()
         text = render_status(snapshot(self.plugin.runtime,'Asia/Shanghai','test-stream'))
-        self.assertIn('状态：slow（半忙）', text)
-        self.assertIn('不延迟回复', text)
+        self.assertIn('状态：slow（正在专注）', text)
+        self.assertIn('不延迟或补发', text)
         self.assertNotIn('私密研究', text)
         self.assertNotIn('正在学习', text)
         self.assertIn(data['reason'], text)
         self.body(fatigue=90)
         text = render_status(snapshot(self.plugin.runtime,'Asia/Shanghai','test-stream'))
-        self.assertIn('状态：busy（忙碌）', text)
+        self.assertIn('状态：busy（需要休息）', text)
         self.assertIn('不回复原因：忙碌静默（MaiVita：疲劳过高）', text)
 
     async def test_failure_guard_still_applies(self):

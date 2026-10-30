@@ -1,6 +1,6 @@
 """SDK-only real model boundary. No Host internals, keys, chat reads or retries."""
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import time
 
@@ -30,7 +30,7 @@ PRESENT_CONTRACT={
 
 PLANNING_CONTRACT = {
     'instruction': (
-        '这是每日规划。请为角色生成今天的一整天日程，共 6-12 个活动。'
+        '这是每日参考规划。完整一天通常安排 10-16 项有意义的生活阶段，数量只是参考，不设硬下限。'
         '只允许 apply_plan_patch；日程使用角色时区的今天日期。'
         '禁止 start_activity、winding_down、start_sleep、extend_sleep——这是规划，不是执行，不要直接开始活动。'
         '\n\n'
@@ -40,22 +40,26 @@ PLANNING_CONTRACT = {
         '\n- window：一个时间窗内灵活安排，用 window_start_at/window_end_at + '
         'preferred_duration_minutes。适合「下午学习 1-2 小时」这类不精确的事。'
         '\n- unscheduled：今天想做但不定时，只有 name。'
-        '  只用于确实无法定时的事，且全天最多 2 条。'
+        '  适合不需要定时的打算，不要为了凑数量添加事项。'
         '\n\n'
-        '【覆盖要求】'
-        '\n- 6-12 个活动，覆盖早/中/晚主要时段（不能只写上午或只写晚上）。'
-        '\n- 至少 3 条必须是 fixed 或 window（有明确时间），不能全是 unscheduled。'
-        '\n- 允许且鼓励用 free_time / rest / daily_life 表达空白时段，不要排满 24 小时。'
+        '【时间与粒度】'
+        '\n- 睡眠、吃饭、洗漱计入总数；不在这些基础活动外额外安排十几项正事。'
+        '\n- 根据当前当地时间安排尚未过去的时间；晚启动或重生成只安排剩余时间，不补编过去。'
+        '\n- 活动按目的、场景或专注程度的变化划分；普通活动多为半小时到两小时，睡眠和长活动可更久。'
+        '\n- 喝水、翻身等微动作合并到休息或日常活动；晨间洗漱护肤通常合并。'
+        '\n- 合理的睡眠可以跨午夜；三餐可按人设合并为早午餐，不强迫固定套路。'
+        '\n- 安排有大致时间的生活，也允许空档；不要求无缝覆盖 24 小时。'
         '\n- 活动之间不能时间重叠（fixed 项）。'
         '\n\n'
         '【生活质感】'
         '\n- 不要排成流程模板（起床→上班→午休→下班→晚饭→睡觉一条龙）。'
-        '\n- 每天不应该长得差不多；允许临时起意、无所事事、赖床、发呆。'
-        '\n- 结合人设、作息偏好（只是参考）、当前季节/节日。'
+        '\n- 允许稳定重复，也允许临时起意、无所事事、赖床、发呆，不强求每天不同。'
+        '\n- 结合人设、近期已记录的生活、作息偏好（只是参考）、当地日期和星期；没有外部依据时不编造天气或节日。'
+        '\n- 计划写打算，不提前写死买到了什么、学会了什么、情绪反应或他人的行为。'
         '\n- 有明确时间的事要合理（不要凌晨 3 点学习，除非人设是夜猫子）。'
         '\n\n'
         '【输出】'
-        '\nexample 只是格式示范，不要求恰好 6 条，也不要照抄活动或 item_id。'
+        '\nexample 只是随当前时间裁剪的格式示范，不要求同样条数，也不要照抄活动或 item_id。'
         '每项使用有意义且不与其他日期混淆的 item_id；修改已有事项时保留原 item_id。'
         '\nReturn exactly one JSON object with only kind and payload. '
         'Plans are not actual history. Preserve confirmed commitments. '
@@ -69,6 +73,9 @@ PLANNING_CONTRACT = {
         'payload': {
             'local_date': '2026-10-29',
             'upserts': [
+                {'item_id': 'night', 'name': '睡眠', 'category': 'rest',
+                 'time_mode': 'fixed', 'start_at': '2026-10-29T01:00:00+08:00',
+                 'end_at': '2026-10-29T08:00:00+08:00', 'visibility': 'public_summary'},
                 {'item_id': 'd1', 'name': '起床洗漱', 'category': 'daily_life',
                  'time_mode': 'fixed',
                  'start_at': '2026-10-29T08:00:00+08:00',
@@ -90,20 +97,43 @@ PLANNING_CONTRACT = {
                  'start_at': '2026-10-29T12:00:00+08:00',
                  'end_at': '2026-10-29T13:00:00+08:00',
                  'visibility': 'public_summary'},
-                {'item_id': 'd5', 'name': '自由时间', 'category': 'free_time',
+                {'item_id': 'd5', 'name': '午后休息，随便看看', 'category': 'rest',
                  'time_mode': 'window',
                  'window_start_at': '2026-10-29T13:00:00+08:00',
-                 'window_end_at': '2026-10-29T18:00:00+08:00',
-                 'preferred_duration_minutes': 180,
+                 'window_end_at': '2026-10-29T14:30:00+08:00',
+                 'preferred_duration_minutes': 90,
                  'visibility': 'public_summary'},
+                {'item_id': 'afternoon', 'name': '阅读感兴趣的书', 'category': 'entertainment',
+                 'time_mode': 'window', 'window_start_at': '2026-10-29T14:30:00+08:00',
+                 'window_end_at': '2026-10-29T16:00:00+08:00',
+                 'preferred_duration_minutes': 90, 'visibility': 'public_summary'},
+                {'item_id': 'walk', 'name': '去附近散步，顺路逛逛', 'category': 'travel',
+                 'time_mode': 'window', 'window_start_at': '2026-10-29T16:00:00+08:00',
+                 'window_end_at': '2026-10-29T17:30:00+08:00',
+                 'preferred_duration_minutes': 60, 'visibility': 'public_summary'},
                 {'item_id': 'd6', 'name': '晚饭', 'category': 'daily_life',
                  'time_mode': 'fixed',
                  'start_at': '2026-10-29T18:00:00+08:00',
                  'end_at': '2026-10-29T19:00:00+08:00',
                  'visibility': 'public_summary'},
+                {'item_id': 'game', 'name': '玩一会儿游戏', 'category': 'entertainment',
+                 'time_mode': 'window', 'window_start_at': '2026-10-29T19:00:00+08:00',
+                 'window_end_at': '2026-10-29T20:30:00+08:00',
+                 'preferred_duration_minutes': 90, 'visibility': 'public_summary'},
+                {'item_id': 'wash', 'name': '洗漱整理', 'category': 'daily_life',
+                 'time_mode': 'window', 'window_start_at': '2026-10-29T20:30:00+08:00',
+                 'window_end_at': '2026-10-29T21:00:00+08:00',
+                 'preferred_duration_minutes': 30, 'visibility': 'public_summary'},
+                {'item_id': 'relax', 'name': '听歌阅读，放松一下', 'category': 'rest',
+                 'time_mode': 'window', 'window_start_at': '2026-10-29T21:00:00+08:00',
+                 'window_end_at': '2026-10-29T23:00:00+08:00',
+                 'preferred_duration_minutes': 90, 'visibility': 'public_summary'},
+                {'item_id': 'sleep', 'name': '夜间睡眠', 'category': 'rest',
+                 'time_mode': 'fixed', 'start_at': '2026-10-29T23:00:00+08:00',
+                 'end_at': '2026-10-30T08:00:00+08:00', 'visibility': 'public_summary'},
             ],
             'remove_ids': [],
-            'reason': '这是格式示例：6 个活动覆盖早中晚，fixed 与 window 混用，空档用 free_time 表达'
+            'reason': '这是格式示例：包含日常起居，保留空档，睡眠可以跨午夜；请按人设和当下时间安排'
         }
     }
 }
@@ -118,26 +148,27 @@ SEGMENT_CONTRACT = {
         '\n- 她是谁（人设）：优先级最高'
         '\n- 上一段在做什么、做了多久、还剩多久'
         '\n- 她现在的身体读数（精力、疲劳、压力、睡眠债）'
-        '\n- 今天已经过完的时段'
+        '\n- 最近24小时已经记录的生活（包括午夜前），不是计划中的未来经历'
         '\n- 今天的大致样子（若有）'
         '\n\n'
         '【怎么决定】'
-        '\n1. 身体读数是输入：累到不行就休息/睡觉，饿到不行就去吃——怎么权衡由你判断'
+        '\n1. 身体读数是输入：累到不行就休息/睡觉；吃饭参考当地时间、人设和近期活动，不假设存在饥饿读数'
         '\n2. 一件事做到一半接着做很正常（continue=true）；做很久了、或身体不允许时就换'
-        '\n3. minutes 要真实：喝口水 15-30 分钟，出门办事 1-3 小时；别因为要填时间就往长了写'
+        '\n3. minutes 描述一个生活阶段：阅读、休息或出门通常半小时到两小时；喝水等微动作并入当前活动，遵守 context 中时长边界'
         '\n4. 换一件事要接得上：上一段在哪、刚做完什么，换地方要有说得过去的由头'
-        '\n5. 一天可以被小事打断（快递到了、朋友叫住）；也可以临时起意（突然想出去走走）'
+        '\n5. 可以临时起意，但没有依据就不编造朋友来访、快递通知或真实平台互动；观察缺口不能补编成经历'
         '\n6. 别把一天排成流程模板；午睡不是每天必须有'
         '\n7. 允许无所事事、发呆、刷手机——这也是她的一天'
         '\n\n'
         '【输出】只输出一个 JSON 对象：'
         '\n{"event": "在做什么", "location": "在哪", "emotion": "心情", '
-        '"minutes": 45, "continue": false, "category": "rest"}'
-        '\n- event 要具体到能说出口（不要"翻个身"这种微动作；睡眠直接写"睡眠"）'
+        '"minutes": 45, "continue": false, "category": "rest", "sleep": false}'
+        '\n- event 要具体到能说出口，不要把翻身等微动作单列。sleep=true 表示真正睡眠，名称可自然描述；清醒休息用 sleep=false。'
+        '\n- continue=true 不改变当前睡眠状态，sleep 可省略；睡眠只能依既有唤醒规则结束。'
         '\n- continue=true 时 event/location/emotion 可留空'
         '\n- category：rest|study|work|entertainment|daily_life|social|travel|creative|other。身体变化由固定类别规则计算，不输出变化速率。'
     ),
-    'example': {'event': '在家读小说', 'location': '家里的沙发', 'emotion': '放松', 'minutes': 45, 'continue': False, 'category': 'rest'}
+    'example': {'event': '在家读小说', 'location': '家里的沙发', 'emotion': '放松', 'minutes': 45, 'continue': False, 'category': 'rest', 'sleep': False}
 }
 
 def parse_candidate(text, *, task_kind='present'):
@@ -174,14 +205,35 @@ class SDKModelPort:
             local_now=to_local(context['now'],context.get('character_timezone','Asia/Shanghai'))
             today=local_now.date().isoformat()
             items=[]
+            reference_date=datetime.fromisoformat(contract['example']['payload']['local_date']).date()
             for template in contract['example']['payload']['upserts']:
                 item={**template,'item_id':template['item_id']+'-'+today}
                 for key in ('start_at','end_at','window_start_at','window_end_at'):
                     if key in item:
-                        item[key]=datetime.fromisoformat(item[key]).replace(
-                            year=local_now.year,month=local_now.month,day=local_now.day,
+                        original=datetime.fromisoformat(item[key])
+                        day=local_now.date()+(original.date()-reference_date)
+                        item[key]=original.replace(year=day.year,month=day.month,day=day.day,
                             tzinfo=local_now.tzinfo).isoformat()
+                start_key='start_at' if item['time_mode']=='fixed' else 'window_start_at'
+                end_key='end_at' if item['time_mode']=='fixed' else 'window_end_at'
+                if end_key in item:
+                    end=datetime.fromisoformat(item[end_key])
+                    if end<=local_now:
+                        continue
+                    if datetime.fromisoformat(item[start_key])<local_now:
+                        item[start_key]=local_now.isoformat()
+                    if 'preferred_duration_minutes' in item:
+                        available=int((end-datetime.fromisoformat(item[start_key])).total_seconds()/60)
+                        if available<1: continue
+                        item['preferred_duration_minutes']=min(item['preferred_duration_minutes'],available)
                 items.append(item)
+            if not items:
+                items=[{'item_id':'evening-'+today,'name':'睡前放松','category':'rest','time_mode':'window',
+                    'window_start_at':local_now.isoformat(),'window_end_at':(local_now+timedelta(minutes=30)).isoformat(),
+                    'preferred_duration_minutes':30,'visibility':'public_summary'}]
+            context['planning_window']={'not_before':local_now.isoformat(),
+                'local_date':today,'weekday':('星期一','星期二','星期三','星期四','星期五','星期六','星期日')[local_now.weekday()],
+                'note':'只安排从现在起的参考生活；跨午夜睡眠允许延续。过去只能引用已记录的活动。'}
             contract={**contract,'example':{**contract['example'],
                 'payload':{**contract['example']['payload'],'local_date':today,'upserts':items}}}
         from .persona import read_persona

@@ -17,6 +17,10 @@
 
 每日规划默认开启，使用 Host 的 `planner` 模型任务，**会产生模型调用费用**。按角色时区每天 08:00 触发，晚启动会补触发当天规划；重启不会重复已调用的规划。参考规划与滚动生活共用角色时区自然日预算，新安装默认 20 次，包含失败重试。实际活动只有滚动决策一条推进路径。
 
+完整一天通常包含 10–16 项参考安排，睡眠、吃饭、洗漱也计入。按有意义的生活阶段划分，允许稳定重复、空档和跨午夜睡眠；数量不是硬性要求。晚间启动或重新生成时主要安排剩余时间，不补写过去。计划描述打算，不提前写死购买结果、学习收获或他人的行为。
+
+普通聊天会参考当前公开活动、地点、心情和最近 24 小时的已记录生活，午夜不会清空衔接。背景仅在相关或被问到时自然带出，不逐条播报，也不额外调用摘要模型；私有记录和观察缺口中的经历不进入聊天素材。生活记录是角色模拟，不代表实际执行了外部操作。
+
 ### 可确认的生活管理
 
 管理员可以新增或调整计划、管理目标、开始和结束活动、请求睡眠。新增管理操作先预览，再由同一账号在同一会话两分钟内确认；状态或权限发生变化时，旧预览会被拒绝。确认结果持久保存，重复确认不会重复修改。
@@ -25,7 +29,7 @@
 
 睡眠时普通出站消息会被守卫拦截，包括命令回执。MaiHush 的硬静音独立生效：唤醒不会解除硬静音，解除硬静音也不会唤醒。作息配置是模型偏好，不是强制睡眠时刻。
 
-忙闲三态功能默认关闭，可通过 `[availability] enabled = true` 开启。`/maivita status` 显示三态、原因及开关状态：学习、工作、出行、创作为 slow；其他活动能耗率 `energy_rate <= -0.05` 也为 slow；其余为 free。slow 与 free 均正常回复。活跃睡眠会话或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 busy，启用后出站守卫返回 abort。类别与身体阈值可配置。
+身体极值拦截默认关闭，可通过 `[availability] enabled = true` 开启。学习、工作、出行、创作显示为“正在专注”（API 值 `slow`），聊天背景提示自然简短回应，仍由 MaiBot 正常回复，不保证延迟或限长。普通空闲为 `free`；睡眠或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 `busy`。启用极值拦截后 busy 会暂停出站消息。旧活动的能耗字段仍保留读取兼容，新活动按类别判断。
 
 忙碌期间不延迟、不缓存、不补发消息，`followup_after_busy` 仅支持 `false`。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
 
@@ -119,7 +123,7 @@ vita_admin_accounts = ["你的真实QQ号"]
 
 ## 配置
 
-完整字段、默认值和范围见 [config.example.toml](config.example.toml)。配置格式版本与插件发布版本不同。
+[config.example.toml](config.example.toml) 只列常用设置，省略字段使用默认值。WebUI 的常用区域提供会话、时区、生活背景、调用额度和作息；活动检查与休息拦截在高级区域，模型路由等可在原始 TOML 中修改。配置格式版本与插件发布版本不同。
 
 ### 会话与时区
 
@@ -161,6 +165,25 @@ preferred_wake_time = "08:00"
 ```
 
 版本变化见 [UPDATE_NOTES.md](UPDATE_NOTES.md)。
+
+### 高级参数与旧配置
+
+下列参数通常无需修改。隐藏字段仍可在原始 TOML 中设置，升级不会删除旧值；不要把示例直接覆盖到已有配置。
+
+| 字段 | 默认值与说明 |
+| --- | --- |
+| `model.mode / task / model` | `task / planner / ""`；指定模型时使用 `mode = "model"` 并填写模型名 |
+| `model.timeout_seconds / max_tokens` | `90 / 8192`；超时 1–300 秒，输出上限 128–16384 token |
+| `model.generate_on_start` | `false`；每日规划关闭时，每次加载额外请求一次当前活动决策 |
+| `scheduler.decision_interval_minutes` | `15`；定期检查并不等于调用模型 |
+| `scheduler.segment_min_minutes / segment_max_minutes` | `15 / 180`；检查间隔须在两者之间 |
+| `scheduler.segment_sleep_max_minutes` | `720`；睡眠硬上限，不小于活动上限且最多 1080 分钟 |
+| `availability.enabled` | `false`；控制身体极值拦截，不控制睡眠静默 |
+| `availability.slow_categories` | `study, work, travel, creative`；正在专注的类别 |
+| `availability.busy_fatigue_threshold / busy_energy_threshold` | `90 / 10`；0–100 的模拟身体阈值 |
+| `routine.initialize_body_state` | `true`；只把首次未知的身体读数初始化为中性值，已有读数不重置 |
+
+`routine.weekly_pattern` 仅保存旧配置，尚不影响生活；可将工作日与周末偏好写入 `model.life_context`。`scheduler.enabled` 固定开启，`change_chance_percent` 固定为 0，`daily_decision_budget` 由 `model.daily_budget` 统一覆盖。`availability.followup_after_busy` 和 `instance.frequency_enabled` 只支持 false。`availability.busy_when_sleeping` 默认 true，仅影响三态推导，不解除睡眠静默。`acknowledgement`、`writer_lock` 属于兼容与部署字段，普通用户无需填写。
 
 ## 已知限制
 

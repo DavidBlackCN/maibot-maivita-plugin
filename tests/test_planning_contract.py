@@ -37,7 +37,7 @@ class PlanningContractTests(unittest.TestCase):
         self.assertEqual(validate_task_candidate(example, 'planning'), example)
         self.assertIsNone(validate_plan_quality(example))
         items = example['payload']['upserts']
-        self.assertTrue(6 <= len(items) <= 12)
+        self.assertTrue(10 <= len(items) <= 16)
         self.assertEqual(items[0]['time_mode'], 'fixed')
         self.assertGreaterEqual(sum(i['time_mode'] in ('fixed', 'window') for i in items), 3)
         starts = [datetime.fromisoformat(i.get('start_at') or i['window_start_at']) for i in items]
@@ -46,7 +46,7 @@ class PlanningContractTests(unittest.TestCase):
         self.assertTrue(any(t.hour >= 18 for t in starts))
         fixed = sorted((i for i in items if i['time_mode'] == 'fixed'), key=lambda i: i['start_at'])
         self.assertTrue(all(a['end_at'] <= b['start_at'] for a, b in zip(fixed, fixed[1:])))
-        self.assertIn('6-12', PLANNING_CONTRACT['instruction'])
+        self.assertIn('10-16', PLANNING_CONTRACT['instruction'])
         self.assertIn('fixed', PLANNING_CONTRACT['instruction'])
         self.assertIn('不要照抄', PLANNING_CONTRACT['instruction'])
         self.assertEqual(set(PLANNING_CONTRACT['commands']), {'apply_plan_patch'})
@@ -54,10 +54,10 @@ class PlanningContractTests(unittest.TestCase):
     def test_all_unscheduled_is_degraded_but_schema_valid(self):
         value = proposal(unscheduled(6))
         self.assertEqual(validate_task_candidate(value, 'planning'), value)
-        self.assertEqual(validate_plan_quality(value), 'degraded:all_unscheduled')
+        self.assertEqual(validate_plan_quality(value), 'warning:all_unscheduled')
         # Omitted time_mode defaults to unscheduled in ScheduleItem.
         del value['payload']['upserts'][0]['time_mode']
-        self.assertEqual(validate_plan_quality(value), 'degraded:all_unscheduled')
+        self.assertEqual(validate_plan_quality(value), 'warning:all_unscheduled')
 
     def test_timed_minimum(self):
         for count in (1, 2, 3, 6):
@@ -65,19 +65,13 @@ class PlanningContractTests(unittest.TestCase):
                 items = deepcopy(PLANNING_CONTRACT['example']['payload']['upserts'][:count])
                 value = proposal(items + unscheduled(1))
                 self.assertEqual(validate_task_candidate(value, 'planning'), value)
-                self.assertEqual(validate_plan_quality(value),
-                                 'degraded:insufficient_timed_items' if count < 3 else None)
+                self.assertIsNone(validate_plan_quality(value))
 
-    def test_out_of_range_warns_without_rejection(self):
-        for count in (0, 13):
-            with self.subTest(count=count):
-                value = proposal(unscheduled(count))
-                self.assertEqual(validate_task_candidate(value, 'planning'), value)
-                with self.assertLogs(level='WARNING') as logs:
-                    diagnostic = validate_plan_quality(value)
-                self.assertIn('warning:item_count_out_of_range', diagnostic)
-                self.assertIn(str(count), logs.output[0])
-        self.assertNotIn('warning:', validate_plan_quality(proposal(unscheduled(12))))
+    def test_quantity_is_not_a_quality_gate(self):
+        timed = deepcopy(PLANNING_CONTRACT['example']['payload']['upserts'][1])
+        for count in (0, 1, 8, 16, 20):
+            items = [{**timed, 'item_id': str(i)} for i in range(count)]
+            self.assertIsNone(validate_plan_quality(proposal(items)))
         self.assertIsNone(validate_plan_quality({'kind': 'update_direction', 'payload': {'goals': [], 'reason': '休息'}}))
 
     def test_weekly_defaults_and_single_day_toml_roundtrip(self):
@@ -92,7 +86,7 @@ class PlanningContractTests(unittest.TestCase):
         self.assertEqual(IntegrationConfig.model_validate(config.model_dump()), config)
         self.assertEqual(RoutineSettings().weekly_pattern.monday, '')
         example = tomllib.loads((Path(__file__).resolve().parents[1] / 'config.example.toml').read_text())
-        self.assertEqual(example['routine']['weekly_pattern'], dict.fromkeys(days, ''))
+        self.assertNotIn('weekly_pattern', example['routine'])
         self.assertEqual(IntegrationConfig.model_validate(example).routine.weekly_pattern, WeeklyPattern())
         with self.assertRaises(ValueError): WeeklyPattern(monday=123)
         with self.assertRaises(ValueError): WeeklyPattern(monday_typo='上课')
@@ -104,6 +98,7 @@ class PlanningPromptTests(unittest.IsolatedAsyncioTestCase):
         state = SimpleNamespace(state_version=0, plan_version=0, config_revision=1)
         # Include local/UTC date differences and the New York DST transition day.
         cases = [('Asia/Shanghai', datetime(2027, 1, 1, 18, tzinfo=timezone.utc)),
+                 ('Asia/Shanghai', datetime(2026, 10, 31, 15, 50, tzinfo=timezone.utc)),
                  ('America/New_York', datetime(2026, 11, 1, 4, tzinfo=timezone.utc))]
         for zone, now in cases:
             for task_kind in ('planning', 'present'):
@@ -130,21 +125,24 @@ class PlanningPromptTests(unittest.IsolatedAsyncioTestCase):
                         for key in ('start_at', 'end_at', 'window_start_at', 'window_end_at'):
                             if key not in item: continue
                             instant = datetime.fromisoformat(item[key])
-                            self.assertEqual(instant.date(), today)
+                            self.assertGreaterEqual(instant, now)
+                            self.assertIn((instant.date()-today).days, (0, 1))
                             self.assertEqual(instant.utcoffset(), instant.astimezone(ZoneInfo(zone)).utcoffset())
-                    self.assertEqual(example['payload']['upserts'][0]['start_at'][11:16], '08:00')
+                    self.assertEqual(prompt['context']['planning_window']['not_before'], now.astimezone(ZoneInfo(zone)).isoformat())
+                    if now.astimezone(ZoneInfo(zone)).hour==23:
+                        self.assertLess(len(example['payload']['upserts']),3)
         self.assertEqual(PLANNING_CONTRACT, original)
 
 
 class PlanningQualityRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_quality_persists_without_retry_or_execution_and_status_counts_schedule_items(self):
         timed = deepcopy(PLANNING_CONTRACT['example']['payload']['upserts'])
-        cases = [(unscheduled(1), 'planning', 'degraded:all_unscheduled'),
-                 (timed[:2], 'planning', 'degraded:insufficient_timed_items'),
+        cases = [(unscheduled(1), 'planning', 'warning:all_unscheduled'),
+                 (timed[:2], 'planning', None),
                  (timed, 'planning', None),
-                 ([], 'planning', 'warning:item_count_out_of_range'),
-                 (unscheduled(13), 'planning', 'degraded:all_unscheduled;warning:item_count_out_of_range'),
-                 (timed + unscheduled(7), 'planning', 'warning:item_count_out_of_range'),
+                 ([], 'planning', None),
+                 (unscheduled(13), 'planning', 'warning:all_unscheduled'),
+                 (timed + unscheduled(7), 'planning', None),
                  (unscheduled(1), 'present', None)]
         for items, task_kind, diagnostic in cases:
             with self.subTest(count=len(items), task_kind=task_kind, diagnostic=diagnostic), tempfile.TemporaryDirectory() as tmp:

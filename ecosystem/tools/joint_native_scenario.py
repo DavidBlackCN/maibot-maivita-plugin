@@ -20,6 +20,7 @@ async def run(work):
     automatic=os.environ.get('JOINT_AUTO_ROUTES')=='1'
     space=os.environ.get('JOINT_SPACE')=='1'
     trusted=os.environ.get('JOINT_TRUSTED_MANAGEMENT')=='1'
+    vita_context=os.environ.get('JOINT_VITA_CONTEXT')=='1'
     scope=None if automatic else 'synthetic-test-scope'
     from src.config.config import config_manager
     config_manager.initialize(); cfg=config_manager.get_global_config()
@@ -44,6 +45,8 @@ async def run(work):
         configs['maibot-maihush-plugin']['routes'][0]['route_scope']=''
     route_id=stream if automatic else 'test'
     if trusted: configs['maibot-maiIdentity-plugin']['management']={'vita_admin_accounts':['10001']}
+    if vita_context:
+        configs['maibot-maivita-plugin']['model']['daily_planning_enabled']=False
     if space:
         configs['maibot-maicoordinate-plugin']['routes']=[]
         configs['maibot-maicoordinate-plugin']['plugin']['config_version']='2'
@@ -121,6 +124,9 @@ async def run(work):
     cases=[]
     try:
         await supervisor.start()
+        if vita_context:
+            from vita_context_native import context_cases
+            return await context_cases(work,supervisor,manager,call,configs,stream,vita_path,model_calls,driver)
         if space:
             from phase1_native_space import space_cases
             return await space_cases(work,supervisor,call,configs,model_calls,vita_path)

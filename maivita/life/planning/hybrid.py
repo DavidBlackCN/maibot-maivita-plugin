@@ -94,12 +94,7 @@ def validate_plan_quality(proposal):
     timed = sum(item.get('time_mode') in ('fixed', 'window') for item in items)
     diagnostics = []
     if items and not timed:
-        diagnostics.append('degraded:all_unscheduled')
-    elif items and timed < 3:
-        diagnostics.append('degraded:insufficient_timed_items')
-    if not 1 <= len(items) <= 12:
-        logger.warning('Daily planning item count outside 1..12: %d', len(items))
-        diagnostics.append('warning:item_count_out_of_range')
+        diagnostics.append('warning:all_unscheduled')
     return ';'.join(diagnostics) or None
 
 

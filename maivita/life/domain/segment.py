@@ -31,11 +31,13 @@ class SchedulerConfig:
 def validate_segment(payload, config=None, *, current=None):
     require(isinstance(payload, Mapping), 'segment must be an object')
     required = {'event', 'location', 'emotion', 'minutes', 'continue'}
-    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate'}, 'invalid segment fields')
+    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate', 'sleep'}, 'invalid segment fields')
     # Old saved candidates remain readable. New candidates use categories only.
     category = payload.get('category', 'rest' if payload.get('energy_rate', 0) > 0 else 'other')
     require(category in ('rest','study','work','entertainment','daily_life','social','travel','creative','other'), 'invalid activity category')
     require(type(payload['continue']) is bool, 'continue must be boolean')
+    if 'sleep' in payload:
+        require(type(payload['sleep']) is bool, 'sleep must be boolean')
     for name in ('event', 'location', 'emotion'):
         require(isinstance(payload[name], str) and len(payload[name]) <= 1000, 'invalid segment '+name)
     require(payload['continue'] or payload['event'].strip(), 'segment event required')
@@ -44,8 +46,18 @@ def validate_segment(payload, config=None, *, current=None):
     resume = payload.get('resumes_activity_id')
     require(resume is None or isinstance(resume, str) and bool(resume.strip()), 'invalid resume ID')
     require(not (payload['continue'] and resume), 'continue cannot resume another activity')
+    # Explicit intent wins over wording. Only old candidates without the field
+    # use the historical exact name; existing sleep is identified by its session.
+    sleeping = payload.get('sleep', payload['event'].strip() == '睡眠')
+    if current is not None and payload['continue']:
+        sleeping = current.sleep_session_id is not None
+        require('sleep' not in payload or payload['sleep'] == sleeping,
+                'continue cannot change sleep state')
+    require(not (resume and sleeping), 'sleep cannot resume an awake activity')
     if config:
-        sleeping = (current.name if current and payload['continue'] else payload['event']) == '睡眠'
         maximum = config.segment_sleep_max_minutes if sleeping else config.segment_max_minutes
         require(config.segment_min_minutes <= payload['minutes'] <= maximum, 'segment duration outside bounds')
-    return {**dict(payload), 'category': category}
+    result = {**dict(payload), 'category': category}
+    if not payload['continue'] or current is not None or 'sleep' in payload:
+        result['sleep'] = sleeping
+    return result

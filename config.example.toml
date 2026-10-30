@@ -1,94 +1,23 @@
-# 插件开关与配置格式。以下字段均可省略并使用所示默认值；条件必填项另有说明。
+# 常用配置示例。未列出的参数使用默认值；高级配置与兼容字段见 README。
+# 使用 MaiBot 已有的 planner 模型和人设，无需在此填写密钥。
 [plugin]
-# 是否启用插件；布尔值，默认 true，可选。
 enabled = true
-# 配置格式版本，固定为 "4"（不是发布版本）；默认 "4"，可选，请勿改写。
 config_version = "4"
 
-# 会话范围、时区与部署选项。
 [instance]
-# 历史兼容确认串；可选，默认空；仅允许空或 isolated-test-instance，不是启用门禁。
-acknowledgement = ""
-# 可选绝对锁路径；默认空，沿用权威记录或授权数据目录，无需手填。
-writer_lock = ""
-# 可选会话 ID 数组；默认空表示所有 Host 接入会话；非空须填精确 ID，不支持通配符。
+# 留空沿用 Host/适配器允许的全部会话；也可填写精确的会话 ID。
 allowed_streams = []
-# IANA 时区字符串；可选，默认 Asia/Shanghai，影响日程及每日规划。
 timezone = "Asia/Shanghai"
-# 调频开关；可选，仅允许 false，默认 false，当前不支持归属化调频。
-frequency_enabled = false
 
-# 模型路由配置：选择使用哪个 Host 任务或具体模型，以及超时、预算等。
 [model]
-# 路由模式 task/model；可选，默认 task，跟随 Host 任务类别。
-mode = "task"
-# Host 已有任务类别，非空字符串；可选，默认 planner；model 模式也须保留非空值。
-task = "planner"
-# 具体模型 name 或 model_identifier；默认空，task 模式可不填，mode=model 时必填。
-model = ""
-# 单次模型调用超时秒数；整数 1–300，可选，默认 90。
-timeout_seconds = 90
-# 单次最大输出 token 数；整数 128–16384，可选，默认 8192。
-max_tokens = 8192
-# 角色时区自然日的生活调用尝试预算（规划、滚动、失败及重试共用）；整数 1–1000，默认 20。
+# 参考计划和滚动生活共用；失败及重试也计入。
 daily_budget = 20
-# 每次加载是否请求一次规划；布尔值，可选，默认 false，开启会消耗模型预算。
-generate_on_start = false
-# 是否每日自动规划；布尔值，可选，默认 true，会产生模型调用费用。
-daily_planning_enabled = true
-# 角色时区的触发时刻，HH:MM（00:00–23:59）；可选，默认 08:00，晚启动当天补触发。
-daily_planning_time = "08:00"
-# 补充生活背景，最多 4000 字符；可选，默认空，Host 人设仍会读取。
+# 可选：例如“工作日通常在家学习，周末喜欢散步”。留空沿用 Host 人设。
 life_context = ""
+daily_planning_enabled = true
+daily_planning_time = "08:00"
 
-# 身体数值初始化与作息偏好；时刻偏好仅供模型参考，不强制改变睡眠状态。
 [routine]
-# 首次启动时把精力/疲劳/压力初始化为中性值 50。
-# 关闭后保持未知（None），直到有足够活动历史才估算。
-initialize_body_state = true
-# 偏好入睡时刻，HH:MM（00:00–23:59）；可选，默认 01:00。
+# 仅供角色参考，不是强制静音时刻。
 preferred_sleep_time = "01:00"
-# 偏好起床时刻，HH:MM（00:00–23:59）；可选，默认 08:00。
 preferred_wake_time = "08:00"
-
-# 周表：一周的稳定节奏。留空则不使用。
-# 第一阶段冻结：仅保存兼容配置，不进入模型提示，不产生行为。
-[routine.weekly_pattern]
-monday = ""
-tuesday = ""
-wednesday = ""
-thursday = ""
-friday = ""
-saturday = ""
-sunday = ""
-
-# 滚动分段：启用后角色每个决策窗检查当前活动，仍保留每日整表规划。
-[scheduler]
-# 唯一实际活动推进路径；升级后固定开启。
-enabled = true
-# 决策窗间隔，单位分钟；须在分段最短与最长时长之间。
-decision_interval_minutes = 15
-# 兼容字段；第一阶段固定为 0，不进行随机模型检查。
-change_chance_percent = 0
-# 兼容旧配置的字段；升级后由 model.daily_budget 统一覆盖，不是第二份预算。
-# 规划、即时决策、分段共用硬上限，失败和重试同样计入；整数 1–1000。
-daily_decision_budget = 20
-# 模型单次提出的最短与最长段时长，单位分钟，正整数。
-segment_min_minutes = 15
-segment_max_minutes = 180
-# 睡眠单次会话硬上限，含续做；不小于普通最长段，最多 1080 分钟。
-segment_sleep_max_minutes = 720
-
-# 忙闲三态驱动回复（方案 B）。free 正常；slow 等同 free，仅状态显示；busy 拦截。
-[availability]
-# 实验性功能，默认关闭；状态仍可查看，原有睡眠静默始终独立生效。
-enabled = false
-# 半忙活动类别；其他活动 energy_rate <= -0.05 时也显示半忙，不会单独触发 busy。
-slow_categories = ["study", "work", "travel", "creative"]
-# 活跃睡眠会话（含临时醒来）推导为 busy；关闭此项不会解除原有睡眠守卫。
-busy_when_sleeping = true
-# 身体极值（包含边界）；整数 0–100，未知身体值不会被当作极值。
-busy_fatigue_threshold = 90
-busy_energy_threshold = 10
-# 本阶段不实现恢复补发，仅支持 false；不缓存、不重发被拦截的消息。
-followup_after_busy = false

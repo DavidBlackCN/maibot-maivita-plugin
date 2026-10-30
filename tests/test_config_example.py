@@ -14,9 +14,9 @@ class ConfigExampleTests(unittest.TestCase):
         with (ROOT / 'config.example.toml').open('rb') as file:
             config = tomllib.load(file)
         model = IntegrationConfig.model_validate(config)
-        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine', 'scheduler', 'availability'})
+        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine'})
         self.assertEqual(config['plugin']['config_version'], '4')
-        self.assertEqual(model.model_dump(), config)
+        self.assertEqual(model, IntegrationConfig())
         self.assertIsInstance(model.selected_config(), DevelopmentConfig)
         self.assertEqual(model.selected_config().routine, model.routine)
 
@@ -40,7 +40,7 @@ enabled = true
                 original = copy.deepcopy(source)
                 model = IntegrationConfig.model_validate(source)
                 self.assertEqual(source, original)
-                self.assertEqual(model.model_dump(), clean)
+                self.assertEqual(model, IntegrationConfig.model_validate(clean))
                 self.assertEqual(model.selected_config(), IntegrationConfig.model_validate(clean).selected_config())
                 self.assertNotIn('engine', IntegrationConfig.model_fields)
                 self.assertNotIn('legacy', IntegrationConfig.model_fields)
@@ -119,7 +119,7 @@ class ModelSettingsTests(unittest.TestCase):
             generate_on_start=False, daily_planning_enabled=True, daily_planning_time='08:00', life_context=''))
         with (ROOT / 'config.example.toml').open('rb') as stream:
             example = tomllib.load(stream)
-        self.assertEqual(example['model'], defaults)
+        self.assertTrue(set(example['model']) <= set(defaults))
         self.assertEqual(IntegrationConfig.model_validate(example).model.model_dump(), defaults)
 
     def test_invalid_routes_and_limits(self):

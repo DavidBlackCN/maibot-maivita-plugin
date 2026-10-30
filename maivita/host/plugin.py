@@ -221,9 +221,13 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         if not isinstance(original,str): return {'action':'continue'}
         # Own marked block only. Unknown fields and other plugin text survive.
         original=re.sub(re.escape(BEGIN)+r'.*?'+re.escape(END),'',original,flags=re.S).rstrip()
-        state=self.runtime.queries.get_life_state()
-        block=BEGIN+'\n'+json.dumps(state,ensure_ascii=False)+'\n'+END
+        block=BEGIN+'\n'+self.chat_context()+'\n'+END
         return {'action':'continue','modified_kwargs':{**kwargs,'extra_prompt':original+'\n'+block}}
+
+    def chat_context(self):
+        from .life_context import chat_background
+        return chat_background(self.runtime.queries.get_public_life_context(),
+            self.runtime.queries.get_plan(), self.active_config.instance.timezone)
 
     @HookHandler('maisaka.replyer.before_request',name='maivita_life_replyer')
     async def replyer_hook(self,**kwargs): return self.inject(kwargs)
@@ -232,7 +236,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         if 'extra_prompt' in kwargs:return self.inject(kwargs)
         if not self.ready or not stream_allowed(kwargs.get('session_id'),self.active_config.instance.allowed_streams):return {'action':'continue'}
         from .typed_prompt import inject
-        return inject(self,kwargs,self.runtime.queries.get_life_state(),'MaiVita')
+        return inject(self,kwargs,self.chat_context(),'MaiVita')
     @HookHandler('send_service.before_send',name='maivita_sleep_silence',order='early',error_policy='abort')
     async def silence_hook(self,message=None,**kwargs):
         stream=message.get('session_id') if isinstance(message,dict) else getattr(message,'session_id',None)

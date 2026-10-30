@@ -15,6 +15,10 @@ def test_host_webui_schema_has_no_empty_select_and_roundtrips_defaults():
     assert schema['sections']['instance']['fields']['acknowledgement']['hidden']
     assert not {'owner_auth_enabled', 'privileged_writes_enabled'} & schema['sections']['instance']['fields'].keys()
     assert schema['sections']['plugin']['fields']['config_version']['disabled']
+    assert schema['sections']['model']['fields']['timeout_seconds']['hidden']
+    assert schema['sections']['scheduler']['collapsed']
+    assert schema['sections']['availability']['collapsed']
+    assert not schema['sections']['model']['fields']['daily_budget']['hidden']
     config = {name: {k: v['default'] for k, v in s['fields'].items()} for name, s in schema['sections'].items()}
     assert IntegrationConfig.model_validate(json.loads(json.dumps(config))) == IntegrationConfig()
 
