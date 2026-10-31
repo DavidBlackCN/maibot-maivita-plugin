@@ -73,14 +73,12 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((await plugin.get_public_route_scope(stream_id='outside'))['ok'])
         self.assertEqual(plugin.delegate.inject({'session_id':'outside'})['action'],'continue')
 
-    async def test_unsupported_host_refuses_before_storage(self):
+    async def test_manifest_admitted_patch_has_no_second_version_gate(self):
         with patch.dict('os.environ',{'MAIBOT_HOST_VERSION':'1.3.14'}):
             plugin=self.plugin()
-            with self.assertRaisesRegex(RuntimeError,'unsupported Host/SDK pair'):
-                await plugin.on_load()
-            self.assertFalse(plugin.ready)
-            self.assertFalse((self.work/'data').exists())
-            self.assertEqual(self.calls,[])
+            await plugin.on_load()
+            self.assertTrue(plugin.ready)
+            self.assertTrue((await plugin.get_life_state())['ok'])
 
     async def test_sdk_default_discovery_before_config_does_not_freeze_disabled_delegate(self):
         plugin=create_plugin(); plugin.get_components()  # Real Host discovers metadata first.

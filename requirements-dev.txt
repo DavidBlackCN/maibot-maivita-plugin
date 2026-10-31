@@ -1,9 +1,8 @@
-# Development and unit tests only; plugin runtime dependencies are in _manifest.json.
-# CI selects an exact supported SDK version in its test matrix.
--r tools/requirements.txt
-maibot-plugin-sdk>=2.15.0,<=2.19.0
+# Development and unit tests only. Runtime compatibility is declared in _manifest.json.
+maibot-plugin-sdk==2.19.0
 pydantic==2.14.1
-pillow==13.0.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
+tomli-w==1.2.0
+pillow==13.0.0
 tzdata==2026.5

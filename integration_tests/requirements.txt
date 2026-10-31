@@ -1,6 +1,0 @@
-# Windows-only isolated Runner tests on the fixed Host 1.3.12 fixture.
--r ../requirements-dev.txt
-maibot-plugin-sdk==2.15.0
-jsonschema==4.26.0
-structlog==25.4.0
-tomlkit==0.13.3

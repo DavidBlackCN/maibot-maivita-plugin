@@ -1,7 +1,7 @@
 """Installable I1 lifecycle adapter. Only the new engine may run here."""
 from pathlib import Path
 import asyncio
-from ..runtime_versions import runtime_pair, runtime_supported
+from ..runtime_versions import runtime_pair
 import json
 import re
 
@@ -44,8 +44,6 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         cfg=self.config
         if not cfg.plugin.enabled: return
         try:
-            if not runtime_supported():
-                raise RuntimeError('I1 unsupported Host/SDK pair: '+repr(runtime_pair()))
             await assert_no_old_writer(self.ctx)
             data=resolve_data_dir(self.ctx)
             # Refuse legacy co-location before opening any database. No import

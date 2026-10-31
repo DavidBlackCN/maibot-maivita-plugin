@@ -7,7 +7,7 @@ from .config import stream_allowed
 from .integration_config import IntegrationConfig
 from .plugin import MaiVitaDevelopmentPlugin
 from ..life.storage.safety import resolve_data_dir
-from ..runtime_versions import runtime_pair, runtime_supported
+from ..runtime_versions import runtime_pair
 
 
 class EngineContext:
@@ -96,8 +96,6 @@ class MaiVitaPlugin(MaiBotPlugin):
         if not self.config.plugin.enabled:
             return
         try:
-            if not runtime_supported():
-                raise RuntimeError('unsupported Host/SDK pair: '+repr(runtime_pair()))
             data = resolve_data_dir(self.ctx)
             if (data / 'goals.db').exists() or (data / 'maivita.db').exists():
                 raise ValueError('unscoped database requires explicit offline migration')

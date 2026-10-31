@@ -29,7 +29,7 @@ def entries():
     files['_manifest.json']=(ROOT/'_manifest.json').read_bytes()
     files['webui.json']=(ROOT/'webui.json').read_bytes()
     files['config.example.toml']=(ROOT/'config.example.toml').read_bytes()
-    for name in ('r0_migrate.py','stage_legacy.py','requirements.txt'):
+    for name in ('r0_migrate.py','stage_legacy.py'):
         files['tools/'+name]=(ROOT/'tools'/name).read_bytes()
     return files
 

@@ -33,8 +33,8 @@ async def run(work):
     stream=session.session_id
     configs={
         'maibot-maihush-plugin':{'plugin':{'enabled':True,'config_version':'1'},'routes':[{'enabled':True,'stream_id':stream,'owner_accounts':['10002'],'admin_accounts':['10001']} ]},
-        'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'3','acknowledgement':'local-operator-reviewed','instance_id':'joint-test','writer_lock':str(work/'identity.lock')},
-            'identity':{'adapter_namespace':'synthetic-test-adapter','route_scope':'synthetic-test-scope','accounts':[]}},
+        'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'4'},
+            'identity':{'adapter_namespace':'synthetic-test-adapter','route_scope':'synthetic-test-scope','people':[{'qq':'10002','nickname':'妈妈','prompt_template':'private fixed profile'}]}},
         'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'4'},
             'instance':{'writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
         'maibot-maicoordinate-plugin':{'plugin':{'enabled':True,'config_version':'1'},'mode':'shadow','acknowledgement':'isolated-test-instance','model_task':'joint-test','poll_seconds':1,
@@ -44,7 +44,7 @@ async def run(work):
         configs['maibot-maiIdentity-plugin']['identity']['route_scope']=''
         configs['maibot-maihush-plugin']['routes'][0]['route_scope']=''
     route_id=stream if automatic else 'test'
-    if trusted: configs['maibot-maiIdentity-plugin']['management']={'vita_admin_accounts':['10001']}
+    if trusted: configs['maibot-maiIdentity-plugin']['management']={'admin_accounts':['10001']}
     if vita_context:
         configs['maibot-maivita-plugin']['model']['daily_planning_enabled']=False
     if space:
@@ -144,7 +144,7 @@ async def run(work):
                     if field['ui_type']=='select': assert '' not in (field.get('choices') or []),(plugin_id,field)
         broken=await supervisor.inspect_plugin_config(IDENTITY,{'plugin':{'enabled':True}},use_provided_config=True)
         assert 'config_version' in broken.config_error
-        repaired=await supervisor.inspect_plugin_config(IDENTITY,{'plugin':{'enabled':True,'config_version':'3'}},use_provided_config=True)
+        repaired=await supervisor.inspect_plugin_config(IDENTITY,{'plugin':{'enabled':True,'config_version':'4'}},use_provided_config=True)
         assert not repaired.config_error and repaired.config_schema['sections']
         cases.append('WebUI_native_config_schema_and_missing_version_recovery')
         if automatic:
@@ -180,7 +180,7 @@ async def run(work):
         assert status['data']['counts'].get('sent_some')==1,status
         assert driver.calls==[stream]
         cases.append('real_wakeup_public_pull_durable_decision_generation_SendService_counted_driver')
-        assert (await call(IDENTITY,'authorize',{'owner':True,'proof_ref':'fake'}))['error']['code']=='UNTRUSTED_CONTEXT'
+        assert (await call(IDENTITY,'is_admin',{'owner':True,'proof_ref':'fake'}))=={'is_admin':False}
         assert not (await call(VITA,'request_wakeup',{'owner':True}))['ok']
         assert not (await call(HUSH,'get_state',{'owner':True}))['ok']
         cases.append('forged_management_context_stays_denied')
@@ -235,7 +235,7 @@ async def run(work):
                 m.raw_message=MessageSequence([TextComponent(text)]);m.processed_plain_text=text
                 executor,groups,_=component_query_service.find_command_by_text(text)
                 return await executor(message=m,matched_groups=groups,plugin_config={})
-            assert not (await call(IDENTITY,'authorize_vita_command',{'__maibot_command_ref__':'forged','owner':True}))['allowed']
+            assert not (await call(IDENTITY,'is_admin',{'__maibot_command_ref__':'forged','owner':True}))['is_admin']
             # Cross-plugin api.call cannot name Command handlers. It only
             # resolves registered APIs; a public policy query is not a permit.
             for target in (IDENTITY+'.maiidentity_manage',IDENTITY+'.self_command',VITA+'.maivita',VITA+'.command'):
@@ -250,20 +250,18 @@ async def run(work):
             cfg.bot.qq_account=''
             assert not (await call(VITA,'request_wakeup',{'policy':policy,**query}))['ok']
             cases.append('official_api_registry_cannot_invoke_Command_and_read_policy_cannot_execute')
-            for user in ('10002','10003'): await command('/maiidentity register',user)
-            await command('/maiidentity relation propose 10003 friend','10002')
-            # Inspect only isolated fixture data, never a live production DB.
             import sqlite3
             path=work/'data/plugins'/IDENTITY/'identity.db'
             with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True) as read:
-                relation=json.loads(read.execute("SELECT data FROM records WHERE kind='relation'").fetchone()[0])
-            await command('/maiidentity relation confirm '+relation['id'],'10001')
+                before=list(read.execute('SELECT * FROM metadata ORDER BY key'))
+            for user in ('10002','10003'):
+                await command('/maiidentity register',user)
+            await command('/maiidentity relation propose 10003 friend','10002')
             with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True) as read:
-                assert json.loads(read.execute("SELECT data FROM records WHERE kind='relation'").fetchone()[0])['status']=='pending_confirmation'
-            await command('/maiidentity relation confirm '+relation['id'],'10003')
-            with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True) as read:
-                assert json.loads(read.execute("SELECT data FROM records WHERE kind='relation'").fetchone()[0])['status']=='confirmed'
-            cases.append('official_Host_Command_self_registration_and_bilateral_confirmation_without_owner_override')
+                assert list(read.execute('SELECT * FROM metadata ORDER BY key'))==before
+                assert read.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()==[('metadata',)]
+            assert not (await call(IDENTITY,'is_admin',dict({k:v for k,v in query.items() if k!='action'},account_id='10002')))['is_admin']
+            cases.append('removed_identity_commands_do_not_write_or_grant_fixed_profile_admin')
             assert (await supervisor.unload_plugins([VITA],reason='sleep-fixture')).success
             current=LifeStateEngine(LifeDatabase(vita_path,clock=SystemClock()))
             current.execute(Command(kind='start_sleep',payload={'duration_minutes':30},source='legacy_observed',
@@ -282,7 +280,7 @@ async def run(work):
             assert len(driver.calls)==1
             await command('/maivita 重新规划')
             cases.append('official_Vita_Command_read_only_policy_wakeup_replay_after_reload_hard_silence_independence')
-            configs['maibot-maiIdentity-plugin']['management']['vita_admin_accounts']=[]
+            configs['maibot-maiIdentity-plugin']['management']['admin_accounts']=[]
             (work/'plugins/maibot-maiIdentity-plugin/config.toml').write_text(
                 tomli_w.dumps(configs['maibot-maiIdentity-plugin']),encoding='utf8')
             assert await supervisor.reload_plugins([IDENTITY],reason='remove-admin')
@@ -295,15 +293,15 @@ async def run(work):
             cases.append('adapter_reported_identity_with_empty_global_fallback')
             # Product features through the actual official Command and Hook
             # registries. Inspect only this synthetic instance's owned data.
-            configs['maibot-maiIdentity-plugin']['management']['vita_admin_accounts']=['10001']
+            configs['maibot-maiIdentity-plugin']['management']['admin_accounts']=['10001']
             (work/'plugins/maibot-maiIdentity-plugin/config.toml').write_text(tomli_w.dumps(configs['maibot-maiIdentity-plugin']),encoding='utf8')
             assert await supervisor.reload_plugins([IDENTITY],reason='restore-configured-admin')
             social=await call(IDENTITY,'get_public_social_context',{'stream_id':stream,'bot_account_id':'123456789','route_scope':scope})
-            assert social['ok'] and social['data']['counts']['friend']==1,social
-            assert '10002' not in json.dumps(social) and relation['id'] not in json.dumps(social)
+            assert social['ok'] and not any(social['data']['counts'].values()),social
+            assert '10002' not in json.dumps(social) and 'private fixed profile' not in json.dumps(social)
             persona=await call(VITA,'get_public_persona')
             assert persona['ok'] and persona['data']['source']=='official_config',persona
-            cases.append('shared_official_persona_and_public_group_relations_no_actor_or_private_leak')
+            cases.append('shared_official_persona_and_neutral_group_context_no_private_profile_leak')
             from src.plugin_runtime.hook_payloads import serialize_prompt_items,deserialize_prompt_items
             from src.llm_models.payload_content.context_item import UserMessageItem,ContextItemMeta,ContextTextPart
             from src.llm_models.payload_content.context_protocol import ContextProtocolMode
@@ -366,7 +364,7 @@ async def run(work):
             assert len(driver.calls)==before
             await command('/maihush 恢复聊天')
             await command('/maiidentity relations','10004')
-            assert len(driver.calls)==before+1 and 'MaiIdentity 未执行' in driver.texts[-1],driver.texts[-3:]
+            assert len(driver.calls)==before+1 and '此命令不可用' in driver.texts[-1],driver.texts[-3:]
             cases.append('native_identity_denial_receipt_visible_when_allowed_and_blocked_by_hard_silence')
 
     finally:

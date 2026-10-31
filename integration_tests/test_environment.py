@@ -1,4 +1,4 @@
-"""Explicit I0 suite; install integration_tests/requirements.txt and prepare pinned source first."""
+"""Explicit I0 suite; prepare a separate native Host environment and pinned source first."""
 from pathlib import Path
 import ctypes
 from ctypes import wintypes
