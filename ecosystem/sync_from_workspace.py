@@ -20,7 +20,7 @@ def main():
         hashes[name]=hashlib.sha256(f.read_bytes()).hexdigest()
     (target/'coordinator-source.json').write_text(json.dumps(hashes,indent=2)+'\n',encoding='utf8',newline='\n')
     (target/'tools').mkdir(exist_ok=True)
-    for name in ('run_joint_native.py','joint_native_scenario.py','phase1_native_space.py','vita_context_native.py','product_bundle.py'):shutil.copyfile(root/'tools'/name,target/'tools'/name)
+    for name in ('run_joint_native.py','joint_native_scenario.py','phase1_native_space.py','vita_context_native.py','hush_native_experience.py','product_bundle.py'):shutil.copyfile(root/'tools'/name,target/'tools'/name)
     pins={}
     for key,folder in (('identity','maibot-maiIdentity-plugin'),('hush','maibot-maihush-plugin')):
         repo=root/folder

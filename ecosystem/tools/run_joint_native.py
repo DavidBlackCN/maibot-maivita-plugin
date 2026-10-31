@@ -31,11 +31,13 @@ def main():
     parser.add_argument('--maitrace-source',type=Path)
     parser.add_argument('--server-probe-source',type=Path)
     parser.add_argument('--vita-context',action='store_true')
+    parser.add_argument('--hush-experience',action='store_true')
     args=parser.parse_args()
     host=args.host_source.resolve()
     verification={name:digest(ROOT/'tools'/name) for name in ('run_joint_native.py','joint_native_scenario.py')}
     if args.vita_context:
         verification['vita_context_native.py']=digest(ROOT/'tools/vita_context_native.py')
+    if args.hush_experience: verification['hush_native_experience.py']=digest(ROOT/'tools/hush_native_experience.py')
     work=args.output.resolve()
     if work.exists(): raise ValueError('new isolated directory required')
     lock=json.loads(args.source_lock.read_text())
@@ -112,7 +114,7 @@ def main():
         PYTHONPATH=os.pathsep.join((str(safety),str(ROOT/'tools'),str(host))),
         MAIBOT_HOST_VERSION=host_version,JOINT_AUTO_ROUTES=str(int(args.auto_routes)),
         JOINT_TRUSTED_MANAGEMENT=str(int(args.trusted_management)),
-        JOINT_SPACE=str(int(args.space)),
+        JOINT_SPACE=str(int(args.space)),JOINT_HUSH_EXPERIENCE=str(int(args.hush_experience)),
         JOINT_VITA_CONTEXT=str(int(args.vita_context)),
         JOINT_SERVER_PROBE=str(int(bool(args.server_probe_source))),
         MAIBOT_INSTANCE_DIR=str(work),TEMP=str(work),TMP=str(work),USERPROFILE=str(work))

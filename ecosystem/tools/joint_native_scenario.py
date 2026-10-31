@@ -17,6 +17,7 @@ COORD='davidblackcn.maibot-maicoordinate-plugin'
 
 
 async def run(work):
+    hush_experience=os.environ.get('JOINT_HUSH_EXPERIENCE')=='1'
     automatic=os.environ.get('JOINT_AUTO_ROUTES')=='1'
     space=os.environ.get('JOINT_SPACE')=='1'
     trusted=os.environ.get('JOINT_TRUSTED_MANAGEMENT')=='1'
@@ -32,17 +33,17 @@ async def run(work):
     session=await chat_manager.get_or_create_session('qq','10001','987654321',account_id='123456789',scope=scope)
     stream=session.session_id
     configs={
-        'maibot-maihush-plugin':{'plugin':{'enabled':True,'config_version':'1'},'routes':[{'enabled':True,'stream_id':stream,'owner_accounts':['10002'],'admin_accounts':['10001']} ]},
+        'maibot-maihush-plugin':{'plugin':{'enabled':True,'config_version':'2'},'groups':[{'group_id':'987654321','route_scope':scope or ''}], 'management':{'source':'local','admin_accounts':['10001','10002']},'reply':{'enabled':False}},
         'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'4'},
             'identity':{'adapter_namespace':'synthetic-test-adapter','route_scope':'synthetic-test-scope','people':[{'qq':'10002','nickname':'妈妈','prompt_template':'private fixed profile'}]}},
         'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'4'},
             'instance':{'writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
         'maibot-maicoordinate-plugin':{'plugin':{'enabled':True,'config_version':'1'},'mode':'shadow','acknowledgement':'isolated-test-instance','model_task':'joint-test','poll_seconds':1,
-            'routes':[{'route_id':'test','instance_id':'joint-test','adapter_namespace':'synthetic-test-adapter','bot_account_id':'123456789','route_scope':'synthetic-test-scope','group_id':'987654321','stream_id':stream}]}}
+            'routes':[{'route_id':'test','instance_id':'joint-test','adapter_namespace':'host-qq','bot_account_id':'123456789','route_scope':'synthetic-test-scope','group_id':'987654321','stream_id':stream}]}}
     if automatic:
         configs['maibot-maicoordinate-plugin']['routes']=[]
         configs['maibot-maiIdentity-plugin']['identity']['route_scope']=''
-        configs['maibot-maihush-plugin']['routes'][0]['route_scope']=''
+        configs['maibot-maihush-plugin']['groups'][0]['route_scope']=''
     route_id=stream if automatic else 'test'
     if trusted: configs['maibot-maiIdentity-plugin']['management']={'admin_accounts':['10001']}
     if vita_context:
@@ -55,6 +56,11 @@ async def run(work):
             'routine':{'post_enabled':False,'browse_enabled':False},'send':{'enable_chat_memory':False},
             'image':{'enable_image':False},'monitor':{'read_list_type':'whitelist','read_list':['10001'],
                 'enable_auto_reply':True,'like_probability':1.0,'comment_probability':1.0,'silent_hours':''}}
+    if hush_experience:
+        cfg.bot.nickname='小桃'
+        configs['maibot-maiIdentity-plugin']['management']={'admin_accounts':['10001']}
+        configs['maibot-maihush-plugin']['management']={'source':'identity'}
+        configs['maibot-maihush-plugin']['reply']={'enabled':True}
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf8')
     # Seed a real life database while no Runner owns it; startup will perform
@@ -72,7 +78,7 @@ async def run(work):
         life.execute(Command(kind='start_activity',payload={'name':'安静阅读','category':'rest','visibility':'public_summary'},source='legacy_observed',idempotency_key='space-fixture',expected_state_version=0))
         clock.advance(timedelta(minutes=21))
         life.execute(Command(kind='advance',payload={'initialize_neutral':True},idempotency_key='space-observed-until-now',expected_state_version=1))
-    else:
+    elif not hush_experience:
         life.execute(Command(kind='start_sleep',payload={'duration_minutes':5},source='legacy_observed',idempotency_key='sleep-fixture',expected_state_version=0))
     from src.plugin_runtime.integration import get_plugin_runtime_manager
     from src.plugin_runtime.host.supervisor import PluginSupervisor
@@ -84,6 +90,9 @@ async def run(work):
     async def models(plugin_id,capability,args): return ['joint-test']
     async def model(plugin_id,capability,args):
         model_calls.append(plugin_id)
+        if plugin_id==HUSH:
+            data=json.loads(args['prompt'][1]['content'])
+            return {'success':True,'response':json.dumps({'schema_version':1,'intent':'pause','target':'bot','decision':'soft_silence','duration_seconds':60,'reason_code':'RESPECT_REQUEST','evidence_message_ids':[data['request']['id']],'reply':'好，你们先聊。'})}
         if plugin_id==COORD: return {'success':True,'response':'隔离测试：我醒啦。','model_name':'synthetic'}
         if plugin_id=='Rabbit-Jia-Er.MaiTrace': return {'success':True,'response':'隔离测试：安静地读了一会儿书。','model_name':'synthetic'}
         return {'success':False,'response':'','model_name':'synthetic-unavailable'}
@@ -124,6 +133,9 @@ async def run(work):
     cases=[]
     try:
         await supervisor.start()
+        if hush_experience:
+            from hush_native_experience import run_cases
+            return await run_cases(work,supervisor,manager,call,configs,stream,scope,driver,model_calls)
         if vita_context:
             from vita_context_native import context_cases
             return await context_cases(work,supervisor,manager,call,configs,stream,vita_path,model_calls,driver)
