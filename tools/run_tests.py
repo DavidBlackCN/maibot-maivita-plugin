@@ -36,6 +36,8 @@ def main():
               "skipped": len(result.skipped), "passed": result.wasSuccessful(),
               "real_host_runtime": "not_run", "production_data": "not_accessed"}
     (EVIDENCE / (args.report_prefix + ".json")).write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if not result.wasSuccessful():
+        print(log.read_text(encoding='utf-8'), file=sys.stderr)
     print(json.dumps(report, indent=2))
     return not result.wasSuccessful()
 

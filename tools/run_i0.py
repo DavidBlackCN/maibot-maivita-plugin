@@ -26,7 +26,9 @@ if __name__=='__main__':
         (EVIDENCE/'i0/environment-tests.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
         report=getattr(I0EnvironmentTests,'runner_report',{'passed':False})
         report['environment_suite']=summary
-        if not result.wasSuccessful(): report['passed']=False
+        if not result.wasSuccessful():
+            report['passed']=False
+            print((EVIDENCE/'i0/environment-tests.txt').read_text(encoding='utf-8'),file=sys.stderr)
     else:
         try: report=run_i0()
         except Exception as error:

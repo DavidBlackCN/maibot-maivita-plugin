@@ -1,202 +1,111 @@
 # MaiVita
 
-为 MaiBot 提供持久的生活状态、活动、计划、目标与睡眠，让日常回复感知角色正在做什么。
+为 MaiBot 添加日程、日常活动和睡眠，让麦麦在聊天时有自己的生活背景。
 
-- 当前版本：`0.9.0`
-- MaiBot 版本范围：`1.3.12–1.3.18`
-- Plugin SDK 版本范围：`2.15.0–2.19.0`
-- 项目地址：[MaiVita](https://github.com/DavidBlackCN/maibot-maivita-plugin)
-
-仅支持精确配对 **Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**，不支持中间版本或交叉配对。无需私有 Host 补丁。
+当前版本 **0.9.0**，仍在开发中。
 
 ## 功能
 
-### 日程规划与生活状态
+- 根据 MaiBot 的人设安排日程，并随时间和身体状态调整活动。
+- 聊天时参考当前活动、地点、心情和最近一天的生活记录。
+- 模拟精力与疲劳，累了会休息，睡眠期间暂停回复。
+- 支持管理员查看和调整日程、活动、目标及睡眠。
 
-根据 Host 的昵称、人设、行为和回复风格生成每日计划，向 Planner 和 Replyer 提供公开生活上下文。计划代表打算做的事，活动历史代表实际发生的事；活动段结束不证明目标完成；不能把计划直接当成经历。长期目标自动经营、习惯学习和承诺自动协商暂未启用。
-
-每日规划默认开启，使用 Host 的 `planner` 模型任务，**会产生模型调用费用**。按角色时区每天 08:00 触发，晚启动会补触发当天规划；重启不会重复已调用的规划。参考规划与滚动生活共用角色时区自然日预算，新安装默认 20 次，包含失败重试。实际活动只有滚动决策一条推进路径。
-
-完整一天通常包含 10–16 项参考安排，睡眠、吃饭、洗漱也计入。按有意义的生活阶段划分，允许稳定重复、空档和跨午夜睡眠；数量不是硬性要求。晚间启动或重新生成时主要安排剩余时间，不补写过去。计划描述打算，不提前写死购买结果、学习收获或他人的行为。
-
-普通聊天会参考当前公开活动、地点、心情和最近 24 小时的已记录生活，午夜不会清空衔接。背景仅在相关或被问到时自然带出，不逐条播报，也不额外调用摘要模型；私有记录和观察缺口中的经历不进入聊天素材。生活记录是角色模拟，不代表实际执行了外部操作。
-
-### 可确认的生活管理
-
-管理员可以新增或调整计划、管理目标、开始和结束活动、请求睡眠。新增管理操作先预览，再由同一账号在同一会话两分钟内确认；状态或权限发生变化时，旧预览会被拒绝。确认结果持久保存，重复确认不会重复修改。
-
-### 睡眠与静音
-
-睡眠时普通出站消息会被守卫拦截，包括命令回执。MaiHush 的硬静音独立生效：唤醒不会解除硬静音，解除硬静音也不会唤醒。作息配置是模型偏好，不是强制睡眠时刻。
-
-身体极值拦截默认关闭，可通过 `[availability] enabled = true` 开启。学习、工作、出行、创作显示为“正在专注”（API 值 `slow`），聊天背景提示自然简短回应，仍由 MaiBot 正常回复，不保证延迟或限长。普通空闲为 `free`；睡眠或身体达到极值（默认疲劳 ≥ 90、精力 ≤ 10）优先推导为 `busy`。启用极值拦截后 busy 会暂停出站消息。活动按类别判断身体变化。
-
-忙碌期间不延迟、不缓存、不补发消息。关闭忙闲守卫或 `busy_when_sleeping` 不会解除原有睡眠静默，MaiHush 仍独立决定是否拒绝发送。两个 EARLY 守卫不依赖先后顺序；任一个 abort 都终止发送，continue 也不会绕过另一个守卫。busy 时 status 命令回执同样可能被拦截；公开 availability API 可只读查看三态，未知身体值不触发极值规则。
-
-### 可选主动表达
-
-**MaiCoordinate 是可选扩展**：不安装也能使用 MaiVita、MaiIdentity、MaiHush 三核心功能。需要根据公开生活事件主动发言时，可另行安装 MaiCoordinate；其默认 shadow 模式不调用模型、不发送消息，主动表达须显式选择 controlled。
-
-### 身体变化
-
-身体数值是角色模拟估计。按实际睡眠会话或活动类别计算每小时变化，新活动不由模型填写精力速率。
-
-| 状态／类别 | 精力 | 疲劳 | 压力 |
-| --- | ---: | ---: | ---: |
-| 实际睡眠 | +8 | −5 | −3 |
-| 清醒休息 | +3 | −2 | −1 |
-| 学习、工作、创作、出行 | −3 | +2 | +0.8 |
-| 其他清醒活动 | −1 | +1 | −1 |
-
-默认每 15 分钟检查一次，检查不一定调用模型。模型失败或预算用完时，无活动或过度疲劳者进入中性休息，其他情况有界延续；睡眠按截止时间或可信管理员唤醒结束。停机未知区间不补编经历，升级不追溯重算旧身体值。
-
-### QQ 空间组合
-
-Vita 提供公开生活，MaiCoordinate 判断时机，固定适配的 MaiTrace 6.3.0 执行发布与浏览互动。空间独立于群路由；新配置先观察，旧配置迁移后关闭。默认每天最多尝试发布 2 次、间隔至少 4 小时；最多浏览 6 轮、间隔至少 1 小时，每轮最多 5 条。互动须设置显式白名单。
-
-适配补丁、推荐配置与离线构建方法见 [MaiTrace 适配说明](ecosystem/maitrace/README.md)；协调层配置见 [MaiCoordinate](ecosystem/coordinator/README.md)。QQ 登录、模型和图片服务仍由 MaiTrace 配置，不能同时启用它自身的自动生活与空间调度。
+私聊中可以说“陪我聊会儿”。麦麦可能暂停手头的事，也可能边做边聊；被打断的活动可以稍后继续。睡眠期间，聊天邀请不会将它唤醒。
 
 ## 安装
 
-### 1. 放置插件
+目前支持以下版本组合：
 
-停止 MaiBot，将插件放入 `plugins`，同一插件 ID 只保留一份。超级麦麦三核心组合安装 MaiVita、MaiIdentity、MaiHush；MaiCoordinate 按需安装。
+| MaiBot | Plugin SDK |
+| --- | --- |
+| 1.3.18 | 2.19.0 |
+| 1.3.15 | 2.16.0 |
+| 1.3.12 | 2.15.0 |
 
-```text
-MaiBot/
-└── plugins/
-    └── maibot-maivita-plugin/
-        ├── _manifest.json
-        ├── plugin.py
-        └── maivita/
-```
+1. 停止 MaiBot，将本插件放入 `plugins/maibot-maivita-plugin/`，确保目录内有 `plugin.py` 和 `_manifest.json`。不要同时运行其他完整的自主规划插件。
+2. 在 MaiBot 使用的 Python 环境安装 `pillow>=9.0.0`、`tzdata>=2024.1`，并确认 `model_config.toml` 中已配置 `planner` 模型任务。
+3. 启动 MaiBot，插件会生成默认配置。发送 `/maivita status` 查看状态，发送 `/maivita help` 查看用法。
 
-使用 MaiBot 自己的 Python 环境，确认已安装 Manifest 声明的 `pillow>=9.0.0` 与 `tzdata>=2024.1`。停止旧的完整自主规划插件，避免同时维护生活状态。
+**日程和活动生成会调用模型，产生相应费用。** 默认每天最多尝试 20 次，失败和重试也计入。
 
-### 2. 检查模型与管理员
+### 设置管理员
 
-确认 Host 的 `model_config.toml` 已配置 `planner` 任务。若不需要每日参考计划，可关闭 `daily_planning_enabled`；滚动生活仍会调用模型。完全停用需关闭插件总开关。
-
-生活管理权限唯一来自 **MaiIdentity 的 config.toml**：
+调整生活状态需要安装 MaiIdentity，并在它的 `config.toml` 中填写：
 
 ```toml
 [management]
-# 替换为真实 QQ 账号；空数组表示无人拥有 Vita 管理权
-vita_admin_accounts = ["你的真实QQ号"]
+vita_admin_accounts = ["你的QQ号"]
 ```
 
-保存后重载 MaiIdentity。群主称号、昵称、自称和关系都不授予管理权。MaiHush 使用自己路由里的 `owner_accounts` / `admin_accounts`，两套名单独立。
+保存后重载 MaiIdentity。名单为空时，无人拥有 MaiVita 管理权限；群管理员不会自动获得此权限。
 
-### 3. 启动与查看
+## 常用配置
 
-首次加载由 Host 生成配置；无需填写确认串、写锁路径或会话 ID。发送 `/maivita help` 或 `/maivita status` 查看状态。状态包含今日计划、模型调用和不回复原因；睡眠或硬静音期间可能无法收到回执。
-
-### 测试实例
-
-当前为开发中的版本，按全新实例安装，从 [config.example.toml](config.example.toml) 配置即可。测试前备份需要保留的数据；回滚时使用匹配的代码、配置和完整数据，不能覆盖运行中的数据库，见[回滚指南](docs/ROLLBACK.md)。
-
-### 聊天邀请与继续活动
-
-在私聊中说“陪我聊会儿”“能和我聊会儿吗”这类简短明确的邀请，会给生活决策一次调整机会。角色可以继续手头的事、边做边聊，也可以暂停活动专心聊天。普通问候、群消息、引用和转发不会触发；这不是管理命令，不能唤醒角色。
-
-邀请最多每半小时考虑一次，五分钟内有效，与其他生活决策共用每日额度。只保留一件明确被打断的活动，最多四小时；后续决策可选择继续，也可放下。普通活动切换不会增加待办。重启不补处理邀请；聊天正文、参与者身份不进入生活记录或空间素材。状态中的“稍后可继续”仅表示一个选择，不代表承诺。
-
-## 命令
-
-| 命令 | 说明 |
-| --- | --- |
-| `/maivita help` | 查看帮助 |
-| `/maivita status` | 查看生活状态、规划与模型调用情况 |
-| `/maivita plan`、`/maivita goals`、`/maivita activity` | 查看公开计划、目标、当前活动及 ID |
-| `/maivita sleep 5` | 预览休息 5 分钟的请求 |
-| `/maivita activity start study 阅读` | 预览开始活动 |
-| `麦麦管理 结束当前活动` | 预览结束活动 |
-| `/maivita plan add 明天 09:00 10:00 阅读` | 预览新增计划 |
-| `/maivita plan update 条目ID 明天 10:00 11:00 阅读` | 预览调整计划 |
-| `麦麦管理 取消计划 条目ID` | 预览取消未开始计划，保留历史 |
-| `麦麦管理 新增目标 学习Python` | 预览新增目标 |
-| `/maivita goal update 目标ID 新标题` | 预览修改目标 |
-| `/maivita goal pause 目标ID` | 暂停目标；也支持 resume、cancel |
-| `/maivita goal complete 目标ID 已结束活动ID` | 引用活动证据完成目标 |
-| `/maivita confirm 请求ID` | 确认预览，重新检查权限与状态 |
-| `/maivita cancel 请求ID`、`/maivita result 请求ID` | 取消请求、查看持久化结果 |
-| `/maivita wake`、`/maivita replan` | 管理员唤醒、重新决定当前活动 |
-| `/maivita plan regenerate` | 重新生成今日参考计划；沿用 replan 权限 |
-
-日期支持今天、明天或 `YYYY-MM-DD`，时间按角色时区。中文管理仅识别 `麦麦管理` 前缀后的有限语法，不执行普通闲聊里的指令。新目标和活动公开可见；公开命令不能编辑私密计划与目标。睡眠有时长、承诺冲突及冷却约束，唤醒后五分钟内不能开启新的睡眠会话。回执被静音拦截时，恢复后用 `result` 查询，不要重复提交。
-
-## 配置
-
-[config.example.toml](config.example.toml) 只列常用设置，省略字段使用默认值。WebUI 的常用区域提供会话、时区、生活背景、调用额度和作息；活动检查与休息拦截在高级区域，模型路由等可在原始 TOML 中修改。配置格式版本与插件发布版本不同。
-
-### 会话与时区
+多数设置保持默认即可。可在 MaiBot 的插件设置界面修改，也可参考 [config.example.toml](config.example.toml)。
 
 ```toml
 [instance]
-# 空数组跟随 Host/适配器允许的全部会话；非空为精确 stream_id 白名单
-allowed_streams = []
-# 日程时间和每日规划使用的 IANA 时区
 timezone = "Asia/Shanghai"
-```
 
-`writer_lock` 为部署写锁路径，正常安装留空即可；不修改 Host 全局回复频率。
-
-### 模型与每日规划
-
-```toml
 [model]
-# task 跟随 Host 任务路由；model 指定 Host 中已有的模型
-mode = "task"
-task = "planner"
-model = ""
-# 角色时区自然日最多 20 次生活调用尝试；失败也计入
+# 补充角色的日常习惯，留空使用 MaiBot 人设
+life_context = ""
 daily_budget = 20
-# 默认每日规划开启，会产生费用；启动时即时规划单独控制
 daily_planning_enabled = true
 daily_planning_time = "08:00"
-generate_on_start = false
-```
 
-指定模型时设置 `mode = "model"`，并在 `model` 填入 Host `model_config.toml` 的模型 name 或 model_identifier。密钥仅放在 Host 配置中。`timeout_seconds` 默认 90 秒，`max_tokens` 默认 8192；`life_context` 可补充生活背景。非法模型内容最多重试一次，超时、网络失败或不确定结果不自动重试。
-
-### 作息偏好
-
-```toml
 [routine]
-# HH:MM 格式，仅作为模型参考，不强制入睡或醒来
 preferred_sleep_time = "01:00"
 preferred_wake_time = "08:00"
 ```
 
-版本变化见 [UPDATE_NOTES.md](UPDATE_NOTES.md)。
+日程时间按 `timezone` 计算。作息时间是参考，角色不一定准点入睡或醒来。
 
-### 高级参数与旧配置
+关闭 `daily_planning_enabled` 只停止生成每日计划，日常活动仍会调用模型。需要完全停用时，关闭插件总开关。
 
-下列参数通常无需修改。隐藏字段仍可在原始 TOML 中设置，升级不会删除旧值；不要把示例直接覆盖到已有配置。
+如需指定其他模型，在 `[model]` 中设置 `mode = "model"`，并用 `model = "模型名称"` 指定 MaiBot 已配置的模型。密钥仍填写在 MaiBot 的模型配置中。
 
-| 字段 | 默认值与说明 |
+## 常用命令
+
+| 命令 | 用途 |
 | --- | --- |
-| `model.mode / task / model` | `task / planner / ""`；指定模型时使用 `mode = "model"` 并填写模型名 |
-| `model.timeout_seconds / max_tokens` | `90 / 8192`；超时 1–300 秒，输出上限 128–16384 token |
-| `model.generate_on_start` | `false`；每日规划关闭时，每次加载额外请求一次当前活动决策 |
-| `scheduler.decision_interval_minutes` | `15`；定期检查并不等于调用模型 |
-| `scheduler.segment_min_minutes / segment_max_minutes` | `15 / 180`；检查间隔须在两者之间 |
-| `scheduler.segment_sleep_max_minutes` | `720`；睡眠硬上限，不小于活动上限且最多 1080 分钟 |
-| `availability.enabled` | `false`；控制身体极值拦截，不控制睡眠静默 |
-| `availability.slow_categories` | `study, work, travel, creative`；正在专注的类别 |
-| `availability.busy_fatigue_threshold / busy_energy_threshold` | `90 / 10`；0–100 的模拟身体阈值 |
-| `routine.initialize_body_state` | `true`；只把首次未知的身体读数初始化为中性值，已有读数不重置 |
+| `/maivita status` | 查看当前状态和今日模型调用次数 |
+| `/maivita plan` | 查看今日日程 |
+| `/maivita activity` | 查看当前活动 |
+| `/maivita goals` | 查看目标 |
+| `/maivita replan` | 重新决定当前做什么 |
+| `/maivita plan regenerate` | 重新生成今日日程 |
+| `/maivita sleep 30` | 请求睡眠 30 分钟 |
+| `/maivita wake` | 唤醒 |
+| `麦麦管理 开始活动 阅读` | 开始一项活动 |
+| `麦麦管理 结束当前活动` | 结束当前活动 |
+| `/maivita plan add 明天 09:00 10:00 阅读` | 添加日程 |
+| `麦麦管理 新增目标 学习Python` | 添加目标 |
+| `/maivita help` | 查看更多管理命令 |
 
-工作日与周末偏好可直接写入 `model.life_context`。`availability.busy_when_sleeping` 默认 true，仅影响忙闲状态推导，不解除睡眠静默。
+添加或修改日程、活动、目标，以及请求睡眠时，会先显示预览。按照提示，用同一账号在同一会话内发送 `/maivita confirm 请求ID` 确认，预览两分钟后过期。也可用 `/maivita cancel 请求ID` 取消，或用 `/maivita result 请求ID` 查询结果。
 
-## 已知限制
+通过这些命令创建的日程、活动和目标是公开的，请勿填写私人信息。
 
-不支持静默回执豁免（H01）、按插件归属的频率控制（H02）和通用跨插件特权委托（H03）。公开 API 和模型 Tool 不授予管理写权限。详情见[限制](docs/LIMITATIONS.md)、[API 契约](docs/CONTRACTS.md)与[拒绝诊断](docs/DIAGNOSTICS.md)。
+## 常见问题
 
-## 鸣谢
+**为什么不回复？** 睡眠期间会暂停回复，命令回复也可能被拦截。管理员可用 `/maivita wake` 唤醒。如果同时使用 MaiHush，还需检查是否处于群静音中；唤醒不会解除群静音。
 
-感谢 MaiBot 与插件 SDK，以及 xuqian13、cateyemizuki 和 DavidBlackCN 的自主规划插件工作。完整继承与署名见 [SOURCES](docs/SOURCES.md)。
+**“正在专注”会停止回复吗？** 不会。若希望身体过度疲劳时也暂停回复，可在高级设置中开启对应选项，默认关闭。
 
-## 许可
+**日程一定会照着执行吗？** 不一定。它是当天的打算，实际活动会调整。生活记录和身体状态都是角色模拟，不代表机器人真的完成了现实中的操作。
 
-[GNU Affero General Public License v3.0](LICENSE)。
+## 可选扩展
+
+[MaiCoordinate](ecosystem/coordinator/README.md) 可让麦麦根据生活状态主动发言；配合[适配版 MaiTrace](ecosystem/maitrace/README.md)，还可发布 QQ 空间动态、浏览和互动好友动态。安装与配置见各自说明。
+
+## 其他资料
+
+[更新说明](UPDATE_NOTES.md) · [排错](docs/DIAGNOSTICS.md) · [备份与回滚](docs/ROLLBACK.md) · [开发接口](docs/CONTRACTS.md)
+
+## 鸣谢与许可
+
+感谢 MaiBot、插件 SDK，以及 xuqian13、cateyemizuki 和 DavidBlackCN 的自主规划插件工作。来源与署名见 [SOURCES](docs/SOURCES.md)。
+
+本项目使用 [AGPL-3.0](LICENSE) 许可证。
