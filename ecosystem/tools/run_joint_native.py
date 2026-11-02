@@ -10,6 +10,7 @@ import subprocess
 import sys
 import signal
 import tempfile
+import tomllib
 import zipfile
 import maibot_sdk
 
@@ -45,7 +46,7 @@ def main():
         if digest(host/name)!=sha: raise ValueError('Host source mismatch: '+name)
     site=Path(maibot_sdk.__file__).parent.parent
     sdk=importlib.metadata.version('maibot-plugin-sdk')
-    host_version={'2.15.0':'1.3.12','2.16.0':'1.3.15','2.19.0':'1.3.18'}[sdk]
+    host_version=tomllib.loads((host/'pyproject.toml').read_text(encoding='utf-8'))['project']['version']
     for name,sha in lock['sdk_files'].items():
         if digest(site/name)!=sha: raise ValueError('SDK source mismatch: '+name)
     work.mkdir(parents=True)
@@ -100,7 +101,7 @@ def main():
     if args.server_probe_source:
         probe=work/'plugins/phase1-server-probe'
         shutil.copytree(args.server_probe_source,probe)
-        import tomllib,tomli_w
+        import tomli_w
         cfg=tomllib.loads((probe/'config.toml').read_text('utf-8'))
         assert cfg['execute'] is False
         cfg['plugin']['enabled']=False

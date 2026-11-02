@@ -8,7 +8,7 @@ import argparse,hashlib,json,os,shutil,sqlite3,tomllib,zipfile
 
 IDS=('davidblackcn.maibot-maivita-plugin','davidblackcn.maibot-maiidentity-plugin',
      'davidblackcn.maibot-maihush-plugin','davidblackcn.maibot-maicoordinate-plugin','Rabbit-Jia-Er.MaiTrace')
-PAIRS={('1.3.12','2.15.0'),('1.3.15','2.16.0'),('1.3.18','2.19.0')}
+PAIRS={('1.3.12','2.15.0'),('1.3.15','2.16.0'),('1.3.18','2.19.0'),('1.3.19','2.20.0')}
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def write(p,v):p.write_text(json.dumps(v,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
 def files(root):

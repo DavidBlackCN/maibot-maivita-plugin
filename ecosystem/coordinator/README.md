@@ -7,11 +7,11 @@
 根据公开生活事件协调受控主动表达；需要这项功能时再安装，并显式开启 controlled 模式。
 
 - 当前版本：`0.4.0`
-- MaiBot 版本范围：`1.3.12–1.3.18`
-- Plugin SDK 版本范围：`2.15.0–2.19.0`
+- MaiBot 版本范围：`1.3.12–1.3.19`
+- Plugin SDK 版本范围：`2.15.0–2.20.0`
 - 项目地址：[MaiVita / ecosystem/coordinator](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator)
 
-仅支持精确配对 **Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**，不支持中间版本或交叉配对。配合 MaiVita 0.9.0、原样保留的 MaiIdentity 3.2.3、MaiHush 0.2.3 使用，无需私有 Host 补丁。
+支持以下配对：**Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**、**Host 1.3.19 / SDK 2.20.0**。配合 MaiVita 0.9.0、MaiIdentity 3.4.0、MaiHush 0.3.0 使用。
 
 ## 空间（0.4.0）
 
