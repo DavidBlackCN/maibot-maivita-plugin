@@ -182,6 +182,23 @@ class GuardTests(unittest.IsolatedAsyncioTestCase):
         data = self.plugin.runtime.queries.get_availability()
         self.assertEqual((data['state'],data['reason']), ('busy','睡眠中'))
 
+    async def test_availability_snapshot_expiry_is_not_the_sleep_deadline_or_a_permit(self):
+        await self.load()
+        self.execute('start_sleep', duration_minutes=5)
+        data = self.plugin.runtime.queries.get_availability()
+        stamp = lambda name: datetime.fromisoformat(data[name].replace('Z','+00:00'))
+        self.assertLessEqual((stamp('snapshot_valid_until')-stamp('as_of')).total_seconds(),5)
+        self.assertGreater(stamp('valid_until'),stamp('snapshot_valid_until'))
+        self.assertFalse(data['send_permit'])
+        with patch.object(self.plugin.runtime.engine.clock,'now_utc',return_value=stamp('valid_until')+timedelta(seconds=1)):
+            stale=self.plugin.runtime.queries.get_availability()
+            self.assertLess(datetime.fromisoformat(stale['snapshot_valid_until']),datetime.fromisoformat(stale['as_of']))
+        version=data['state_version']
+        self.execute('wake', reason='test observation')
+        changed=self.plugin.runtime.queries.get_availability()
+        self.assertGreater(changed['state_version'],version)
+        self.assertTrue(changed['available'])  # A five-second snapshot is not a lease.
+
     async def test_status_and_api_agree_and_hide_private_activity_details(self):
         await self.load()
         self.execute('start_activity',name='私密研究',category='study',check_after_minutes=30)

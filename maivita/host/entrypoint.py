@@ -1,5 +1,6 @@
 """SDK lifecycle entrypoint for the life engine."""
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 
 from maibot_sdk import API, MaiBotPlugin
 from .activation import EngineAuthority
@@ -162,9 +163,13 @@ class MaiVitaPlugin(MaiBotPlugin):
                 'state_version': None, 'as_of': None}
 
     async def life_query(self, method):
-        if not self.ready:
+        if not self.ready or not self.delegate or not self.delegate.ready:
             return self.unavailable(self.failure_code or 'NOT_READY')
-        return await self.delegate.read(method)
+        delegate, config = self.delegate, self.active_config
+        result = await delegate.read(method)
+        if not self.ready or self.delegate is not delegate or not delegate.ready or self.active_config is not config:
+            return self.unavailable('NOT_READY')
+        return result
 
     # Stable static bindings are required by the native WebUI validator.
     @API('get_life_state', public=True, version='1')
@@ -199,12 +204,31 @@ class MaiVitaPlugin(MaiBotPlugin):
 
     @API('get_public_route_scope', public=True, version='1')
     async def get_public_route_scope(self, stream_id=None, **kwargs):
-        if not self.ready or not self.delegate.ready:
+        if not self.ready or not self.delegate or not self.delegate.ready:
             return self.unavailable('ENGINE_UNAVAILABLE')
-        if not stream_allowed(stream_id, self.active_config.instance.allowed_streams):
-            return self.unavailable('ROUTE_UNAVAILABLE')
+        delegate, config, authority = self.delegate, self.active_config, self.authority
+        if type(stream_id) is not str or not 0 < len(stream_id) <= 256:
+            return self.unavailable('INVALID_ARGUMENT')
+        if not stream_allowed(stream_id, config.instance.allowed_streams):
+            result = self.unavailable('ROUTE_UNAVAILABLE')
+            result['error']['reason'] = 'OUTSIDE_CONFIGURED_SCOPE'
+            return result
+        from .routes import resolve
+        try:
+            route = await resolve(self.ctx, stream_id)
+        except Exception:
+            result = self.unavailable('ROUTE_UNAVAILABLE')
+            result['error']['reason'] = 'HOST_ROUTE_UNRESOLVED'
+            return result
+        if (not self.ready or self.delegate is not delegate or not delegate.ready
+                or self.active_config is not config or self.authority is not authority):
+            return self.unavailable('ENGINE_UNAVAILABLE')
+        now = datetime.now(timezone.utc)
         return {'api_version':1,'ok':True,'data':{'stream_id':stream_id,'character_id':'default','guarded':True,
-            'config_digest':self.authority['config_sha256']},'error':None}
+            'config_digest':authority['config_sha256'], 'platform':route['platform'],
+            'bot_account_id':route['account_id'], 'route_scope':route.get('scope'),
+            'as_of':now.isoformat(), 'snapshot_valid_until':(now+timedelta(seconds=5)).isoformat(),
+            'send_permit':False},'error':None}
     @API('request_replan', public=True, version='1')
     async def request_replan(self, **kwargs): return self.unavailable('PERMISSION_DENIED')
     @API('request_wakeup', public=True, version='1')

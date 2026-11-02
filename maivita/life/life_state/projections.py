@@ -103,7 +103,9 @@ class LifeQueries:
                 for g in u.goals.for_character(character_id) if visible(g,scope)]
 
     def get_availability(self, scope=QueryScope(), character_id='default'):
+        from datetime import timedelta
         from ..domain.clock import from_epoch_ms
+        now = self.engine.clock.now_utc()
         with self.engine.database.read_view() as u:
             state = u.states.get(character_id)
             activity = u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
@@ -121,7 +123,10 @@ class LifeQueries:
                 'available':allowed, 'can_reply_recommendation':allowed,
                 'can_proactively_contact_recommendation':allowed,
                 'interruptibility':'requires_policy' if state.sleep_phase=='sleeping' else 'policy_dependent',
-                'valid_until':iso_instant(deadline) if deadline else None}
+                'valid_until':iso_instant(deadline) if deadline else None,
+                'as_of':iso_instant(now),
+                'snapshot_valid_until':iso_instant(min(now+timedelta(seconds=5), deadline) if deadline else now+timedelta(seconds=5)),
+                'send_permit':False}
 
     def get_diagnostics(self, scope=QueryScope(), character_id='default'):
         state = self.get_life_state(scope,character_id)

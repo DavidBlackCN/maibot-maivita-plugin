@@ -22,6 +22,9 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
             cap=payload['capability']
             if cap=='component.list_loaded_plugins': return {'success':True,'plugins':[]}
             if cap=='config.get': return {'success':True,'value':{}}
+            if cap=='chat.get_all_streams':
+                return {'success':True,'streams':[{'platform':'qq','session_id':'host-admitted-session',
+                    'stream_id':'host-admitted-session','account_id':'123456789','scope':None}]}
             raise AssertionError('unexpected SDK side effect '+cap)
         self.ctx=PluginContext('davidblackcn.maibot-maivita-plugin',rpc_call=rpc,
                                paths=PluginPaths(self.work/'data',self.work/'runtime'))

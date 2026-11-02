@@ -33,12 +33,16 @@ def main():
     parser.add_argument('--server-probe-source',type=Path)
     parser.add_argument('--vita-context',action='store_true')
     parser.add_argument('--hush-experience',action='store_true')
+    parser.add_argument('--smart-poke-source',type=Path)
+    parser.add_argument('--smart-poke-vita',action='store_true')
     args=parser.parse_args()
+    if args.smart_poke_vita and not args.smart_poke_source: parser.error('--smart-poke-vita requires --smart-poke-source')
     host=args.host_source.resolve()
     verification={name:digest(ROOT/'tools'/name) for name in ('run_joint_native.py','joint_native_scenario.py')}
     if args.vita_context:
         verification['vita_context_native.py']=digest(ROOT/'tools/vita_context_native.py')
     if args.hush_experience: verification['hush_native_experience.py']=digest(ROOT/'tools/hush_native_experience.py')
+    if args.smart_poke_source: verification['smart_poke_native.py']=digest(ROOT/'tools/smart_poke_native.py')
     work=args.output.resolve()
     if work.exists(): raise ValueError('new isolated directory required')
     lock=json.loads(args.source_lock.read_text())
@@ -106,6 +110,9 @@ def main():
         assert cfg['execute'] is False
         cfg['plugin']['enabled']=False
         (probe/'config.toml').write_text(tomli_w.dumps(cfg),encoding='utf-8')
+    if args.smart_poke_source:
+        from smart_poke_native import stage
+        stage(args.smart_poke_source.resolve(),work)
     safety=work/'safety'; safety.mkdir()
     socket_dir=tempfile.TemporaryDirectory(prefix='joint-rpc-')
     socket_path=str(Path(socket_dir.name)/'rpc.sock')
@@ -116,6 +123,8 @@ def main():
         MAIBOT_HOST_VERSION=host_version,JOINT_AUTO_ROUTES=str(int(args.auto_routes)),
         JOINT_TRUSTED_MANAGEMENT=str(int(args.trusted_management)),
         JOINT_SPACE=str(int(args.space)),JOINT_HUSH_EXPERIENCE=str(int(args.hush_experience)),
+        JOINT_SMART_POKE=str(int(bool(args.smart_poke_source))),
+        JOINT_SMART_POKE_VITA=str(int(args.smart_poke_vita)),
         JOINT_VITA_CONTEXT=str(int(args.vita_context)),
         JOINT_SERVER_PROBE=str(int(bool(args.server_probe_source))),
         MAIBOT_INSTANCE_DIR=str(work),TEMP=str(work),TMP=str(work),USERPROFILE=str(work))

@@ -18,6 +18,7 @@ COORD='davidblackcn.maibot-maicoordinate-plugin'
 
 async def run(work):
     hush_experience=os.environ.get('JOINT_HUSH_EXPERIENCE')=='1'
+    smart_poke=os.environ.get('JOINT_SMART_POKE')=='1'
     automatic=os.environ.get('JOINT_AUTO_ROUTES')=='1'
     space=os.environ.get('JOINT_SPACE')=='1'
     trusted=os.environ.get('JOINT_TRUSTED_MANAGEMENT')=='1'
@@ -61,6 +62,9 @@ async def run(work):
         configs['maibot-maiIdentity-plugin']['management']={'admin_accounts':['10001']}
         configs['maibot-maihush-plugin']['management']={'source':'identity'}
         configs['maibot-maihush-plugin']['reply']={'enabled':True}
+    if smart_poke:
+        from smart_poke_native import configure
+        configure(configs)
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf8')
     # Seed a real life database while no Runner owns it; startup will perform
@@ -78,7 +82,7 @@ async def run(work):
         life.execute(Command(kind='start_activity',payload={'name':'安静阅读','category':'rest','visibility':'public_summary'},source='legacy_observed',idempotency_key='space-fixture',expected_state_version=0))
         clock.advance(timedelta(minutes=21))
         life.execute(Command(kind='advance',payload={'initialize_neutral':True},idempotency_key='space-observed-until-now',expected_state_version=1))
-    elif not hush_experience:
+    elif not hush_experience and not smart_poke:
         life.execute(Command(kind='start_sleep',payload={'duration_minutes':5},source='legacy_observed',idempotency_key='sleep-fixture',expected_state_version=0))
     from src.plugin_runtime.integration import get_plugin_runtime_manager
     from src.plugin_runtime.host.supervisor import PluginSupervisor
@@ -133,6 +137,9 @@ async def run(work):
     cases=[]
     try:
         await supervisor.start()
+        if smart_poke:
+            from smart_poke_native import run_cases
+            return await run_cases(work,supervisor,manager,call,configs,stream,scope,driver,model_calls)
         if hush_experience:
             from hush_native_experience import run_cases
             return await run_cases(work,supervisor,manager,call,configs,stream,scope,driver,model_calls)
