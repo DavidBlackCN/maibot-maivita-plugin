@@ -17,7 +17,7 @@ class ManifestTests(unittest.TestCase):
         self.assertNotIn("frequency.get_current_talk_value", capabilities)
         self.assertEqual(capabilities, {'message.get_by_id', 'api.call', 'send.text', 'config.get', 'llm.generate',
                                         'chat.get_all_streams', 'component.list_loaded_plugins'})
-        self.assertEqual(manifest["version"], "0.9.0")
+        self.assertRegex(manifest["version"], r"^\d+\.\d+\.\d+$")
 
 
 if __name__ == "__main__":

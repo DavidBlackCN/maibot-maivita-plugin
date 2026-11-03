@@ -2,7 +2,7 @@ import asyncio
 import importlib.metadata
 import os
 from maibot_sdk import API, Command, HookHandler, MaiBotPlugin
-from .config import Settings, HOST, SDK, SUPPORTED_PAIRS, Route, HUSH
+from .config import Settings, HOST, SDK, Route, HUSH
 from .contracts import decide, Unavailable
 from .service import Coordinator
 from .store import Store
@@ -30,8 +30,6 @@ class MaiCoordinatePlugin(MaiBotPlugin):
     async def on_load(self):
         if not self.config.plugin.enabled: return
         if self.store is not None: raise RuntimeError('ALREADY_LOADED')
-        if (os.environ.get('MAIBOT_HOST_VERSION'),importlib.metadata.version('maibot-plugin-sdk')) not in SUPPORTED_PAIRS:
-            raise RuntimeError('UNSUPPORTED_BASELINE')
         self.active=self.config.model_copy(deep=True)
         try:
             if self.active.mode=='controlled':

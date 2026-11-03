@@ -140,7 +140,11 @@ async def test_ambiguous_send_is_durable_and_not_retried(system):
 @pytest.mark.asyncio
 @pytest.mark.parametrize('result,status',[
     ({'success':True,'sent':True,'message_id':'some'},'sent_some'),
-    ({'success':False,'sent':False},'not_sent'),({'success':True},'unknown'),(True,'unknown')])
+    ({'success':False,'sent':False},'unknown'),
+    ({'success':False,'sent':False,'behavior_state':'not_submitted'},'not_sent'),
+    ({'success':False,'sent':False,'behavior_state':'unknown'},'unknown'),
+    ({'success':True,'sent':True,'behavior_state':'partial'},'unknown'),
+    ({'success':True},'unknown'),(True,'unknown')])
 async def test_send_result_is_not_inferred_from_truthiness(system,result,status):
     service,host,store=system; host.send_result=result
     await service.cycle()

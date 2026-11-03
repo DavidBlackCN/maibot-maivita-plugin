@@ -155,9 +155,12 @@ class Coordinator:
                 self.store.conn.execute('INSERT OR REPLACE INTO cooldown VALUES(?,?)',(route.route_id,self.wall()+self.settings.cooldown_seconds))
                 self.store.conn.execute("UPDATE actions SET status='executing',reason='SEND_ATTEMPT',attempt=?,updated=? WHERE event_id=? AND route=?",(attempt,self.wall(),event_id,route.route_id))
             result=await asyncio.wait_for(self.ctx.send.text(text.strip(),route.stream_id,return_details=True),10)
-            if type(result) is dict and result.get('success') is True and result.get('sent') is True:
+            outcome=result.get('behavior_state') if type(result) is dict else None
+            if outcome in ('unknown','submitted','partial'):
+                finish('unknown','SEND_OUTCOME_UNKNOWN',basis)
+            elif type(result) is dict and result.get('success') is True and result.get('sent') is True:
                 finish('sent_some','HOST_CONFIRMED_AT_LEAST_ONE_DELIVERY',basis)
-            elif type(result) is dict and result.get('success') is False and result.get('sent') is False:
+            elif type(result) is dict and result.get('success') is False and result.get('sent') is False and outcome in ('not_submitted','denied','failed'):
                 finish('not_sent','HOST_DID_NOT_CONFIRM_DELIVERY',basis)
             else: finish('unknown','UNRECOGNIZED_SEND_RESULT',basis)
         except BaseException as exc:

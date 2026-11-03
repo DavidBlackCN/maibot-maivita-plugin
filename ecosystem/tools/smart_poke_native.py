@@ -60,6 +60,9 @@ def configure(configs):
 
 async def run_cases(work,supervisor,manager,call,configs,stream,scope,driver,model_calls):
     import os
+    if os.environ.get('JOINT_SMART_POKE_IDENTITY')=='1':
+        from identity_poke_native import run_cases as identity_cases
+        return await identity_cases(work,supervisor,manager,call,configs,stream,scope,driver,model_calls)
     if os.environ.get('JOINT_SMART_POKE_VITA')=='1':
         return await run_vita_cases(work,supervisor,manager,call,configs,stream,scope,driver,model_calls)
     from src.chat.message_receive.message import SessionMessage

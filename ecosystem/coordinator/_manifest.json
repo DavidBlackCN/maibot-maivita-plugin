@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "davidblackcn.maibot-maicoordinate-plugin",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "name": "MaiCoordinate",
   "description": "Read-only aggregation, shadow decisions and opt-in bounded public-event expression.",
   "author": {
@@ -26,7 +26,7 @@
   },
   "sdk": {
     "min_version": "2.15.0",
-    "max_version": "2.20.0"
+    "max_version": "2.21.0"
   },
   "dependencies": [],
   "capabilities": [

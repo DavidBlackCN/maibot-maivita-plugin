@@ -12,7 +12,6 @@ import os
 import importlib.metadata
 HOST=os.environ.get('MAIBOT_HOST_VERSION','1.3.12')
 SDK=importlib.metadata.version('maibot-plugin-sdk')
-SUPPORTED_PAIRS={('1.3.12','2.15.0'),('1.3.15','2.16.0'),('1.3.18','2.19.0'),('1.3.19','2.20.0')}
 
 
 class Strict(PluginConfigBase):

@@ -248,6 +248,9 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         return inject(self,kwargs,self.chat_context(),'MaiVita')
     @HookHandler('send_service.before_send',name='maivita_sleep_silence',order='early',error_policy='abort')
     async def silence_hook(self,message=None,**kwargs):
+        from .behavior import control
+        if control(self).get('defer_send_guard'):
+            return {'action':'continue'}
         stream=message.get('session_id') if isinstance(message,dict) else getattr(message,'session_id',None)
         if not self.ready:
             return ({'action':'abort','reason':'maivita_runtime_failed'} if self.failure_code and
@@ -266,6 +269,11 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             if derive_availability(state,None,config).state=='busy':
                 return {'action':'abort','reason':'maivita_busy'}
         return {'action':'continue'}
+
+    @API('evaluate_behavior',public=False,version='1')
+    async def evaluate_behavior(self,**kwargs):
+        from .behavior import evaluate
+        return evaluate(self)
 
 
 def create_plugin(): return MaiVitaDevelopmentPlugin()

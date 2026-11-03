@@ -35,14 +35,18 @@ def main():
     parser.add_argument('--hush-experience',action='store_true')
     parser.add_argument('--smart-poke-source',type=Path)
     parser.add_argument('--smart-poke-vita',action='store_true')
+    parser.add_argument('--smart-poke-identity',action='store_true')
     args=parser.parse_args()
     if args.smart_poke_vita and not args.smart_poke_source: parser.error('--smart-poke-vita requires --smart-poke-source')
+    if args.smart_poke_identity and (not args.smart_poke_source or args.smart_poke_vita):
+        parser.error('--smart-poke-identity requires --smart-poke-source and excludes --smart-poke-vita')
     host=args.host_source.resolve()
     verification={name:digest(ROOT/'tools'/name) for name in ('run_joint_native.py','joint_native_scenario.py')}
     if args.vita_context:
         verification['vita_context_native.py']=digest(ROOT/'tools/vita_context_native.py')
     if args.hush_experience: verification['hush_native_experience.py']=digest(ROOT/'tools/hush_native_experience.py')
     if args.smart_poke_source: verification['smart_poke_native.py']=digest(ROOT/'tools/smart_poke_native.py')
+    if args.smart_poke_identity: verification['identity_poke_native.py']=digest(ROOT/'tools/identity_poke_native.py')
     work=args.output.resolve()
     if work.exists(): raise ValueError('new isolated directory required')
     lock=json.loads(args.source_lock.read_text())
@@ -125,6 +129,7 @@ def main():
         JOINT_SPACE=str(int(args.space)),JOINT_HUSH_EXPERIENCE=str(int(args.hush_experience)),
         JOINT_SMART_POKE=str(int(bool(args.smart_poke_source))),
         JOINT_SMART_POKE_VITA=str(int(args.smart_poke_vita)),
+        JOINT_SMART_POKE_IDENTITY=str(int(args.smart_poke_identity)),
         JOINT_VITA_CONTEXT=str(int(args.vita_context)),
         JOINT_SERVER_PROBE=str(int(bool(args.server_probe_source))),
         MAIBOT_INSTANCE_DIR=str(work),TEMP=str(work),TMP=str(work),USERPROFILE=str(work))

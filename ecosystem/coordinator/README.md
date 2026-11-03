@@ -6,14 +6,14 @@
 
 根据公开生活事件协调受控主动表达；需要这项功能时再安装，并显式开启 controlled 模式。
 
-- 当前版本：`0.4.0`
+- 当前版本：`0.4.1`
 - MaiBot 版本范围：`1.3.12–1.3.19`
-- Plugin SDK 版本范围：`2.15.0–2.20.0`
+- Plugin SDK 版本范围：`2.15.0–2.21.0`
 - 项目地址：[MaiVita / ecosystem/coordinator](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator)
 
-支持以下配对：**Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**、**Host 1.3.19 / SDK 2.20.0**。配合 MaiVita 0.9.0、MaiIdentity 3.4.0、MaiHush 0.3.0 使用。
+支持以下配对：**Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**、**Host 1.3.19 / SDK 2.21.0**。配合 MaiVita 0.9.0、MaiIdentity 3.4.0、MaiHush 0.3.0 使用。
 
-## 空间（0.4.0）
+## 空间（0.4.1）
 
 新增独立 `[space] mode`，与根级群 `mode` 分开。新安装空间为 shadow，旧配置迁移后关闭；无群路由也可运行，空间不查询 Hush。Vita 提供公开经历，固定适配的 MaiTrace 6.3.0 执行发布与浏览。
 
