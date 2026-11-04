@@ -24,6 +24,6 @@ def evaluate(plugin):
     if state.sleep_phase in ('sleeping', 'temporarily_awake'):
         return {**result, 'reason': 'sleeping'}
     config = plugin.active_config.availability
-    if config.enabled and derive_availability(state, None, config).state == 'busy':
+    if request.get('category') != 'cognition' and config.enabled and derive_availability(state, None, config).state == 'busy':
         return {**result, 'reason': 'busy'}
     return {**result, 'decision': 'allow', 'reason': 'available', 'revision': state.state_version}
