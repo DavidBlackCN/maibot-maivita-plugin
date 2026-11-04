@@ -20,7 +20,7 @@ class Port:
         assert name.endswith('get_public_life_context')
         return {'success':True,'result':{'ok':True,'api_version':1,'data':{
             'as_of':datetime.fromtimestamp(self.now,timezone.utc).isoformat(),'awake':self.awake,
-            'availability':{'state':'free'},'activity':self.activity,'history':[]}}}
+            'availability':{'state':'free'},'participation':{'version':1,'band':'normal','proactive_allowed':True},'activity':self.activity,'history':[]}}}
     async def call_space(self,name,**args):
         self.calls.append((name,args))
         if self.block: await self.block.wait()

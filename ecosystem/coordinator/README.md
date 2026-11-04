@@ -6,16 +6,16 @@
 
 根据公开生活事件协调受控主动表达；需要这项功能时再安装，并显式开启 controlled 模式。
 
-- 当前版本：`0.4.1`
-- MaiBot 版本范围：`1.3.12–1.3.19`
-- Plugin SDK 版本范围：`2.15.0–2.21.0`
+- 当前版本：`0.5.0`
+- MaiBot：`1.3.19`
+- Plugin SDK：`2.21.0`
 - 项目地址：[MaiVita / ecosystem/coordinator](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator)
 
-支持以下配对：**Host 1.3.12 / SDK 2.15.0**、**Host 1.3.15 / SDK 2.16.0**、**Host 1.3.18 / SDK 2.19.0**、**Host 1.3.19 / SDK 2.21.0**。配合 MaiVita 0.9.0、MaiIdentity 3.4.0、MaiHush 0.3.0 使用。
+配合 MaiVita 0.10.0、MaiIdentity 和 MaiHush 使用。疲倦时主动表达间隔加倍；专注、睡眠或需要休息时不主动发起。空间行动只在清醒且空闲时开始。本插件不修改宿主发言倍率。
 
-## 空间（0.4.1）
+## 空间
 
-新增独立 `[space] mode`，与根级群 `mode` 分开。新安装空间为 shadow，旧配置迁移后关闭；无群路由也可运行，空间不查询 Hush。Vita 提供公开经历，固定适配的 MaiTrace 6.3.0 执行发布与浏览。
+独立的 `[space] mode` 与根级群 `mode` 分开，默认 shadow；无群路由也可运行，空间不查询 Hush。Vita 提供公开经历，固定适配的 MaiTrace 6.3.0 执行发布与浏览。
 
 每天最多发布 2 次尝试、间隔 4 小时；浏览 6 轮、间隔 1 小时、每轮最多 5 条。空互动白名单不互动。只分享公开且持续 15 分钟或已经结束的活动；醒来、启用、重启不补发积压。失败、延后、未知结果分别显示，已提交或未知操作不重发。
 

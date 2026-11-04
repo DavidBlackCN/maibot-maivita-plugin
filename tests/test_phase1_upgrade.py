@@ -35,6 +35,9 @@ class PhaseOneUpgrade(EngineFixture,unittest.TestCase):
     def test_schema6_and_coordinate1_copies_upgrade_and_restore(self):
         self.apply('advance',{'initialize_neutral':True})
         with closing(sqlite3.connect(self.db.path)) as c,c:
+            for table in ('activity_details','model_usage','frequency_claims','webui_jobs'):
+                c.execute(f'DROP TABLE {table}')
+            c.execute('ALTER TABLE life_state DROP COLUMN sleepiness')
             c.execute('DROP TABLE body_rule_cutovers');c.execute('DROP TABLE conversation_state');c.execute('DELETE FROM schema_migrations WHERE version>=7')
             before=c.execute('SELECT energy,fatigue,stress FROM life_state').fetchone()
         vita=self.db.path.parent
@@ -50,7 +53,7 @@ class PhaseOneUpgrade(EngineFixture,unittest.TestCase):
             self.assertTrue(report['source_unchanged']);self.assertTrue(report['rollback_copy_verified'])
             with closing(sqlite3.connect(output/'upgraded/vita/maivita.db')) as c:
                 self.assertEqual(c.execute('SELECT energy,fatigue,stress FROM life_state').fetchone(),before)
-                snapshot=list(c.iterdump());self.assertEqual(migrate(c,self.clock),8);self.assertEqual(list(c.iterdump()),snapshot)
+                snapshot=list(c.iterdump());self.assertEqual(migrate(c,self.clock),9);self.assertEqual(list(c.iterdump()),snapshot)
             with closing(sqlite3.connect(output/'upgraded/coordinate/coordinate.sqlite3')) as c:
                 self.assertEqual(c.execute("SELECT status FROM actions WHERE event_id='old-id'").fetchone()[0],'unknown')
                 self.assertEqual(c.execute('PRAGMA user_version').fetchone()[0],2)

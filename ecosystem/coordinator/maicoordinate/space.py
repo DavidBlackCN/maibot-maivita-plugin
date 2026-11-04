@@ -101,7 +101,7 @@ class SpaceCoordinator:
                     self.awake=False; self.since=self.wall(); self.reason='SLEEPING'; return
                 if self.awake is False: self.since=self.wall()
                 self.awake=True
-                if life.get('availability',{}).get('state')!='free': self.reason='NOT_FREE'; return
+                if not self.free(life): self.reason='NOT_FREE'; return
                 status=self.status(); now=self.wall()
                 # Only the newest valid observation can be considered; no queue.
                 records=[life.get('activity'),*life.get('history',[])]
@@ -139,7 +139,7 @@ class SpaceCoordinator:
                       {'max_feeds':self.config.max_feeds,'interaction_whitelist':self.config.interaction_whitelist})
                 # Recheck after preflight, before any model/platform request.
                 fresh=await self.life()
-                if not fresh.get('awake') or fresh.get('availability',{}).get('state')!='free':
+                if not fresh.get('awake') or not self.free(fresh):
                     self.reason='LIFE_CHANGED_BEFORE_START'; return
                 operation='post:'+activity['activity_id'] if kind=='post' else 'browse:'+uuid4().hex
                 day=datetime.fromtimestamp(now,ZoneInfo(self.config.timezone)).date().isoformat()
@@ -169,6 +169,12 @@ class SpaceCoordinator:
             self.store.conn.execute('UPDATE space_actions SET status=?,reason=?,result=? WHERE operation_id=?',
                 (status,str(reason)[:500],canonical(result),operation))
         self.reason=status+': '+str(reason)
+
+    @staticmethod
+    def free(life):
+        participation=life.get('participation',{})
+        return (life.get('availability',{}).get('state')=='free' and participation.get('version')==1
+                and participation.get('band')=='normal' and participation.get('proactive_allowed') is True)
 
     async def run(self,poll_seconds):
         while True:

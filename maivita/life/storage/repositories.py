@@ -107,7 +107,7 @@ class RecordSpec:
 
 SPECS = {
     "states": RecordSpec("life_state", LifeState, "character_id", ("secondary_activity_ids",),
-                         fixed_fields=(("energy", 100), ("fatigue", 100), ("stress", 100), ("sleep_debt_minutes", 1))),
+                         fixed_fields=(("energy", 100), ("fatigue", 100), ("stress", 100), ("sleepiness", 100), ("sleep_debt_minutes", 1))),
     "activities": RecordSpec("activities", Activity, "activity_id", fixed_fields=(("energy_rate", 1000),)),
     "plans": RecordSpec("plans", Plan, "plan_id", date_fields=("local_date",)),
     "items": RecordSpec("schedule_items", ScheduleItem, "item_id", fixed_fields=(("preferred_duration_minutes", 1),),

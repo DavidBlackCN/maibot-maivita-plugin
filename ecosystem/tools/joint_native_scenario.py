@@ -37,7 +37,7 @@ async def run(work):
         'maibot-maihush-plugin':{'plugin':{'enabled':True,'config_version':'2'},'groups':[{'group_id':'987654321','route_scope':scope or ''}], 'management':{'source':'local','admin_accounts':['10001','10002']},'reply':{'enabled':False}},
         'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'4'},
             'identity':{'adapter_namespace':'synthetic-test-adapter','route_scope':'synthetic-test-scope','people':[{'qq':'10002','nickname':'妈妈','prompt_template':'private fixed profile'}]}},
-        'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'4'},
+        'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'5'},
             'instance':{'writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
         'maibot-maicoordinate-plugin':{'plugin':{'enabled':True,'config_version':'1'},'mode':'shadow','acknowledgement':'isolated-test-instance','model_task':'joint-test','poll_seconds':1,
             'routes':[{'route_id':'test','instance_id':'joint-test','adapter_namespace':'host-qq','bot_account_id':'123456789','route_scope':'synthetic-test-scope','group_id':'987654321','stream_id':stream}]}}

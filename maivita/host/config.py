@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from maibot_sdk import PluginConfigBase
 from pydantic import Field,model_validator
 
-VERSION='4'
+VERSION='5'
 
 ClockTime = Annotated[str, Field(pattern=r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$')]
 
@@ -16,7 +16,7 @@ class Strict(PluginConfigBase):
 
 class PluginSettings(Strict):
     enabled: bool=True
-    config_version: Literal['4']='4'
+    config_version: Literal['5']='5'
 
 
 class InstanceSettings(Strict):
@@ -76,6 +76,7 @@ class SchedulerSettings(Strict):
 
 class AvailabilitySettings(Strict):
     enabled: bool=Field(default=False, strict=True)
+    adjust_group_frequency: bool=Field(default=True,strict=True,description='根据生活状态减少普通群聊插话；勿与其他调频插件同时启用。')
     slow_categories: list[Literal['rest','study','work','entertainment','daily_life',
                                  'social','travel','creative','other']]=Field(
         default_factory=lambda: ['study','work','travel','creative'])
@@ -90,7 +91,7 @@ class AvailabilitySettings(Strict):
 
     def runtime_config(self):
         from ..life.planning.availability import AvailabilityConfig
-        return AvailabilityConfig(**self.model_dump())
+        return AvailabilityConfig(**self.model_dump(exclude={'adjust_group_frequency'}))
 
 
 class DevelopmentConfig(Strict):

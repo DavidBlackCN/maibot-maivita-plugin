@@ -14,8 +14,8 @@ class ConfigExampleTests(unittest.TestCase):
         with (ROOT / 'config.example.toml').open('rb') as file:
             config = tomllib.load(file)
         model = IntegrationConfig.model_validate(config)
-        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine'})
-        self.assertEqual(config['plugin']['config_version'], '4')
+        self.assertEqual(set(config), {'plugin', 'instance', 'model', 'routine', 'availability'})
+        self.assertEqual(config['plugin']['config_version'], '5')
         self.assertEqual(model, IntegrationConfig())
         self.assertIsInstance(model.selected_config(), DevelopmentConfig)
         self.assertEqual(model.selected_config().routine, model.routine)

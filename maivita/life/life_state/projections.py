@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from ..domain.clock import iso_instant,to_epoch_ms
 from ..planning.availability import AvailabilityConfig, derive_availability
+from ..planning.participation import derive as participation_view
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,15 @@ def visible(record, scope):
 class LifeQueries:
     def __init__(self, engine, *, availability=None):
         self.engine = engine
+        self.participation_previous=1.0
         self.availability = availability if availability is not None else AvailabilityConfig()
+
+    def get_participation(self):
+        from ..planning.participation import derive
+        with self.engine.database.read_view() as u:
+            state=u.states.get('default')
+            activity=u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
+            return derive(state,activity,self.availability,self.engine.clock.now_utc(),self.participation_previous)
 
     def get_public_life_context(self, scope=QueryScope(), character_id='default'):
         """One read transaction, public observations only; plans are never evidence."""
@@ -44,7 +53,9 @@ class LifeQueries:
             def unknown(a):
                 return any(to_epoch_ms(a.started_at)<right and to_epoch_ms(a.ended_at or now)>left for left,right in gaps)
             def public(a):
+                from ..planning.details import read
                 return {'activity_id':a.activity_id,'name':a.name,'category':a.category,
+                    'reflection':read(u,a.activity_id) if not unknown(a) else None,
                     'location':a.location,'emotion':a.emotion,'started_at':iso_instant(a.started_at),
                     'ended_at':iso_instant(a.ended_at) if a.ended_at else None,
                     'end_status':a.status.value if hasattr(a.status,'value') else a.status,
@@ -52,10 +63,13 @@ class LifeQueries:
                     'duration_minutes':None if unknown(a) else max(0,(a.ended_at or now).__sub__(a.started_at).total_seconds()/60)}
             availability=derive_availability(state,current,self.availability,
                 activity_visible=current is not None and current.visibility=='public_summary')
+            from ..planning.details import continuing
             return {'api_version':1,'as_of':iso_instant(now),'state_version':state.state_version,
                 'sleep_phase':state.sleep_phase.value,'awake':state.sleep_phase in ('awake','winding_down') and not state.active_sleep_session_id,
                 'availability':{'state':availability.state,'reason':availability.reason},
-                'body':{key:getattr(state,key) for key in ('energy','fatigue','stress','confidence')},
+                'participation':participation_view(state,current,self.availability,now,self.participation_previous),
+                'body':{key:getattr(state,key) for key in ('energy','fatigue','stress','sleepiness','confidence')},
+                'continuing':continuing(u,now),
                 'body_rule':'fixed-categories-v4','activity':public(current) if current and current.visibility=='public_summary' else None,
                 'history':[public(a) for a in history],
                 'continuity_unknown':any(right>to_epoch_ms(cutoff) for _,right in gaps) or
@@ -71,14 +85,22 @@ class LifeQueries:
             checkpoint=u.connection.execute('SELECT deadline_at_ms FROM activity_checkpoints WHERE activity_id=? AND processed=0',(state.primary_activity_id,)).fetchone() if actual else None
             from ..domain.clock import from_epoch_ms
             deadline=(session.interrupt_until or session.expected_wake_at) if session else from_epoch_ms(checkpoint[0]) if checkpoint else None
+            now=self.engine.clock.now_utc()
+            awake_start=state.awake_since_at or state.last_wake_at
+            awake_known=bool(awake_start and not u.connection.execute(
+                'SELECT 1 FROM observation_gaps WHERE character_id=? AND end_at_ms>? LIMIT 1',
+                (character_id,to_epoch_ms(awake_start))).fetchone())
             return {'character_id':character_id, 'state_version':state.state_version,
+                'participation':participation_view(state,actual,self.availability,self.engine.clock.now_utc(),self.participation_previous),
                 'plan_version':state.plan_version, 'sleep_phase':state.sleep_phase,
                 'activity': ({'activity_id':actual.activity_id,'name':actual.name, 'category':actual.category,
                               'started_at':iso_instant(actual.started_at)} if actual and not unknown and visible(actual,scope) else None),
                 'activity_continuity_unknown':unknown,
-                'energy':state.energy, 'fatigue':state.fatigue, 'stress':state.stress,
+                'energy':state.energy, 'fatigue':state.fatigue, 'stress':state.stress, 'sleepiness':state.sleepiness,
                 'sleep_debt_minutes':state.sleep_debt_minutes,
                 'sleep_history_coverage_days':state.sleep_history_coverage_days,
+                'awake_minutes':max(0,(now-awake_start).total_seconds()/60) if awake_known and not session else None,
+                'sleep_session_minutes':session.actual_sleep_minutes if session else None,
                 'confidence':state.confidence, 'provenance':state.provenance,
                 'next_deadline_at':iso_instant(deadline) if deadline else None,
                 'degraded_reason':state.degraded_reason,

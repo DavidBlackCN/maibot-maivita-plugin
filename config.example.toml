@@ -2,7 +2,11 @@
 # 使用 MaiBot 已有的 planner 模型和人设，无需在此填写密钥。
 [plugin]
 enabled = true
-config_version = "4"
+config_version = "5"
+
+[availability]
+# 减少疲倦、专注时的普通群聊插话；不要同时启用其他写入发言倍率的插件。
+adjust_group_frequency = true
 
 [instance]
 # 留空沿用 Host/适配器允许的全部会话；也可填写精确的会话 ID。

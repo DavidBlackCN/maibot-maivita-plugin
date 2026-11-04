@@ -66,6 +66,9 @@ def decide(snapshot, now):
     if snapshot.get('error'): return snapshot['error']
     if not now < snapshot['valid_until']: return 'SNAPSHOT_EXPIRED'
     if snapshot['life']['sleep_phase'] not in ('awake','winding_down'): return 'LIFE_UNAVAILABLE'
+    participation=snapshot['life'].get('participation')
+    if not isinstance(participation,dict) or participation.get('version')!=1:return 'PARTICIPATION_UNAVAILABLE'
+    if not participation.get('proactive_allowed'):return 'LIFE_FOCUSED_OR_RESTING'
     if snapshot['hush']['health']!='READY': return 'HUSH_UNAVAILABLE'
     if snapshot['hush']['hard']!='NONE' or snapshot['hush']['soft']!='NORMAL': return 'SPEECH_CONSTRAINED'
     if snapshot['identity'].get('ready') is not True: return 'IDENTITY_UNAVAILABLE'

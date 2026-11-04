@@ -37,6 +37,7 @@ class HostDouble:
     def __init__(self):
         self.now=100000.; self.phase='awake'; self.hard='NONE'; self.soft='NORMAL'; self.version=1
         self.persona_digest='a'*64;self.social_revision='a'*64
+        self.multiplier=1.0
         self.api=self; self.llm=self; self.send=SimpleNamespace(text=self.send_text)
         self.events=[event()]; self.sent=[]; self.generated=0; self.change=False; self.timeout=False; self.bad_route=False
         self.send_result={'success':True,'sent':True,'message_id':'test-id'}
@@ -49,7 +50,7 @@ class HostDouble:
     async def call(self,name,version,**args):
         assert version=='1'
         plugin,method=name.rsplit('.',1)
-        if method=='get_integration_contract': return wrap({'contract_version':'1.0.0','host':HOST,'sdk':SDK,'plugin_version':'0.4.1','features':['public_persona_v1','public_events_v1']},True)
+        if method=='get_integration_contract': return wrap({'contract_version':'1.0.0','host':HOST,'sdk':SDK,'plugin_version':'0.10.0','features':['public_persona_v1','public_events_v1','chat_participation_v1']},True)
         if method=='get_contract':
             return wrap({'plugin_id':plugin,'plugin_version':'0.3.1' if plugin==HUSH else '3.1.1',
                 'contract_version':'1.1.0','api_major':'1','features':['public_social_context_v1'],'host':HOST,'sdk':SDK,'ready':True})
@@ -59,6 +60,8 @@ class HostDouble:
         if method=='get_engine_status': return wrap({'ready':True,'engine':'life'},True)
         if method=='get_life_state':
             value=wrap({'character_id':'default','sleep_phase':self.phase,'state_version':self.version,'plan_version':0,'next_deadline_at':None})
+            value['result']['data']['participation']={'version':1,'multiplier':self.multiplier,'proactive_allowed':self.multiplier>.3,
+                'cooldown_factor':2 if self.multiplier==.6 else 1,'valid_until':datetime.fromtimestamp(self.now+30,timezone.utc).isoformat()}
             value['result']['as_of']=datetime.fromtimestamp(self.now,timezone.utc).isoformat(); return value
         if method=='get_public_constraints': return wrap({'stream_id':'stream','route_fingerprint':'wrong' if self.bad_route else route().hush_fingerprint(),
             'hard':self.hard,'soft':self.soft,'health':'READY','state_version':1,'config_revision':1,'as_of':self.now,'valid_until':self.now+5})

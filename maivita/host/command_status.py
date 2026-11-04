@@ -47,7 +47,7 @@ def snapshot(runtime, timezone, stream_id):
     from ..life.planning.conversation import context as conversation_context
     resume=conversation_context(runtime.engine)['resume']
     return {'resume':clean(resume['event']) if resume else None, 'phase':state.sleep_phase,
-            'body':{key:getattr(state,key) for key in ('energy','fatigue','stress')},
+            'body':{key:getattr(state,key) for key in ('energy','fatigue','stress','sleepiness')},
             'next_check_seconds':max(0,int(runtime.config.scheduler.decision_interval_minutes*60-
                 (runtime.engine.clock.monotonic()-runtime.last_segment_check))) if runtime.last_segment_check is not None else 0,
             'body_warnings':[(field,getattr(state,field)) for field in ('energy','fatigue','stress')
@@ -107,14 +107,14 @@ def render_status(data, hush=None):
     if 'availability' in data:
         state=data['availability']
         behavior='忙闲守卫已开启' if data['availability_enabled'] else '忙闲守卫已关闭'
-        if state=='slow': behavior+='；专注时仍可正常回复，不延迟或补发'
+        if state=='slow': behavior+='；专注不等于禁言，不延迟或补发'
         lines.insert(1,f'状态：{state}（{LABELS[state]}）| 原因：{data["availability_reason"]} | {behavior}')
     if data.get('body_warnings'):
-        labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}
+        labels={'energy':'精力','fatigue':'疲劳','stress':'压力','sleepiness':'困意'}
         values='、'.join(f'{labels[field]} {value:.2f}' for field,value in data['body_warnings'])
         lines.append('⚠ 身体数值异常：'+values+'（请检查活动历史或测试数据）')
     if data.get('body'):
-        labels={'energy':'精力','fatigue':'疲劳','stress':'压力'}
+        labels={'energy':'精力','fatigue':'疲劳','stress':'压力','sleepiness':'困意'}
         lines.append('身体估计：'+' / '.join(labels[k]+' '+('未知' if v is None else f'{v:.1f}') for k,v in data['body'].items())+
             f'；下次检查约 {data.get("next_check_seconds",0)} 秒后')
     if data.get('resume'):
@@ -126,4 +126,7 @@ async def status_text(plugin, stream_id):
     runtime=plugin.runtime
     timezone=plugin.active_config.instance.timezone
     hush=await hush_reason(plugin.ctx,stream_id)
-    return render_status(snapshot(runtime,timezone,stream_id),hush)
+    text=render_status(snapshot(runtime,timezone,stream_id),hush)
+    participation=runtime.queries.get_participation()
+    enabled=plugin.active_config.availability.adjust_group_frequency
+    return text+'\n普通群聊：'+(f'生活倍率 ×{participation["multiplier"]}；{plugin.frequency.status}' if enabled and plugin.frequency else '生活调频已关闭')

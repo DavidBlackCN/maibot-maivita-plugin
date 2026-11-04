@@ -28,7 +28,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
             raise AssertionError('unexpected SDK side effect '+cap)
         self.ctx=PluginContext('davidblackcn.maibot-maivita-plugin',rpc_call=rpc,
                                paths=PluginPaths(self.work/'data',self.work/'runtime'))
-        self.config={'plugin':{'enabled':True,'config_version':'4'},
+        self.config={'plugin':{'enabled':True,'config_version':'5'},
             'instance':{'writer_lock':str(self.work/'writer.lock'),
                         'allowed_streams':['test-stream']}}
 
@@ -53,7 +53,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(descriptor['owner_auth']['enabled'])
 
     async def test_default_install_lock_scope_sleep_and_reload(self):
-        plugin=self.plugin({'plugin':{'config_version':'4'}})
+        plugin=self.plugin({'plugin':{'config_version':'5'}})
         await plugin.on_load()
         self.assertTrue(plugin.ready)
         self.assertEqual(plugin.config.instance.writer_lock,'')
@@ -64,7 +64,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         from types import SimpleNamespace
         with patch.object(plugin.delegate.runtime.engine,'state',return_value=SimpleNamespace(sleep_phase='sleeping')):
             self.assertEqual((await plugin.delegate.silence_hook(message={'session_id':'another-session'}))['action'],'abort')
-        second=self.plugin({'plugin':{'config_version':'4'}})
+        second=self.plugin({'plugin':{'config_version':'5'}})
         with self.assertRaisesRegex(RuntimeError,'another life writer'): await second.on_load()
         await plugin.on_config_update('self',plugin.config.model_dump(),2)
         self.assertTrue(plugin.ready)

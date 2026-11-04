@@ -27,7 +27,13 @@ class SchedulerConfig:
 def validate_segment(payload, config=None, *, current=None):
     require(isinstance(payload, Mapping), 'segment must be an object')
     required = {'event', 'location', 'emotion', 'minutes', 'continue'}
-    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate', 'sleep', 'pause_for_chat'}, 'invalid segment fields')
+    require(required <= set(payload) <= required | {'resumes_activity_id', 'category', 'energy_rate', 'sleep', 'pause_for_chat', 'reflection'}, 'invalid segment fields')
+    if 'reflection' in payload:
+        reflection=payload['reflection']
+        require(isinstance(reflection, Mapping) and set(reflection) <= {'details','next_step'}, 'invalid reflection')
+        details=reflection.get('details',[])
+        require(isinstance(details,(list,tuple)) and len(details)<=2 and all(isinstance(s,str) and 0<len(s.strip())<=160 for s in details), 'invalid details')
+        require(isinstance(reflection.get('next_step',''),str) and len(reflection.get('next_step',''))<=160, 'invalid next step')
     # Old saved candidates remain readable. New candidates use categories only.
     category = payload.get('category', 'rest' if payload.get('energy_rate', 0) > 0 else 'other')
     require(category in ('rest','study','work','entertainment','daily_life','social','travel','creative','other'), 'invalid activity category')

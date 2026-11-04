@@ -169,6 +169,11 @@ SEGMENT_CONTRACT = {
         '\n- continue=true 不改变当前睡眠状态，sleep 可省略；睡眠只能依既有唤醒规则结束。'
         '\n- continue=true 时 event/location/emotion 可留空'
         '\n- category：rest|study|work|entertainment|daily_life|social|travel|creative|other。身体变化由固定类别规则计算，不输出变化速率。'
+        '\n- 困意是独立的模拟估计；困意较高时认真考虑睡眠，休息不等同睡眠。'
+        '\n- 可选 reflection={"details":["短细节"],"next_step":"下次想继续什么"}，仅回顾 current 已持续至少15分钟的活动。'
+        'details 最多两条、每条最多160字，next_step最多160字；没有合适内容时省略。'
+        '这是角色模拟细节，不是外部事实，禁止声称真实群友行动、查询天气、联网阅读或完成真实作品。'
+        '不要给下一段尚未发生的活动编写回顾；已有 reflection 不重新改写。continuing 是可参考的跨日打算，不必每次执行。'
     ),
     'example': {'event': '在家读小说', 'location': '家里的沙发', 'emotion': '放松', 'minutes': 45, 'continue': False, 'category': 'rest', 'sleep': False}
 }
@@ -195,11 +200,15 @@ class SDKModelPort:
         self.ctx,self.settings,self.context=ctx,settings,context
         self.routine=routine or RoutineSettings()
         self.last={'status':'not_called'}
+        from .calendar import Calendar
+        self.calendar=Calendar(ctx)
+        self.record_usage=None
 
     async def __call__(self,state,triggers,*,task_kind='present'):
         if task_kind not in ('planning','present','segment'): raise DomainError('unknown model task')
         started=time.monotonic()
         context={**self.context(),'routine':self.routine.model_dump(exclude={'initialize_body_state'})}
+        context['calendar']=await self.calendar.get(context['now'],context.get('character_timezone','Asia/Shanghai'))
         if task_kind == 'segment' and context.get('segment'):
             conversation = context['segment']['conversation']
             invitation = conversation.get('invitation')
@@ -261,6 +270,8 @@ class SDKModelPort:
             proposal=validate_task_candidate(parse_candidate(response.get('response'), task_kind=task_kind),task_kind)
             self.last={'status':'candidate_validated','model_name':str(response.get('model_name',response.get('model','')))[:128],
                 'task_name':self.settings.task if self.settings.mode=='task' else '','elapsed_seconds':round(time.monotonic()-started,3)}
+            usage=response.get('usage')
+            self.last['tokens']={k:v for k,v in usage.items() if k in ('prompt_tokens','completion_tokens','total_tokens') and type(v) is int and v>=0} if isinstance(usage,dict) else None
             return proposal
         except asyncio.CancelledError:
             self.last={'status':'cancelled_unknown_outcome'}; raise
@@ -268,3 +279,7 @@ class SDKModelPort:
             self.last={'status':'unavailable_unknown_outcome'}; raise
         except Exception:
             self.last={'status':'invalid_response'}; raise
+        finally:
+            self.last['elapsed_seconds']=round(time.monotonic()-started,3)
+            if self.record_usage:
+                self.record_usage(task_kind,context['now'],self.last)

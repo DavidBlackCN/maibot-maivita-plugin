@@ -2,7 +2,7 @@
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
-from maibot_sdk import API, MaiBotPlugin
+from maibot_sdk import API, MaiBotPlugin, HomeCard
 from .activation import EngineAuthority
 from .config import stream_allowed
 from .integration_config import IntegrationConfig
@@ -59,6 +59,11 @@ class MaiVitaPlugin(MaiBotPlugin):
     def get_components(self):
         delegate = self._select()
         own = super().get_components()
+        from .home_card import content
+        try: context=self.ctx
+        except RuntimeError: context=None  # SDK metadata discovery can precede context binding.
+        for component in own:
+            if component['type']=='HOME_CARD':component['metadata']['content']=content(context)
         own_names = {component['name'] for component in own}
         components = [component for component in delegate.get_components() if component['name'] not in own_names]
         self.handler_types = {c['metadata'].get('handler_name', c['name']): c['type'] for c in components}
@@ -150,6 +155,26 @@ class MaiVitaPlugin(MaiBotPlugin):
         return {'api_version': 1, 'ready': live, 'engine': 'life',
                 'authority': public_authority, 'failure_code': self.failure_code or getattr(self.delegate, 'failure_code', None),
                 'production_switch': False}
+
+    @HomeCard('maivita_home',title='MaiVita · 此刻生活',content='打开生活页面查看活动、心情与睡眠。',
+              link_url='/extensions/davidblackcn.maibot-maivita-plugin/now',link_label='查看生活')
+    async def home_card(self):
+        return None
+
+    @API('ui_snapshot',public=False,version='1')
+    async def ui_snapshot(self):
+        if not self.ready or not self.delegate.ready:raise ValueError('生活服务未就绪')
+        return self.delegate.web.snapshot()
+
+    @API('ui_action',public=False,version='1')
+    async def ui_action(self,action,request_id,minutes=30,activity_id=''):
+        if not self.ready or not self.delegate.ready:raise ValueError('生活服务未就绪')
+        return self.delegate.web.submit(action,request_id,minutes,activity_id)
+
+    @API('get_chat_participation',public=True,version='1')
+    async def get_chat_participation(self):
+        if not self.ready or not self.delegate.ready:return self.unavailable('NOT_READY')
+        return {'api_version':1,'ok':True,'data':self.delegate.runtime.queries.get_participation(),'error':None}
 
     @API('get_integration_contract', public=True, version='1')
     async def get_integration_contract(self, **kwargs):

@@ -1,69 +1,143 @@
 {
   "schema_version": 2,
   "required_capabilities": [
-    "declarative_basic"
+    "custom_pages"
   ],
   "pages": [
     {
-      "id": "status",
-      "title": "MaiVita integration status",
-      "mode": "declarative",
-      "description": "Public state only. Privileged writes and Owner Auth are unavailable.",
+      "id": "now",
+      "title": "此刻生活",
+      "mode": "custom",
+      "entry": "webui/life.html",
       "queries": {
-        "state": {
-          "api": "get_life_state"
-        },
-        "plan": {
-          "api": "get_plan"
-        },
-        "availability": {
-          "api": "get_availability"
-        },
-        "diagnostics": {
-          "api": "get_diagnostics"
-        },
-        "legacy": {
-          "api": "get_current_activity"
-        },
-        "engine": {
-          "api": "get_engine_status"
-        },
-        "contracts": {
-          "api": "get_integration_contract"
+        "overview": {
+          "api": "ui_snapshot"
         }
       },
       "actions": {
-        "denied_replan": {
-          "api": "request_replan"
-        },
-        "denied_wake": {
-          "api": "request_wakeup"
+        "manage": {
+          "api": "ui_action",
+          "parameters": {
+            "action": {
+              "type": "string",
+              "required": true,
+              "choices": [
+                "replan",
+                "plan",
+                "sleep",
+                "wake",
+                "end_note",
+                "abandon_note"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 80
+            },
+            "minutes": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 720
+            },
+            "activity_id": {
+              "type": "string",
+              "max_length": 80
+            }
+          },
+          "confirmation": "确定调整生活状态吗？模型操作将占用今日生活额度。"
+        }
+      }
+    },
+    {
+      "id": "history",
+      "title": "今日与最近",
+      "mode": "custom",
+      "entry": "webui/life.html",
+      "queries": {
+        "overview": {
+          "api": "ui_snapshot"
         }
       },
-      "content": [
-        {
-          "type": "text",
-          "value": "Isolated integration candidate; privileged writes remain disabled."
-        },
-        {
-          "type": "text",
-          "label": "Sleep phase",
-          "value": {
-            "scope": "query",
-            "source": "state",
-            "field": "data.sleep_phase"
-          }
-        },
-        {
-          "type": "text",
-          "label": "State version",
-          "value": {
-            "scope": "query",
-            "source": "state",
-            "field": "state_version"
-          }
+      "actions": {
+        "manage": {
+          "api": "ui_action",
+          "parameters": {
+            "action": {
+              "type": "string",
+              "required": true,
+              "choices": [
+                "replan",
+                "plan",
+                "sleep",
+                "wake",
+                "end_note",
+                "abandon_note"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 80
+            },
+            "minutes": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 720
+            },
+            "activity_id": {
+              "type": "string",
+              "max_length": 80
+            }
+          },
+          "confirmation": "确定调整生活状态吗？模型操作将占用今日生活额度。"
         }
-      ]
+      }
+    },
+    {
+      "id": "runtime",
+      "title": "设置与运行",
+      "mode": "custom",
+      "entry": "webui/life.html",
+      "queries": {
+        "overview": {
+          "api": "ui_snapshot"
+        }
+      },
+      "actions": {
+        "manage": {
+          "api": "ui_action",
+          "parameters": {
+            "action": {
+              "type": "string",
+              "required": true,
+              "choices": [
+                "replan",
+                "plan",
+                "sleep",
+                "wake",
+                "end_note",
+                "abandon_note"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 80
+            },
+            "minutes": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 720
+            },
+            "activity_id": {
+              "type": "string",
+              "max_length": 80
+            }
+          },
+          "confirmation": "确定调整生活状态吗？模型操作将占用今日生活额度。"
+        }
+      }
     }
   ]
 }

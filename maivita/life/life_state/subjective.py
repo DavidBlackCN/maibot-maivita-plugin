@@ -51,7 +51,7 @@ def sleep_debt(segments, *, now, timezone, observed_since, need_minutes=480, obs
 
 def advance(u, state, now, payload):
     require(now >= state.last_advanced_at, 'advance clock regressed')
-    for field in ('energy', 'fatigue', 'stress'):
+    for field in ('energy', 'fatigue', 'stress', 'sleepiness'):
         current = getattr(state, field)
         reason = body_value_warning(field, current)
         if reason:
@@ -68,7 +68,7 @@ def advance(u, state, now, payload):
     if cutover:
         from ..domain.clock import from_epoch_ms
         start=max(start,from_epoch_ms(cutover[0]))
-    delta=[0.0,0.0,0.0]
+    delta=[0.0,0.0,0.0,0.0]
     activities=[a for a in u.activities.for_character(state.character_id) if a.role=='primary']
     segments=u.segments.for_character(state.character_id)
     sleeping_starts={(s.session_id,s.started_at) for s in segments if s.kind=='sleep'}
@@ -82,9 +82,12 @@ def advance(u, state, now, payload):
         sleeping=(actual.sleep_session_id,actual.started_at) in sleeping_starts
         demanding=actual.category in ('study','work','travel','creative')
         rates=(8,-5,-3) if sleeping else (3,-2,-1) if actual.category=='rest' else (-3,2,0.8) if demanding else (-1,1,-1)
+        # 16 observed waking hours add 80; eight sleeping hours remove 80.
+        # Rest is still awake. Gaps above have already been excluded.
+        rates=(*rates, -10 if sleeping else 5)
         for index,rate in enumerate(rates): delta[index]+=hours*rate
     values = {}
-    for field, change in zip(('energy','fatigue','stress'), delta):
+    for field, change in zip(('energy','fatigue','stress','sleepiness'), delta):
         current = getattr(state, field)
         if not math.isfinite(change) or abs(change) > 50:
             logger.warning('body_state anomaly character_id=%s field=%s current=%s delta=%s reason=abnormal_delta',

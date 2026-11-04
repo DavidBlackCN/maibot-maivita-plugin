@@ -100,7 +100,7 @@ class GuardTests(unittest.IsolatedAsyncioTestCase):
 
     async def load(self, **availability):
         config = self.plugin.config.model_dump()
-        config['availability'] = {'enabled':True, **availability}
+        config['availability'] = {'enabled':True, 'adjust_group_frequency':False, **availability}
         self.plugin.set_plugin_config(config)
         await self.plugin.on_load()
 

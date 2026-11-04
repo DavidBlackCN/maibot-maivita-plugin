@@ -287,7 +287,8 @@ class SegmentMigrationTests(unittest.TestCase):
                 spec=SPECS['states']
                 state=LifeState(updated_at=clock.now_utc(), last_advanced_at=clock.now_utc(), primary_activity_id='old-activity')
                 conn.execute('BEGIN')
-                conn.execute(f"INSERT INTO life_state ({','.join(spec.columns)}) VALUES ({','.join('?' for _ in spec.columns)})",spec.encode(state))
+                old_values=[(k,v) for k,v in zip(spec.columns,spec.encode(state)) if k!='sleepiness']
+                conn.execute(f"INSERT INTO life_state ({','.join(k for k,v in old_values)}) VALUES ({','.join('?' for _ in old_values)})",[v for k,v in old_values])
                 conn.execute("INSERT INTO activities VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     ('old-activity','default','旧活动',to_epoch_ms(clock.now_utc()),'model','rest','primary','',
                      None,'active',None,None,None,None,None,'public_summary'))
@@ -303,7 +304,7 @@ class SegmentMigrationTests(unittest.TestCase):
                     self.assertEqual(columns[field][4],default)
                 self.assertFalse(conn.execute("SELECT 1 FROM sqlite_master WHERE name='life_segments'").fetchone())
                 self.assertEqual(migrate(conn,clock,migrations()[:5]),5)
-                self.assertEqual(migrate(conn,clock),8)
+                self.assertEqual(migrate(conn,clock),9)
             database=LifeDatabase(path,clock=clock)
             with database.read_view() as u:
                 old=u.activities.get('old-activity')

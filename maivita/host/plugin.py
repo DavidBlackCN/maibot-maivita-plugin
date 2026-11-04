@@ -32,6 +32,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         from .conversation import ConversationObserver
         self.conversation = ConversationObserver(self)
         self.ready=False; self.failure_code=None
+        self.frequency=None; self.frequency_worker=None; self.web=None
         self.startup_result={'status':'not_requested'}; self.guarded_streams=()
 
     def normalize_plugin_config(self,config_data):
@@ -70,6 +71,16 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
                 scheduler=cfg.scheduler.runtime_config(),availability=cfg.availability.runtime_config()),
                 lock_path=data/'runtime-writer.lock')
             self.runtime.start()
+            def record_usage(task_kind,started,last):
+                from uuid import uuid4
+                from ..life.domain.clock import to_epoch_ms
+                with db.unit_of_work() as u:
+                    u.connection.execute('INSERT INTO model_usage VALUES(?,?,?,?,?,?)',
+                        (uuid4().hex,task_kind,to_epoch_ms(started),last['elapsed_seconds'],last['status'],
+                         json.dumps(last['tokens']) if last.get('tokens') else None))
+                    u.connection.execute('DELETE FROM model_usage WHERE started_at_ms<?',(to_epoch_ms(started)-30*86400000,))
+                    u.commit()
+            self.model_port.record_usage=record_usage
             state=self.runtime.engine.state()
             if self.runtime.config.initialize_body_state and state.energy is None:
                 self.runtime.engine.execute(LifeCommand(kind='advance',
@@ -83,6 +94,11 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
             if self.worker.done(): await self.worker
             self.worker.add_done_callback(self._worker_stopped)
             self.ready=True; self.failure_code=None
+            from .frequency import LifeFrequency
+            from .webui import LifeWebUI
+            self.frequency=LifeFrequency(self)
+            self.frequency_worker=asyncio.create_task(self.frequency.run(),name='maivita-frequency')
+            self.web=LifeWebUI(self)
             if cfg.model.generate_on_start and not cfg.model.daily_planning_enabled:
                 self.startup=asyncio.create_task(self.runtime.request_replan('i1-configured-startup'),name='maivita-i1-startup')
                 self.startup.add_done_callback(self._startup_stopped)
@@ -107,6 +123,11 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         self.ready=False
         self.conversation.pending.clear()
         try:
+            if self.web is not None: await self.web.close(); self.web=None
+            if self.frequency_worker is not None:
+                self.frequency_worker.cancel(); await asyncio.gather(self.frequency_worker,return_exceptions=True)
+            if self.frequency is not None: await self.frequency.close()
+            self.frequency=None; self.frequency_worker=None
             if self.startup is not None:
                 self.startup.cancel(); await asyncio.gather(self.startup,return_exceptions=True)
             if self.runtime is not None: await self.runtime.close()
@@ -139,7 +160,7 @@ class MaiVitaDevelopmentPlugin(MaiBotPlugin):
         result=await self.api.call(method,trusted_context=None)
         if method=='get_diagnostics' and result['ok']:
             result['data'].update({'entry':'life','host_contract':'/'.join(str(v) for v in runtime_pair()),
-                'frequency':'disabled_unsupported','owner_auth':'disabled_no_contract',
+                'frequency':self.frequency.status if self.frequency else '未启动','owner_auth':'disabled_no_contract',
                 'privileged_writes':'denied_no_trusted_user_context','trusted_receipts':'no_silence_exception',
                 'model':self.model_port.last,'startup_decision':self.startup_result,'local_management':'official_command_with_confirmation','first_install_gate':'see_source_bound_delivery_evidence'})
         return result

@@ -16,6 +16,9 @@ from ..domain.segment import validate_segment
 def apply_segment(engine, u, state, command, now):
     current = u.activities.get(state.primary_activity_id) if state.primary_activity_id else None
     p = validate_segment(command.payload, engine.scheduler, current=current)
+    from .details import record, expire
+    record(u,current,p.get('reflection'),now)
+    expire(u,now)
     deadline = now + timedelta(minutes=p['minutes'])
     if p['continue']:
         require(current is not None, 'no segment to continue')
@@ -71,7 +74,7 @@ def apply_segment(engine, u, state, command, now):
             category=previous.category if previous else 'rest' if sleeping else p['category'],
             visibility=previous.visibility if previous else 'public_summary',
             resumes_activity_id=resume, sleep_session_id=session_id,
-            location=p['location'], emotion=p['emotion'], energy_rate=0.0))
+            location=p['location'], emotion=p['emotion'] or (current.emotion if current and current.visibility=='public_summary' else ''), energy_rate=0.0))
         state = replace(state, primary_activity_id=activity_id, secondary_activity_ids=(),
             sleep_phase='sleeping' if sleeping else 'awake', active_sleep_session_id=session_id,
             awake_since_at=None if sleeping else state.awake_since_at or now)
@@ -95,6 +98,17 @@ class SegmentService:
                                        (state.primary_activity_id,)).fetchone()
         if row is None or to_epoch_ms(engine.clock.now_utc()) >= row[0]:
             return True, 'segment_due'
+        if state.sleepiness is not None and state.sleepiness>=80:
+            # Retry a sustained sleepy state at most hourly, not every poll.
+            with engine.database.read_view() as u:
+                last=u.connection.execute("SELECT max(created_at_ms) FROM decision_triggers WHERE kind='sleepiness_threshold'").fetchone()[0]
+            now=engine.clock.now_utc()
+            if last is None or to_epoch_ms(now)-last>=3600000:
+                with engine.database.unit_of_work() as u:
+                    u.connection.execute('INSERT INTO decision_triggers VALUES(?,?,?,?,1)',
+                        ('sleepiness:'+uuid4().hex,state.character_id,'sleepiness_threshold',to_epoch_ms(now)))
+                    u.commit()
+                return True,'sleepiness_threshold'
         if current.category!='rest' and ((state.fatigue is not None and state.fatigue >= 80) or (state.energy is not None and state.energy <= 20)):
             return True, 'body_threshold'
         return False, 'continue'
@@ -116,10 +130,11 @@ class SegmentService:
         from .conversation import context as conversation_context
         return {'conversation': conversation_context(engine), 'as_of': facts['as_of'],
                 'current': ({'event': current['name'], 'location': current['location'], 'emotion': current['emotion'],
+                    'reflection':current.get('reflection'),
                     'elapsed_minutes': current['duration_minutes'],
                     'remaining_minutes': max(0, (from_epoch_ms(row[0])-engine.clock.now_utc()).total_seconds()/60) if row else None}
                     if current else None),
-                'body': facts['body'],
+                'body': facts['body'], 'continuing': facts.get('continuing',[]),
                 'recent_history': [brief(a) for a in reversed(facts['history']) if not a['continuity_unknown']],
                 'continuity_unknown': facts['continuity_unknown'],
                 'history_note': '最近24小时的公开活动；结束或切换不证明目标完成。未知区间不补编经历。',

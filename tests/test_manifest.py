@@ -12,11 +12,11 @@ class ManifestTests(unittest.TestCase):
         capabilities = set(manifest.get("capabilities", []))
         self.assertIn("llm.generate", capabilities)
         self.assertNotIn("llm.get_available_models", capabilities)
-        self.assertNotIn("frequency.set_adjust", capabilities)
-        self.assertNotIn("frequency.get_adjust", capabilities)
+        self.assertIn("frequency.set_adjust", capabilities)
+        self.assertIn("frequency.get_adjust", capabilities)
         self.assertNotIn("frequency.get_current_talk_value", capabilities)
         self.assertEqual(capabilities, {'message.get_by_id', 'api.call', 'send.text', 'config.get', 'llm.generate',
-                                        'chat.get_all_streams', 'component.list_loaded_plugins'})
+                                        'chat.get_all_streams', 'component.list_loaded_plugins', 'frequency.get_adjust', 'frequency.set_adjust'})
         self.assertRegex(manifest["version"], r"^\d+\.\d+\.\d+$")
 
 

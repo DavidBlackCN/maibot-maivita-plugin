@@ -17,7 +17,7 @@ from maibot_autonomous_planning_plugin.maivita.life.storage.safety import Writer
 
 
 def settings(work,**model):
-    return {'plugin':{'enabled':True,'config_version':'4'},
+    return {'plugin':{'enabled':True,'config_version':'5'},
         'instance':{'writer_lock':str(work/'instance-writer.lock'),
                     'allowed_streams':['test-stream']},'model':{'daily_planning_enabled':False,**model}}
 

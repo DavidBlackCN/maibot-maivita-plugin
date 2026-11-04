@@ -2,7 +2,7 @@
 
 另有私有 `evaluate_behavior@1` 供配套统一控制 Host 查询受管范围、睡眠和忙闲状态，不调用模型、不修改生活状态。请求仅取自 Host 内部上下文；第三方公开 API 调用及自行传入的参数不能取得发送许可。独立安装时仍使用原发送守卫。
 
-状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 7 和配置 4 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
+状态：冻结 v1 字段保留，特权传输与推送订阅不启用；新增公开拉取接口用于隔离联调。声明 API 为 get_integration_contract@1，生活查询 API envelope 为 api_version=1；数据库 Schema 9 和配置 5 独立版本化。机器形状由 integrations/contracts.py 导出 JSON Schema，未知字段拒绝，重大不兼容变更新增主版本，不静默改变 v1。
 
 兼容范围由 Manifest 声明，接口 host/sdk 返回实际运行版本；已验证组合包含 Host 1.3.19 / SDK 2.21.0、1.3.18 / 2.19.0、1.3.15 / 2.16.0、1.3.12 / 2.15.0。source_stream 投影要求非空匹配来源；活动、计划条目、目标的新命令不再接受 source_stream，因为 schema 4 无可信来源字段。已有行仍可加载并被公开读取过滤；没有批量改公开或数据库迁移。
 
@@ -42,3 +42,9 @@ get_availability@1 保留原有字段，新增 `state`（free/slow/busy）、`re
 默认会话范围：Vita 的空 allowed_streams 表示所有 Host 接入会话，非空仍精确限制；Identity 的空 route_scope 仅匹配消息 scope=None。自动实例标识、自动锁和默认启用均不建立可信调用者身份，不开放 H01/H02/H03 或跨插件特权。
 
 `get_public_life_context@1` 在同一读取视图返回当前公开活动、地点、情绪、睡眠、忙闲、身体估计、查询时间，以及最近 24 小时最多 20 条公开活动。私有活动与聊天不进入素材；连续性未知区间保留标记。活动结束不是目标完成证明。继续活动和身体积分不会重复生成公开活动开始事件。
+
+0.10.0 增加 `body.sleepiness`、活动的 `reflection` 和最多五条 `continuing`。细节来源固定为 `character_simulation`，不作为真实外部事实或完成证明。已记录细节不重写；接续记录超过七天退出活跃列表。
+
+`get_chat_participation@1` 返回只读 v1 状态：`band`、`multiplier`、`reason`、`proactive_allowed`、`cooldown_factor`、`as_of`、`valid_until` 和固定为 false 的 `send_permit`。相同内容也放在生活状态和公开生活素材的 `participation` 中。有效期 30 秒；`paused` 使用现有睡眠／忙闲保护，倍率 1 不是发送许可。
+
+`ui_snapshot@1`、`ui_action@1` 是私有接口，仅用于 Host 认证的 WebUI 绑定。写操作使用请求编号去重，参数冲突拒绝；重启前未完成的操作标为待核对，不自动重放。配置仍由官方插件配置界面管理。

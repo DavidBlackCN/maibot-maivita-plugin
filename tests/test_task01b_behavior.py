@@ -355,7 +355,8 @@ async def actual_status_examples():
                 hard='HARD_SILENT' if phase in ('winding_down','temporarily_awake') else 'NONE',
                 hard_remaining_seconds=125)))
             if phase=='waking': ctx.call_host_method.side_effect=ConnectionError('Hush unavailable')
-            plugin=SimpleNamespace(runtime=runtime,active_config=SimpleNamespace(instance=SimpleNamespace(timezone='Asia/Shanghai')),ctx=ctx)
+            plugin=SimpleNamespace(runtime=runtime,active_config=SimpleNamespace(instance=SimpleNamespace(timezone='Asia/Shanghai'),
+                availability=SimpleNamespace(adjust_group_frequency=False)),ctx=ctx,frequency=None)
             results[phase]=await status_text(plugin,'test-stream')
     return results
 

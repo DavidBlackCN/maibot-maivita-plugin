@@ -35,7 +35,7 @@ class Coordinator:
             raise Unavailable('CONTRACT_VERSION_UNSUPPORTED')
         for value in (vita,hush,identity):
             if (value.get('host'),value.get('sdk'))!=(HOST,SDK): raise Unavailable('BASELINE_MISMATCH')
-        if not {'public_persona_v1','public_events_v1'}<=set(vita.get('features',[])):raise Unavailable('VITA_FEATURE_UNSUPPORTED')
+        if not {'public_persona_v1','public_events_v1','chat_participation_v1'}<=set(vita.get('features',[])):raise Unavailable('VITA_FEATURE_UNSUPPORTED')
         if identity.get('plugin_id')!=IDENTITY: raise Unavailable('IDENTITY_PLUGIN_MISMATCH')
         if 'public_social_context_v1' not in identity.get('features',[]):raise Unavailable('IDENTITY_FEATURE_UNSUPPORTED')
 
@@ -69,6 +69,13 @@ class Coordinator:
             if life.get('character_id')!=route.character_id: raise Unavailable('CHARACTER_MISMATCH')
             if life.get('sleep_phase') not in ('awake','winding_down','sleeping','temporarily_awake','waking'):
                 raise Unavailable('LIFE_STATE_UNKNOWN')
+            participation=life.get('participation')
+            if (type(participation) is not dict or participation.get('version')!=1
+                    or participation.get('multiplier') not in (1.0,0.6,0.3)
+                    or type(participation.get('proactive_allowed')) is not bool
+                    or participation.get('cooldown_factor') not in (1,2)
+                    or instant(participation.get('valid_until'))<=self.wall()):
+                raise Unavailable('PARTICIPATION_UNAVAILABLE')
             if hush.get('health') not in ('READY','DEGRADED') or hush.get('hard') not in ('NONE','HARD_SILENT') or hush.get('soft') not in ('NORMAL','RESTRAINED','SOFT_SILENT','RECOVERING'):
                 raise Unavailable('HUSH_STATE_UNKNOWN')
             for value in (life.get('state_version'),life.get('plan_version'),hush.get('state_version'),hush.get('config_revision')):
@@ -128,12 +135,16 @@ class Coordinator:
         if snapshot['life']['state_version']<event.state_version: finish('cancelled','EVENT_AHEAD_OF_STATE',basis); return
         cooldown=self.store.conn.execute('SELECT until_at FROM cooldown WHERE route=?',(route.route_id,)).fetchone()
         if cooldown and self.wall()<cooldown[0]: finish('cancelled','COOLDOWN',basis); return
+        factor=snapshot['life']['participation']['cooldown_factor']
+        if self.wall()<self.store.get('last_attempt:'+route.route_id,0)+self.settings.cooldown_seconds*factor:
+            finish('cancelled','LIFE_COOLDOWN',basis); return
         if self.settings.mode=='shadow': finish('shadow','WOULD_GENERATE_AND_RECHECK',basis); return
         # Bound model spending even when generation fails or the state changes.
         # A failed/ambiguous attempt never refunds this persistent reservation.
         with self.store.conn:
+            self.store.put('last_attempt:'+route.route_id,self.wall())
             self.store.conn.execute('INSERT OR REPLACE INTO cooldown VALUES(?,?)',
-                (route.route_id,self.wall()+self.settings.cooldown_seconds))
+                (route.route_id,self.wall()+self.settings.cooldown_seconds*factor))
         finish('preparing','GENERATING',basis)
         try:
             # Fixed intent; no untrusted event payload or private records in prompt.
@@ -152,7 +163,7 @@ class Coordinator:
             # Commit before external effect. Reserve cooldown even on unknown
             # outcome; neither a timeout nor a restart can refund it.
             with self.store.conn:
-                self.store.conn.execute('INSERT OR REPLACE INTO cooldown VALUES(?,?)',(route.route_id,self.wall()+self.settings.cooldown_seconds))
+                self.store.conn.execute('INSERT OR REPLACE INTO cooldown VALUES(?,?)',(route.route_id,self.wall()+self.settings.cooldown_seconds*factor))
                 self.store.conn.execute("UPDATE actions SET status='executing',reason='SEND_ATTEMPT',attempt=?,updated=? WHERE event_id=? AND route=?",(attempt,self.wall(),event_id,route.route_id))
             result=await asyncio.wait_for(self.ctx.send.text(text.strip(),route.stream_id,return_details=True),10)
             outcome=result.get('behavior_state') if type(result) is dict else None

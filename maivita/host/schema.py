@@ -13,6 +13,7 @@ HIDDEN = {
 SECTIONS = {'plugin': '插件', 'instance': '会话与时区', 'model': '生活背景与调用额度',
             'routine': '作息偏好', 'scheduler': '高级：活动检查', 'availability': '高级：专注与休息'}
 LABELS = {
+    'adjust_group_frequency':'生活状态影响群聊参与程度',
     'enabled': '启用', 'allowed_streams': '作用会话（留空沿用宿主范围）', 'timezone': '角色时区',
     'daily_budget': '每日生活模型调用上限', 'life_context': '补充生活背景（可留空）',
     'daily_planning_enabled': '生成每日参考计划', 'daily_planning_time': '每日参考计划时间',

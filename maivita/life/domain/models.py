@@ -212,6 +212,7 @@ class LifeState:
     energy: float | None = None
     fatigue: float | None = None
     stress: float | None = None
+    sleepiness: float | None = None
     sleep_debt_minutes: float | None = None
     sleep_history_coverage_days: int = 0
     provenance: str = "bootstrap_unknown"
@@ -224,7 +225,7 @@ class LifeState:
         require(self.last_advanced_at <= self.updated_at, "advance watermark cannot exceed observation")
         for value in (self.last_wake_at, self.awake_since_at):
             require(value is None or value <= self.updated_at, "future observation is invalid")
-        for value in (self.energy, self.fatigue, self.stress):
+        for value in (self.energy, self.fatigue, self.stress, self.sleepiness):
             if value is not None:
                 number(value, 0, 100)
         if self.sleep_debt_minutes is not None:
